@@ -1,0 +1,31 @@
+#!/bin/bash -e
+
+# ensure that we have the required dependencies installed
+for dep in gofmt gofumpt goimports sponge; do
+    if ! type -t $dep > /dev/null; then
+        echo "Error: '$dep' is not installed" 1>&2
+        exit 1
+    fi
+done
+
+# only modify currently staged Go files
+staged_go_files=$(git diff --cached --name-only --diff-filter=d | grep -E '\.*\.go$' || true)
+
+# we didn't edit any Go files in this commit
+if [[ ${staged_go_files} == "" ]]; then
+    exit 0
+fi
+
+# run gofmt with the simplify flag (this is one of the checks the build bot runs)
+gofmt -s -w ${staged_go_files}
+
+# run gofumpt with the extra rules flag
+gofumpt -s -w --extra ${staged_go_files}
+
+# run goimports to ensure that imports are sorted correctly
+env GOOS="darwin" goimports -w ${staged_go_files}
+env GOOS="linux" goimports -w ${staged_go_files}
+env GOOS="windows" goimports -w ${staged_go_files}
+
+# we are safe to re-add any files that were modified
+git add ${staged_go_files}

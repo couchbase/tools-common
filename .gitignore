@@ -1,0 +1,5 @@
+# JetBrains workspace configuration
+.idea/
+
+# gerrit git hooks
+.githooks/commit-msg
