@@ -45,8 +45,8 @@ func TestGetIntEnvVar(t *testing.T) {
 
 			val, ok := GetInt(test.envName)
 
-			require.Equal(t, ok, test.expectedBool)
-			require.Equal(t, val, test.expectedVal)
+			require.Equal(t, test.expectedBool, ok)
+			require.Equal(t, test.expectedVal, val)
 		})
 	}
 }
@@ -88,8 +88,8 @@ func TestGetUint64EnvVar(t *testing.T) {
 
 			val, ok := GetUint64(test.envName)
 
-			require.Equal(t, ok, test.expectedBool)
-			require.Equal(t, val, test.expectedVal)
+			require.Equal(t, test.expectedBool, ok)
+			require.Equal(t, test.expectedVal, val)
 		})
 	}
 }
@@ -143,8 +143,8 @@ func TestGetBoolEnvVar(t *testing.T) {
 
 			out, ok := GetBool(test.envName)
 
-			require.Equal(t, ok, test.expectedBool)
-			require.Equal(t, out, test.expectedValue)
+			require.Equal(t, test.expectedBool, ok)
+			require.Equal(t, test.expectedValue, out)
 		})
 	}
 }
@@ -196,8 +196,8 @@ func TestGetDurationEnvVar(t *testing.T) {
 
 			out, ok := GetDuration(test.envName)
 
-			require.Equal(t, ok, test.expectedBool)
-			require.Equal(t, out, test.expectedDuration)
+			require.Equal(t, test.expectedBool, ok)
+			require.Equal(t, test.expectedDuration, out)
 		})
 	}
 }

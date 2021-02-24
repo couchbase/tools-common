@@ -36,7 +36,7 @@ func TestSumFloat64(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := SumFloat64(test.s)
-			require.Equal(t, actual, test.expected)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }

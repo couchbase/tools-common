@@ -49,7 +49,7 @@ func TestContainsString(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsString(test.s, test.e)
-			require.Equal(t, actual, test.expected)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
@@ -97,7 +97,7 @@ func TestContainsInt(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsInt(test.s, test.e)
-			require.Equal(t, actual, test.expected)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
@@ -145,7 +145,7 @@ func TestContainsUint16(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsUint16(test.s, test.e)
-			require.Equal(t, actual, test.expected)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
