@@ -1,4 +1,4 @@
-package env
+package envvar
 
 import (
 	"os"
@@ -43,7 +43,7 @@ func TestGetIntEnvVar(t *testing.T) {
 
 			defer os.Unsetenv(test.envName)
 
-			val, ok := GetIntEnvVar(test.envName)
+			val, ok := GetInt(test.envName)
 
 			require.Equal(t, ok, test.expectedBool)
 			require.Equal(t, val, test.expectedVal)
@@ -86,7 +86,7 @@ func TestGetUint64EnvVar(t *testing.T) {
 
 			defer os.Unsetenv(test.envName)
 
-			val, ok := GetUint64EnvVar(test.envName)
+			val, ok := GetUint64(test.envName)
 
 			require.Equal(t, ok, test.expectedBool)
 			require.Equal(t, val, test.expectedVal)
@@ -141,7 +141,7 @@ func TestGetBoolEnvVar(t *testing.T) {
 			err := os.Setenv(test.envName, test.value)
 			require.Nil(t, err)
 
-			out, ok := GetBoolEnvVar(test.envName)
+			out, ok := GetBool(test.envName)
 
 			require.Equal(t, ok, test.expectedBool)
 			require.Equal(t, out, test.expectedValue)
@@ -194,7 +194,7 @@ func TestGetDurationEnvVar(t *testing.T) {
 			err := os.Setenv(test.envName, test.value)
 			require.Nil(t, err)
 
-			out, ok := GetDurationEnvVar(test.envName)
+			out, ok := GetDuration(test.envName)
 
 			require.Equal(t, ok, test.expectedBool)
 			require.Equal(t, out, test.expectedDuration)
