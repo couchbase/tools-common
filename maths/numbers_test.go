@@ -3,7 +3,7 @@ package maths
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMaxUint64(t *testing.T) {
@@ -38,7 +38,7 @@ func TestMaxUint64(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := MaxUint64(tc.a, tc.b)
-			assert.Equal(t, actual, tc.expected)
+			require.Equal(t, actual, tc.expected)
 		})
 	}
 }
@@ -81,7 +81,7 @@ func TestMax(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := Max(tc.a, tc.b)
-			assert.Equal(t, actual, tc.expected)
+			require.Equal(t, actual, tc.expected)
 		})
 	}
 }
@@ -118,7 +118,7 @@ func TestMinUint64(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := MinUint64(tc.a, tc.b)
-			assert.Equal(t, actual, tc.expected)
+			require.Equal(t, actual, tc.expected)
 		})
 	}
 }
@@ -161,7 +161,7 @@ func TestMin(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := Min(tc.a, tc.b)
-			assert.Equal(t, actual, tc.expected)
+			require.Equal(t, actual, tc.expected)
 		})
 	}
 }

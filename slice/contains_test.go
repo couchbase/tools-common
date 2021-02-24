@@ -3,7 +3,7 @@ package slice
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContainsString(t *testing.T) {
@@ -49,7 +49,7 @@ func TestContainsString(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsString(test.s, test.e)
-			assert.Equal(t, actual, test.expected)
+			require.Equal(t, actual, test.expected)
 		})
 	}
 }
@@ -97,7 +97,7 @@ func TestContainsInt(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsInt(test.s, test.e)
-			assert.Equal(t, actual, test.expected)
+			require.Equal(t, actual, test.expected)
 		})
 	}
 }
@@ -145,7 +145,7 @@ func TestContainsUint16(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsUint16(test.s, test.e)
-			assert.Equal(t, actual, test.expected)
+			require.Equal(t, actual, test.expected)
 		})
 	}
 }

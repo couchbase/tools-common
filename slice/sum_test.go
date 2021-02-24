@@ -3,7 +3,7 @@ package slice
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSumFloat64(t *testing.T) {
@@ -36,7 +36,7 @@ func TestSumFloat64(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := SumFloat64(test.s)
-			assert.Equal(t, actual, test.expected)
+			require.Equal(t, actual, test.expected)
 		})
 	}
 }

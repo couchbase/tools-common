@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBytes(t *testing.T) {
@@ -109,7 +109,7 @@ func TestBytes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := Bytes(test.input)
-			assert.Equal(t, actual, test.expected)
+			require.Equal(t, actual, test.expected)
 		})
 	}
 }
@@ -134,7 +134,7 @@ func TestDuration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.input.String(), func(t *testing.T) {
 			actual := Duration(test.input)
-			assert.Equal(t, actual, test.expected)
+			require.Equal(t, actual, test.expected)
 		})
 	}
 }

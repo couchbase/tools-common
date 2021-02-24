@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetIntEnvVar(t *testing.T) {
@@ -39,14 +39,14 @@ func TestGetIntEnvVar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := os.Setenv(test.envName, test.envValue)
-			assert.Nil(t, err)
+			require.Nil(t, err)
 
 			defer os.Unsetenv(test.envName)
 
 			val, ok := GetIntEnvVar(test.envName)
 
-			assert.Equal(t, ok, test.expectedBool)
-			assert.Equal(t, val, test.expectedVal)
+			require.Equal(t, ok, test.expectedBool)
+			require.Equal(t, val, test.expectedVal)
 		})
 	}
 }
@@ -82,14 +82,14 @@ func TestGetUint64EnvVar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := os.Setenv(test.envName, test.envValue)
-			assert.Nil(t, err)
+			require.Nil(t, err)
 
 			defer os.Unsetenv(test.envName)
 
 			val, ok := GetUint64EnvVar(test.envName)
 
-			assert.Equal(t, ok, test.expectedBool)
-			assert.Equal(t, val, test.expectedVal)
+			require.Equal(t, ok, test.expectedBool)
+			require.Equal(t, val, test.expectedVal)
 		})
 	}
 }
@@ -139,12 +139,12 @@ func TestGetBoolEnvVar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := os.Setenv(test.envName, test.value)
-			assert.Nil(t, err)
+			require.Nil(t, err)
 
 			out, ok := GetBoolEnvVar(test.envName)
 
-			assert.Equal(t, ok, test.expectedBool)
-			assert.Equal(t, out, test.expectedValue)
+			require.Equal(t, ok, test.expectedBool)
+			require.Equal(t, out, test.expectedValue)
 		})
 	}
 }
@@ -192,12 +192,12 @@ func TestGetDurationEnvVar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := os.Setenv(test.envName, test.value)
-			assert.Nil(t, err)
+			require.Nil(t, err)
 
 			out, ok := GetDurationEnvVar(test.envName)
 
-			assert.Equal(t, ok, test.expectedBool)
-			assert.Equal(t, out, test.expectedDuration)
+			require.Equal(t, ok, test.expectedBool)
+			require.Equal(t, out, test.expectedDuration)
 		})
 	}
 }
