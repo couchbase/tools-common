@@ -1,6 +1,10 @@
 package slice
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestSumFloat64(t *testing.T) {
 	type test struct {
@@ -32,9 +36,7 @@ func TestSumFloat64(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := SumFloat64(test.s)
-			if actual != test.expected {
-				t.Fail()
-			}
+			assert.Equal(t, actual, test.expected)
 		})
 	}
 }

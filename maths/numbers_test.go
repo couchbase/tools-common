@@ -1,6 +1,10 @@
 package maths
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestMaxUint64(t *testing.T) {
 	type testCase struct {
@@ -33,9 +37,8 @@ func TestMaxUint64(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if out := MaxUint64(tc.a, tc.b); out != tc.expected {
-				t.Fatalf("Expected %d got %d", tc.expected, out)
-			}
+			actual := MaxUint64(tc.a, tc.b)
+			assert.Equal(t, actual, tc.expected)
 		})
 	}
 }
@@ -77,9 +80,8 @@ func TestMax(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if out := Max(tc.a, tc.b); out != tc.expected {
-				t.Fatalf("Expected %d got %d", tc.expected, out)
-			}
+			actual := Max(tc.a, tc.b)
+			assert.Equal(t, actual, tc.expected)
 		})
 	}
 }
@@ -115,9 +117,8 @@ func TestMinUint64(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if out := MinUint64(tc.a, tc.b); out != tc.expected {
-				t.Fatalf("Expected %d got %d", tc.expected, out)
-			}
+			actual := MinUint64(tc.a, tc.b)
+			assert.Equal(t, actual, tc.expected)
 		})
 	}
 }
@@ -159,9 +160,8 @@ func TestMin(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if out := Min(tc.a, tc.b); out != tc.expected {
-				t.Fatalf("Expected %d got %d", tc.expected, out)
-			}
+			actual := Min(tc.a, tc.b)
+			assert.Equal(t, actual, tc.expected)
 		})
 	}
 }

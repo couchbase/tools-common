@@ -3,55 +3,114 @@ package format
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBytes(t *testing.T) {
-	inputs := []uint64{
-		0,                                        // lower byte range
-		500,                                      // mid byte range
-		1023,                                     // high byte range
-		1024,                                     // kb range
-		1024 + 100,                               // mid kb range
-		1024*1024 - 1024,                         // high kb range
-		1024 * 1024,                              // low MB range
-		1024*1024 + 1024*500,                     // mid MB range
-		1024*1024*1024 - 1024*100,                // high MB range
-		1024 * 1024 * 1024,                       // low gb range
-		1024*1024*1024*2 + 1024*1024*100,         // mid gb range
-		1024*1024*1024*1024 - 1024*1024*100,      // high gb range
-		1024 * 1024 * 1024 * 1024,                // low Tb range
-		1024*1024*1024*1024 + 1024*1024*1024*100, // mid tb range
-		1024*1024*1024*1024*1024 - 1024*1024*1024*100,           // high TB range
-		1024 * 1024 * 1024 * 1024 * 1024,                        // low PB range
-		1024*1024*1024*1024*1024 + 1024*1024*1024*1024*500,      // mid PB range
-		1024*1024*1024*1024*1024*1024 - 1024*1024*1024*1024*500, // high PB range
+	type test struct {
+		name     string
+		input    uint64
+		expected string
 	}
 
-	outputs := []string{
-		"0B",
-		"500B",
-		"1023B",
-		"1.00KiB",
-		"1.10KiB",
-		"1023.00KiB",
-		"1.00MiB",
-		"1.49MiB",
-		"1023.90MiB",
-		"1.00GiB",
-		"2.10GiB",
-		"1023.90GiB",
-		"1.00TiB",
-		"1.10TiB",
-		"1023.90TiB",
-		"1.00PiB",
-		"1.49PiB",
-		"1023.51PiB",
+	tests := []*test{
+		{
+			name:     "LowerByteRange",
+			expected: "0B",
+		},
+		{
+			name:     "MidByteRange",
+			input:    500,
+			expected: "500B",
+		},
+		{
+			name:     "HighByteRange",
+			input:    1023,
+			expected: "1023B",
+		},
+		{
+			name:     "LowKiBRange",
+			input:    1024,
+			expected: "1.00KiB",
+		},
+		{
+			name:     "MidKiBRange",
+			input:    1024 + 100,
+			expected: "1.10KiB",
+		},
+		{
+			name:     "HighKiBRange",
+			input:    1024*1024 - 1024,
+			expected: "1023.00KiB",
+		},
+		{
+			name:     "LowMiBRange",
+			input:    1024 * 1024,
+			expected: "1.00MiB",
+		},
+		{
+			name:     "MidMiBRange",
+			input:    1024*1024 + 1024*500,
+			expected: "1.49MiB",
+		},
+		{
+			name:     "HighMiBRange",
+			input:    1024*1024*1024 - 1024*100,
+			expected: "1023.90MiB",
+		},
+		{
+			name:     "LowGiBRange",
+			input:    1024 * 1024 * 1024,
+			expected: "1.00GiB",
+		},
+		{
+			name:     "MidGiBRange",
+			input:    1024*1024*1024*2 + 1024*1024*100,
+			expected: "2.10GiB",
+		},
+		{
+			name:     "HighGiBRange",
+			input:    1024*1024*1024*1024 - 1024*1024*100,
+			expected: "1023.90GiB",
+		},
+		{
+			name:     "LowTiBRange",
+			input:    1024 * 1024 * 1024 * 1024,
+			expected: "1.00TiB",
+		},
+		{
+			name:     "MidTiBRange",
+			input:    1024*1024*1024*1024 + 1024*1024*1024*100,
+			expected: "1.10TiB",
+		},
+		{
+			name:     "HighTiBRange",
+			input:    1024*1024*1024*1024*1024 - 1024*1024*1024*100,
+			expected: "1023.90TiB",
+		},
+		{
+			name:     "LowPiBRange",
+			input:    1024 * 1024 * 1024 * 1024 * 1024,
+			expected: "1.00PiB",
+		},
+		{
+			name:     "MidPiBRange",
+			input:    1024*1024*1024*1024*1024 + 1024*1024*1024*1024*500,
+			expected: "1.49PiB",
+		},
+		{
+			name:     "HighPiBRange",
+			input:    1024*1024*1024*1024*1024*1024 - 1024*1024*1024*1024*500,
+			expected: "1023.51PiB",
+		},
 	}
 
-	for ix := range outputs {
-		if out := Bytes(inputs[ix]); out != outputs[ix] {
-			t.Fatalf("Expected %s got %s", outputs[ix], out)
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := Bytes(test.input)
+			assert.Equal(t, actual, test.expected)
+		})
 	}
 }
 
@@ -75,9 +134,7 @@ func TestDuration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.input.String(), func(t *testing.T) {
 			actual := Duration(test.input)
-			if actual != test.expected {
-				t.Fatalf("Expected %s but got %s", test.expected, actual)
-			}
+			assert.Equal(t, actual, test.expected)
 		})
 	}
 }

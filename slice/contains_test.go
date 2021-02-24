@@ -1,6 +1,10 @@
 package slice
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestContainsString(t *testing.T) {
 	type test struct {
@@ -45,9 +49,7 @@ func TestContainsString(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsString(test.s, test.e)
-			if actual != test.expected {
-				t.Fail()
-			}
+			assert.Equal(t, actual, test.expected)
 		})
 	}
 }
@@ -95,9 +97,7 @@ func TestContainsInt(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsInt(test.s, test.e)
-			if actual != test.expected {
-				t.Fail()
-			}
+			assert.Equal(t, actual, test.expected)
 		})
 	}
 }
@@ -145,9 +145,7 @@ func TestContainsUint16(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ContainsUint16(test.s, test.e)
-			if actual != test.expected {
-				t.Fail()
-			}
+			assert.Equal(t, actual, test.expected)
 		})
 	}
 }
