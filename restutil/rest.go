@@ -3,6 +3,7 @@ package restutil
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -65,4 +66,22 @@ func MarshalAndSend(status int, data interface{}, w http.ResponseWriter, errLog 
 	}
 
 	SendJSONResponse(status, rawData, w, errLog)
+}
+
+// DecodeJSONRequestBody tries to decode the body as JSON. If it fails it will send a 400 response and return false.
+// Otherwise it will return true and decode the body into dest.
+func DecodeJSONRequestBody(body io.ReadCloser, dest interface{}, w http.ResponseWriter) bool {
+	defer body.Close()
+
+	if err := json.NewDecoder(body).Decode(dest); err != nil {
+		HandleErrorWithExtras(ErrorResponse{
+			Status: http.StatusBadRequest,
+			Msg:    "invalid request body",
+			Extras: err.Error(),
+		}, w, nil)
+
+		return false
+	}
+
+	return true
 }

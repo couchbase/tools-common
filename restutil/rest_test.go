@@ -1,6 +1,7 @@
 package restutil
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -213,4 +214,25 @@ func TestMarshalAndSendResponse(t *testing.T) {
 			require.NotZero(t, errResponse.Msg)
 		})
 	}
+}
+
+func TestDecodeJSONRequestBody(t *testing.T) {
+	t.Run("invalidJSON", func(t *testing.T) {
+		responseRecoder := httptest.NewRecorder()
+		var dest map[string]int
+		require.False(t, DecodeJSONRequestBody(io.NopCloser(bytes.NewReader([]byte(`{"x":1`))), &dest, responseRecoder))
+		require.Equal(t, http.StatusBadRequest, responseRecoder.Code)
+
+		var errResponse ErrorResponse
+		require.NoError(t, json.NewDecoder(responseRecoder.Body).Decode(&errResponse))
+		require.Equal(t, "invalid request body", errResponse.Msg)
+		require.Equal(t, http.StatusBadRequest, errResponse.Status)
+	})
+
+	t.Run("validJSON", func(t *testing.T) {
+		var dest map[string]int
+		require.True(t, DecodeJSONRequestBody(io.NopCloser(bytes.NewReader([]byte(`{"x":1}`))), &dest,
+			httptest.NewRecorder()))
+		require.Equal(t, map[string]int{"x": 1}, dest)
+	})
 }
