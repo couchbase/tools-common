@@ -39,14 +39,21 @@ const (
 	VersionLatest = Version7_0_0
 )
 
-// Newer returns a boolean indicating whether the currently version is newer than the provided version.
+// Older returns a boolean indicating whether the current version is older than the provided version.
+//
+// NOTE: The unknown version is a special case and is treated as the latest version.
+func (v Version) Older(other Version) bool {
+	return v.compare(other) < 0
+}
+
+// Newer returns a boolean indicating whether the current version is newer than the provided version.
 //
 // NOTE: The unknown version is a special case and is treated as the latest version.
 func (v Version) Newer(other Version) bool {
 	return v.compare(other) > 0
 }
 
-// AtLeast returns a boolean indicating whether the currently version is higher than or equal to the provided version.
+// AtLeast returns a boolean indicating whether the current version is higher than or equal to the provided version.
 //
 // NOTE: The unknown version is a special case and is treated as the latest version.
 func (v Version) AtLeast(other Version) bool {

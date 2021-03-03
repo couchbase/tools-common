@@ -6,6 +6,59 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestVersionOlder(t *testing.T) {
+	type testCase struct {
+		name     string
+		first    Version
+		second   Version
+		expected bool
+	}
+
+	tests := []testCase{
+		{
+			name:   "SameVersion",
+			first:  Version5_0_0,
+			second: Version5_0_0,
+		},
+		{
+			name:     "5.0.0ToUnknown",
+			first:    Version5_0_0,
+			second:   VersionUnknown,
+			expected: true,
+		},
+		{
+			name:   "UnknownTo5.0.0",
+			first:  VersionUnknown,
+			second: Version5_0_0,
+		},
+		{
+			name:   "UnknownTo7.0.0",
+			first:  VersionUnknown,
+			second: Version7_0_0,
+		},
+		{
+			name:   "UnknownToUnknown",
+			first:  VersionUnknown,
+			second: VersionUnknown,
+		},
+		{
+			name:     "5.0.0ToEmpty",
+			first:    Version5_0_0,
+			expected: true,
+		},
+		{
+			name:   "EmptyTo5.0.0",
+			second: Version5_0_0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, tc.first.Older(tc.second))
+		})
+	}
+}
+
 func TestVersionNewer(t *testing.T) {
 	type testCase struct {
 		name     string
