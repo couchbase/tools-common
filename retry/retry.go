@@ -5,8 +5,12 @@ import (
 	"time"
 )
 
+// LogFn is is a readability wrapper around the function which can be passed to retry functions to allow logging prior
+// to each retry.
 type LogFn func(attempt int)
 
+// ExponentialWithContext retries the provided function an constrained number of times, backing off exponentially
+// between each failure.
 func ExponentialWithContext(ctx context.Context, maxRetries int, wait time.Duration, fn func() error, log LogFn) error {
 	var err error
 
