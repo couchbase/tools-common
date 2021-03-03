@@ -69,3 +69,22 @@ func GetDuration(varName string) (time.Duration, bool) {
 
 	return duration, true
 }
+
+// GetDurationBC returns the time.Duration value of the environmental variable varName if the env var is empty or not a
+// valid duration string it will return 0, false.
+//
+// NOTE: This is the backwards compatible variant of 'GetDuration' meaning when failing to parse a duration, it will
+// fallback to parsing an integer number of seconds.
+func GetDurationBC(varName string) (time.Duration, bool) {
+	duration, ok := GetDuration(varName)
+	if ok {
+		return duration, true
+	}
+
+	raw, ok := GetInt(varName)
+	if ok {
+		return time.Duration(raw) * time.Second, true
+	}
+
+	return 0, false
+}
