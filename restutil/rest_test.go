@@ -135,3 +135,82 @@ func TestHandleErrorWithExtras(t *testing.T) {
 		})
 	}
 }
+
+func TestMarshalAndSendResponse(t *testing.T) {
+	var (
+		errorOccurred error
+		statusCode    int
+		data          interface{}
+	)
+
+	errLog := func(err error) {
+		errorOccurred = err
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		MarshalAndSend(statusCode, data, w, errLog)
+	}))
+	defer testServer.Close()
+
+	type testCase struct {
+		name       string
+		statusCode int
+		data       interface{}
+		expected   []byte
+	}
+
+	cases := []testCase{
+		{
+			name:       "OKNilData",
+			statusCode: http.StatusOK,
+			expected:   []byte{},
+		},
+		{
+			name:       "OKEmptyArray",
+			statusCode: http.StatusOK,
+			data:       []int{},
+			expected:   []byte(`[]`),
+		},
+		{
+			name:       "OKWithBody",
+			statusCode: http.StatusOK,
+			data:       []int{1, 2, 3},
+			expected:   []byte(`[1,2,3]`),
+		},
+		{
+			name:       "cannotMarshall",
+			statusCode: http.StatusInternalServerError,
+			data:       json.RawMessage(`{"x":0`),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			errorOccurred = nil
+			statusCode = tc.statusCode
+			data = tc.data
+
+			res, err := http.Get(testServer.URL + "/")
+			require.NoError(t, err)
+			require.NoError(t, errorOccurred)
+
+			defer res.Body.Close()
+
+			require.Equal(t, tc.statusCode, res.StatusCode)
+			require.Equal(t, "application/json", res.Header.Get("Content-Type"))
+
+			body, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+
+			if tc.statusCode == http.StatusOK {
+				require.Equal(t, tc.expected, body)
+				return
+			}
+
+			var errResponse ErrorResponse
+			require.NoError(t, json.Unmarshal(body, &errResponse))
+			require.Equal(t, tc.statusCode, errResponse.Status)
+			require.NotZero(t, errResponse.Msg)
+		})
+	}
+}

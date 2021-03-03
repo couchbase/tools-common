@@ -41,3 +41,28 @@ func SendJSONResponse(status int, data []byte, w http.ResponseWriter, errLog Err
 		errLog(fmt.Errorf("could not write response: %v", err))
 	}
 }
+
+// MarshalAndSend will try and marshal the given interface, if it fails it will write an ErrorResponse to the client
+// with status 500 and a message saying that the response could not be marshaled. Otherwise it will send the marshaled
+// content.
+func MarshalAndSend(status int, data interface{}, w http.ResponseWriter, errLog ErrLogFn) {
+	var (
+		rawData []byte
+		err     error
+	)
+
+	if data != nil {
+		rawData, err = json.Marshal(data)
+		if err != nil {
+			HandleErrorWithExtras(ErrorResponse{
+				Status: http.StatusInternalServerError,
+				Msg:    "could not marshal response",
+				Extras: err.Error(),
+			}, w, errLog)
+
+			return
+		}
+	}
+
+	SendJSONResponse(status, rawData, w, errLog)
+}
