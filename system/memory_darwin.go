@@ -7,8 +7,8 @@ import (
 	"strconv"
 )
 
-// TotalMemory returns the total physical memory available on the host machine in bytes.
-func TotalMemory() (uint64, error) {
+// totalMemory returns the total physical memory available on the host machine in bytes.
+func totalMemory() (uint64, error) {
 	output, err := exec.Command("sysctl", "hw.memsize").CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("failed to run 'sysctl hw.memsize': %s", output)

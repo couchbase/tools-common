@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// TotalMemory returns the total physical memory available on the host machine in bytes.
-func TotalMemory() (uint64, error) {
+// totalMemory returns the total physical memory available on the host machine in bytes.
+func totalMemory() (uint64, error) {
 	meminfo, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, fmt.Errorf("failed to read '/proc/meminfo': %w", err)

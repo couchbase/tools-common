@@ -7,8 +7,8 @@ import (
 	"strconv"
 )
 
-// TotalMemory returns the total physical memory available on the host machine in bytes.
-func TotalMemory() (uint64, error) {
+// totalMemory returns the total physical memory available on the host machine in bytes.
+func totalMemory() (uint64, error) {
 	output, err := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory")
 	if err != nil {
 		return 0, fmt.Errorf("failed to run 'wmic computersystem get TotalPhysicalMemory': %s", output)
