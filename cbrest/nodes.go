@@ -8,6 +8,16 @@ import (
 // Nodes is a wrapper around a slice of nodes which allows custom unmarshalling.
 type Nodes []*Node
 
+// Copy returns a deep copy of the slice of nodes.
+func (n Nodes) Copy() Nodes {
+	nodes := make(Nodes, 0, len(n))
+	for _, node := range n {
+		nodes = append(nodes, node.Copy())
+	}
+
+	return nodes
+}
+
 // UnmarshalJSON implements the JSON unmarshaler interface for a slice of nodes.
 func (n *Nodes) UnmarshalJSON(data []byte) error {
 	type overlay struct {
@@ -33,8 +43,27 @@ type Node struct {
 	AlternateAddresses *AlternateAddresses `json:"alternateAddresses,omitempty"`
 }
 
-// GetHostname returns the fully qualified hostname to this node whilst honoring whether to use ssl or alternative
-// addressing.
+// Copy returns a deep copy of the the node.
+func (n *Node) Copy() *Node {
+	var services Services
+	if n.Services != nil {
+		services = *n.Services
+	}
+
+	var alternateAddresses AlternateAddresses
+	if n.AlternateAddresses != nil {
+		alternateAddresses = *n.AlternateAddresses
+	}
+
+	return &Node{
+		Hostname:           n.Hostname,
+		Services:           &services,
+		AlternateAddresses: &alternateAddresses,
+	}
+}
+
+// GetHostname returns the fully qualified hostname to this node whilst honoring whether to use ssl or
+// alternative addressing.
 //
 // NOTE: Will return an empty string if there are no valid ports/addresses that we can use against this node.
 func (n *Node) GetHostname(service Service, useSSL, useAltAddr bool) string {

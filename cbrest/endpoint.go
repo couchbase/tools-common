@@ -13,14 +13,14 @@ import (
 type Endpoint string
 
 const (
-	// EndpointPools - Root of the 'ns_server' REST API. Used to fetch version information from the cluster.
+	// EndpointPools is the root of the 'ns_server' REST API. Used to fetch version information from the cluster.
 	EndpointPools Endpoint = "/pools"
 
-	// EndpointPoolsDefault - Represents the default cluster (i.e. 'self'). Used for extracting information about the
+	// EndpointPoolsDefault represents the default cluster (i.e. 'self'). Used for extracting information about the
 	// cluster itself.
 	EndpointPoolsDefault Endpoint = "/pools/default"
 
-	// EndpointNodesServices - Used during the bootstrapping process to fetch a list of all the nodes in the cluster.
+	// EndpointNodesServices is used during the bootstrapping process to fetch a list of all the nodes in the cluster.
 	EndpointNodesServices Endpoint = "/pools/default/nodeServices"
 )
 

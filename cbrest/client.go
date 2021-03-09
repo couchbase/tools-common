@@ -202,6 +202,23 @@ func (c *Client) RequestRetries() int {
 	return c.requestRetries
 }
 
+// Nodes returns a copy of the slice of all the nodes in the cluster.
+//
+// NOTE: This function returns a copy because this is the same data structure the client uses to dispatch REST requests.
+func (c *Client) Nodes() Nodes {
+	return c.authProvider.nodes.Copy()
+}
+
+// TLS returns a boolean indicating whether SSL/TLS is currently enabled.
+func (c *Client) TLS() bool {
+	return c.authProvider.resolved.UseSSL
+}
+
+// AltAddr returns a boolean indicating whether alternate addressing is currently enabled.
+func (c *Client) AltAddr() bool {
+	return c.authProvider.useAltAddr
+}
+
 // Execute the given request to completion reading the entire response body whilst honoring request level
 // retries/timeout.
 func (c *Client) Execute(request *Request) (*Response, error) {

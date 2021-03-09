@@ -133,6 +133,51 @@ func TestNodesUnmarshal(t *testing.T) {
 	require.Equal(t, expected, nodes)
 }
 
+func TestNodesCopy(t *testing.T) {
+	expected := Nodes{
+		{
+			Hostname: "172.20.1.1",
+			Services: &Services{Management: 8091},
+			AlternateAddresses: &AlternateAddresses{
+				Hostname: "172.20.1.2",
+				Services: &Services{Management: 8092},
+			},
+		},
+		{
+			Hostname: "172.20.1.1",
+			Services: &Services{Management: 8091},
+			AlternateAddresses: &AlternateAddresses{
+				Hostname: "172.20.1.2",
+				Services: &Services{Management: 8092},
+			},
+		},
+	}
+
+	actual := expected.Copy()
+	require.Equal(t, expected, actual)
+	require.NotSame(t, expected, actual)
+
+	for i := 0; i < len(expected); i++ {
+		require.NotSame(t, expected[i], actual[i])
+	}
+}
+
+func TestNodeCopy(t *testing.T) {
+	expected := &Node{
+		Hostname: "172.20.1.1",
+		Services: &Services{Management: 8091},
+		AlternateAddresses: &AlternateAddresses{
+			Hostname: "172.20.1.2",
+			Services: &Services{Management: 8092},
+		},
+	}
+
+	actual := expected.Copy()
+
+	require.Equal(t, expected, actual)
+	require.NotSame(t, expected, actual)
+}
+
 func TestNodeGetHostname(t *testing.T) {
 	hostnameNode := &Node{
 		Hostname: "hostname",

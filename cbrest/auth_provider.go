@@ -38,8 +38,9 @@ func NewAuthProvider(resolved *connstr.ResolvedConnectionString, username, passw
 }
 
 // GetServiceHost gets the host required to execute a REST request. A service may be provided to indicate that this
-// request needs to be sent to a specific service. By default providing a zero valued service will mean all requests are
-// directed to 8091/18091 i.e. the ns_server management port.
+// request needs to be sent to a specific service.
+//
+// NOTE: The returned string is a fully qualified hostname with scheme and port.
 func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
 	// If we haven't bootstrapped the client yet, return the next bootstrap address
 	if len(a.nodes) == 0 {
@@ -64,6 +65,8 @@ func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
 }
 
 // GetAllServiceHosts gets all the possible hosts for a given service type.
+//
+// NOTE: The returned strings are fully qualified hostnames with schemes and ports.
 func (a *AuthProvider) GetAllServiceHosts(service Service) ([]string, error) {
 	// If we haven't bootstrapped the client yet, return the next bootstrap address. In theory this function should not
 	// be used when bootstrapping; that should be handled by 'GetServiceHost'.
