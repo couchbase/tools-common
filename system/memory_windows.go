@@ -9,7 +9,7 @@ import (
 
 // totalMemory returns the total physical memory available on the host machine in bytes.
 func totalMemory() (uint64, error) {
-	output, err := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory")
+	output, err := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory").CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("failed to run 'wmic computersystem get TotalPhysicalMemory': %s", output)
 	}
