@@ -100,14 +100,14 @@ func IsEndpointNotFound(err error) bool {
 // NOTE: During development its possible to hit this error in the event that the expected status code is set incorrectly
 // and the successful response does not return a body so is therefore something to watch out for.
 type UnexpectedStatusCodeError struct {
-	status   int
+	Status   int
 	method   Method
 	endpoint Endpoint
 	empty    bool
 }
 
 func (e *UnexpectedStatusCodeError) Error() string {
-	msg := fmt.Sprintf("unexpected status code %d for '%s' request to '%s'", e.status, e.method, e.endpoint)
+	msg := fmt.Sprintf("unexpected status code %d for '%s' request to '%s'", e.Status, e.method, e.endpoint)
 	if e.empty {
 		msg += " response body was empty"
 	}

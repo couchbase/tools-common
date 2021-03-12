@@ -270,7 +270,7 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 	}
 
 	return response, &UnexpectedStatusCodeError{
-		status:   response.StatusCode,
+		Status:   response.StatusCode,
 		method:   request.Method,
 		endpoint: request.Endpoint,
 		empty:    resp.ContentLength == 0,
