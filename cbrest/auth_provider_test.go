@@ -111,9 +111,11 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 				},
 				useAltAddr: true,
 				nodes: Nodes{{
-					Hostname:           "localhost",
-					Services:           testServices,
-					AlternateAddresses: &AlternateAddresses{Hostname: "hostname", Services: testAltServices},
+					Hostname: "localhost",
+					Services: testServices,
+					AlternateAddresses: AlternateAddresses{
+						External: &External{Hostname: "hostname", Services: testAltServices},
+					},
 				}},
 			},
 			service:  ServiceManagement,
@@ -131,9 +133,11 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 					{
 						Hostname: "localhost",
 						Services: testServices,
-						AlternateAddresses: &AlternateAddresses{
-							Hostname: "hostname",
-							Services: testAltServices,
+						AlternateAddresses: AlternateAddresses{
+							External: &External{
+								Hostname: "hostname",
+								Services: testAltServices,
+							},
 						},
 					},
 				},
@@ -243,9 +247,11 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 				useAltAddr: true,
 				nodes: Nodes{
 					{
-						Hostname:           "host1",
-						Services:           testServices,
-						AlternateAddresses: &AlternateAddresses{Hostname: "althost1", Services: testAltServices},
+						Hostname: "host1",
+						Services: testServices,
+						AlternateAddresses: AlternateAddresses{
+							External: &External{Hostname: "althost1", Services: testAltServices},
+						},
 					},
 					{
 						Hostname: "host2",

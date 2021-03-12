@@ -150,8 +150,8 @@ func (a *AuthProvider) shouldUseAltAddr(credentials *AuthProvider, nodes Nodes) 
 			return false
 		}
 
-		if node.AlternateAddresses != nil &&
-			node.AlternateAddresses.Hostname == credentials.resolved.Addresses[a.index].Host {
+		if node.AlternateAddresses.External != nil &&
+			node.AlternateAddresses.External.Hostname == credentials.resolved.Addresses[a.index].Host {
 			return true
 		}
 	}

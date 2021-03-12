@@ -443,8 +443,9 @@ func (c *Client) GetNodes() (Nodes, error) {
 		node.Hostname = netutil.ReconstructIPV6(node.Hostname)
 
 		// We do the same for possible ipv6 alternate addresses
-		if node.AlternateAddresses != nil {
-			node.AlternateAddresses.Hostname = netutil.ReconstructIPV6(node.AlternateAddresses.Hostname)
+		if node.AlternateAddresses.External != nil {
+			node.AlternateAddresses.External.Hostname =
+				netutil.ReconstructIPV6(node.AlternateAddresses.External.Hostname)
 		}
 	}
 

@@ -841,9 +841,11 @@ func TestGetNodesReconstructIPV6AlternateAddress(t *testing.T) {
 					Services: &Services{
 						Management: cluster.Port(),
 					},
-					AlternateAddresses: &AlternateAddresses{
-						Hostname: test.expected,
-						Services: &Services{Management: cluster.Port()},
+					AlternateAddresses: AlternateAddresses{
+						External: &External{
+							Hostname: test.expected,
+							Services: &Services{Management: cluster.Port()},
+						},
 					},
 				},
 			}

@@ -55,7 +55,7 @@ var (
 func TestNodesUnmarshal(t *testing.T) {
 	data := `{"rev":41,"nodesExt":[{"services":{"mgmt":8091,"mgmtSSL":18091,"kv":11210,"kvSSL":11207,` +
 		`"capi":8092,"capiSSL":18092,"projector":9999},"thisNode":true,"hostname":"172.20.1.1",` +
-		`"alternateAddresses":{"hostname":"172.20.1.5","ports":{"mgmt":8092,"mgmtSSL":18092}}},` +
+		`"alternateAddresses":{"external": {"hostname":"172.20.1.5","ports":{"mgmt":8092,"mgmtSSL":18092}}}},` +
 		`{"services":{"mgmt":8091,"mgmtSSL":18091,"kv":11210,"kvSSL":11207,"capi":8092,"capiSSL":18092,` +
 		`"projector":9999},"hostname":"172.20.1.2"},{"services":{"mgmt":8091,"mgmtSSL":18091,` +
 		`"kv":11210,"kvSSL":11207,"capi":8092,"capiSSL":18092,"projector":9999},"hostname":"172.20.1.3"},` +
@@ -81,11 +81,13 @@ func TestNodesUnmarshal(t *testing.T) {
 				CAPI:          8092,
 				CAPISSL:       18092,
 			},
-			AlternateAddresses: &AlternateAddresses{
-				Hostname: "172.20.1.5",
-				Services: &Services{
-					Management:    8092,
-					ManagementSSL: 18092,
+			AlternateAddresses: AlternateAddresses{
+				External: &External{
+					Hostname: "172.20.1.5",
+					Services: &Services{
+						Management:    8092,
+						ManagementSSL: 18092,
+					},
 				},
 			},
 		},
@@ -138,17 +140,21 @@ func TestNodesCopy(t *testing.T) {
 		{
 			Hostname: "172.20.1.1",
 			Services: &Services{Management: 8091},
-			AlternateAddresses: &AlternateAddresses{
-				Hostname: "172.20.1.2",
-				Services: &Services{Management: 8092},
+			AlternateAddresses: AlternateAddresses{
+				External: &External{
+					Hostname: "172.20.1.2",
+					Services: &Services{Management: 8092},
+				},
 			},
 		},
 		{
 			Hostname: "172.20.1.1",
 			Services: &Services{Management: 8091},
-			AlternateAddresses: &AlternateAddresses{
-				Hostname: "172.20.1.2",
-				Services: &Services{Management: 8092},
+			AlternateAddresses: AlternateAddresses{
+				External: &External{
+					Hostname: "172.20.1.2",
+					Services: &Services{Management: 8092},
+				},
 			},
 		},
 	}
@@ -166,9 +172,11 @@ func TestNodeCopy(t *testing.T) {
 	expected := &Node{
 		Hostname: "172.20.1.1",
 		Services: &Services{Management: 8091},
-		AlternateAddresses: &AlternateAddresses{
-			Hostname: "172.20.1.2",
-			Services: &Services{Management: 8092},
+		AlternateAddresses: AlternateAddresses{
+			External: &External{
+				Hostname: "172.20.1.2",
+				Services: &Services{Management: 8092},
+			},
 		},
 	}
 
@@ -187,11 +195,13 @@ func TestNodeGetHostname(t *testing.T) {
 			KV:            11210,
 			KVSSL:         11207,
 		},
-		AlternateAddresses: &AlternateAddresses{
-			Hostname: "alternative_hostname",
-			Services: &Services{
-				Management:    8092,
-				ManagementSSL: 18092,
+		AlternateAddresses: AlternateAddresses{
+			External: &External{
+				Hostname: "alternative_hostname",
+				Services: &Services{
+					Management:    8092,
+					ManagementSSL: 18092,
+				},
 			},
 		},
 	}
@@ -204,11 +214,13 @@ func TestNodeGetHostname(t *testing.T) {
 			KV:            11210,
 			KVSSL:         11207,
 		},
-		AlternateAddresses: &AlternateAddresses{
-			Hostname: "172.20.1.5",
-			Services: &Services{
-				Management:    8092,
-				ManagementSSL: 18092,
+		AlternateAddresses: AlternateAddresses{
+			External: &External{
+				Hostname: "172.20.1.5",
+				Services: &Services{
+					Management:    8092,
+					ManagementSSL: 18092,
+				},
 			},
 		},
 	}
@@ -221,11 +233,13 @@ func TestNodeGetHostname(t *testing.T) {
 			KV:            11210,
 			KVSSL:         11207,
 		},
-		AlternateAddresses: &AlternateAddresses{
-			Hostname: "[2001:4860:4860::9999]",
-			Services: &Services{
-				Management:    8092,
-				ManagementSSL: 18092,
+		AlternateAddresses: AlternateAddresses{
+			External: &External{
+				Hostname: "[2001:4860:4860::9999]",
+				Services: &Services{
+					Management:    8092,
+					ManagementSSL: 18092,
+				},
 			},
 		},
 	}
@@ -371,9 +385,10 @@ func TestNodeGetHostname(t *testing.T) {
 	altAddressNode := &Node{
 		Hostname: "hostname",
 		Services: &Services{},
-		AlternateAddresses: &AlternateAddresses{
-			Hostname: "",
-			Services: &Services{},
+		AlternateAddresses: AlternateAddresses{
+			External: &External{
+				Services: &Services{},
+			},
 		},
 	}
 
@@ -383,7 +398,7 @@ func TestNodeGetHostname(t *testing.T) {
 		"Alternate hostname is not populated, expected to get an empty string",
 	)
 
-	altAddressNode.AlternateAddresses = nil
+	altAddressNode.AlternateAddresses.External = nil
 
 	require.Zero(
 		t,

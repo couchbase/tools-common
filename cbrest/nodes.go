@@ -38,9 +38,9 @@ func (n *Nodes) UnmarshalJSON(data []byte) error {
 
 // Node encapsulates the addressing information for a single node in a Couchbase Cluster.
 type Node struct {
-	Hostname           string              `json:"hostname"`
-	Services           *Services           `json:"services"`
-	AlternateAddresses *AlternateAddresses `json:"alternateAddresses,omitempty"`
+	Hostname           string             `json:"hostname"`
+	Services           *Services          `json:"services"`
+	AlternateAddresses AlternateAddresses `json:"alternateAddresses"`
 }
 
 // Copy returns a deep copy of the the node.
@@ -50,15 +50,15 @@ func (n *Node) Copy() *Node {
 		services = *n.Services
 	}
 
-	var alternateAddresses AlternateAddresses
-	if n.AlternateAddresses != nil {
-		alternateAddresses = *n.AlternateAddresses
+	var external External
+	if n.AlternateAddresses.External != nil {
+		external = *n.AlternateAddresses.External
 	}
 
 	return &Node{
 		Hostname:           n.Hostname,
 		Services:           &services,
-		AlternateAddresses: &alternateAddresses,
+		AlternateAddresses: AlternateAddresses{External: &external},
 	}
 }
 
@@ -93,11 +93,11 @@ func (n *Node) hostname(useAltAddr bool) string {
 		return n.Hostname
 	}
 
-	if n.AlternateAddresses == nil {
+	if n.AlternateAddresses.External == nil {
 		return ""
 	}
 
-	return n.AlternateAddresses.Hostname
+	return n.AlternateAddresses.External.Hostname
 }
 
 // port returns the port which will be used to address this node whilst honoring whether to use ssl and alternative
@@ -109,15 +109,20 @@ func (n *Node) port(service Service, useSSL, useAltAddr bool) uint16 {
 		return n.Services.GetPort(service, useSSL, useAltAddr)
 	}
 
-	if n.AlternateAddresses == nil {
+	if n.AlternateAddresses.External == nil {
 		return 0
 	}
 
-	return n.AlternateAddresses.Services.GetPort(service, useSSL, useAltAddr)
+	return n.AlternateAddresses.External.Services.GetPort(service, useSSL, useAltAddr)
 }
 
-// AlternateAddresses is similar to the 'Node' structure but encapsulates all the alternative addressing information.
+// AlternateAddresses represents the 'alternateAddresses' payload sent the 'nodeServices' endpoint.
 type AlternateAddresses struct {
+	External *External `json:"external"`
+}
+
+// External is similar to the 'Node' structure but encapsulates all the alternative addressing information.
+type External struct {
 	Hostname string    `json:"hostname"`
 	Services *Services `json:"ports"`
 }
