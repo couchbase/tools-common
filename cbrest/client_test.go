@@ -139,7 +139,7 @@ func TestNewClientFailedToBootstrapAgainstAnyHost(t *testing.T) {
 	var bootstrapFailure *BootstrapFailureError
 
 	require.ErrorAs(t, err, &bootstrapFailure)
-	require.False(t, bootstrapFailure.unauthorized)
+	require.Nil(t, bootstrapFailure.ErrAuthentication)
 }
 
 func TestNewClientFailedToBootstrapAgainstAnyHostUnauthorized(t *testing.T) {
@@ -161,7 +161,29 @@ func TestNewClientFailedToBootstrapAgainstAnyHostUnauthorized(t *testing.T) {
 	var bootstrapFailure *BootstrapFailureError
 
 	require.ErrorAs(t, err, &bootstrapFailure)
-	require.True(t, bootstrapFailure.unauthorized)
+	require.NotNil(t, bootstrapFailure.ErrAuthentication)
+}
+
+func TestNewClientFailedToBootstrapAgainstAnyHostForbidden(t *testing.T) {
+	handlers := make(TestHandlers)
+
+	handlers.Add(
+		http.MethodGet,
+		string(EndpointNodesServices),
+		NewTestHandler(t, http.StatusForbidden, make([]byte, 0)),
+	)
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	_, err := newTestClient(cluster)
+
+	var bootstrapFailure *BootstrapFailureError
+
+	require.ErrorAs(t, err, &bootstrapFailure)
+	require.NotNil(t, bootstrapFailure.ErrAuthorization)
 }
 
 func TestNewClientAltAddress(t *testing.T) {
@@ -443,7 +465,7 @@ func TestClientExecuteAuthError(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var unauthorized *UnauthorizedError
+	var unauthorized *AuthenticationError
 
 	require.ErrorAs(t, err, &unauthorized)
 }

@@ -106,8 +106,8 @@ func NewClient(options ClientOptions) (*Client, error) {
 	// Attempt to bootstrap the HTTP client, internally the auth provider will return the next available bootstrap host
 	// for successive calls until we run out of possible hosts (at which point we exit having failed to bootstrap).
 	var (
-		errUnauthorized *UnauthorizedError
-		unauthorized    bool
+		errAuthentication *AuthenticationError
+		errAuthorization  *AuthorizationError
 	)
 
 	for {
@@ -125,15 +125,14 @@ func NewClient(options ClientOptions) (*Client, error) {
 		}
 
 		if errors.Is(err, errExhaustedBootstrapHosts) {
-			return nil, &BootstrapFailureError{unauthorized: unauthorized}
+			return nil, &BootstrapFailureError{ErrAuthentication: errAuthentication, ErrAuthorization: errAuthorization}
 		}
 
-		// If we've hit an authorization error, we will continue trying to bootstrap because this node may no longer
-		// be in the cluster, however, we'll slightly modify our possible returned error message to indicate that
+		// If we've hit an authorization/permission error, we will continue trying to bootstrap because this node may no
+		// longer be in the cluster, however, we'll slightly modify our possible returned error message to indicate that
 		// the user should check their credentials are correct.
-		if errors.As(err, &errUnauthorized) {
-			unauthorized = true
-		}
+		errors.As(err, &errAuthentication)
+		errors.As(err, &errAuthorization)
 
 		log.Warnf("(REST) failed to bootstrap client, will retry: %v", err)
 	}
@@ -246,8 +245,24 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 	}
 
 	switch response.StatusCode {
+	case http.StatusForbidden:
+		type overlay struct {
+			Permissions []string `json:"permissions"`
+		}
+
+		var data overlay
+
+		// Purposely ignored as some endpoints may not return the permissions or a body at all. In this case we just set
+		// the permissions in the AuthorizationError to nil.
+		_ = json.NewDecoder(resp.Body).Decode(&data)
+
+		return response, &AuthorizationError{
+			method:      request.Method,
+			endpoint:    request.Endpoint,
+			permissions: data.Permissions,
+		}
 	case http.StatusUnauthorized:
-		return response, &UnauthorizedError{method: request.Method, endpoint: request.Endpoint}
+		return response, &AuthenticationError{method: request.Method, endpoint: request.Endpoint}
 	case http.StatusInternalServerError:
 		return response, &InternalServerError{method: request.Method, endpoint: request.Endpoint}
 	case http.StatusNotFound:

@@ -20,13 +20,16 @@ var (
 //
 // NOTE: The error message varies depending on whether we received at least one 401 when attempting to bootstrap.
 type BootstrapFailureError struct {
-	unauthorized bool
+	ErrAuthentication error
+	ErrAuthorization  error
 }
 
 func (e *BootstrapFailureError) Error() string {
 	msg := "failed to connect to any host(s) from the connection string"
-	if e.unauthorized {
+	if e.ErrAuthentication != nil {
 		msg += ", check username and password"
+	} else if e.ErrAuthorization != nil {
+		msg += ", user does not have the required permissions"
 	} else {
 		msg += ", check the logs for more details"
 	}
@@ -34,14 +37,32 @@ func (e *BootstrapFailureError) Error() string {
 	return msg
 }
 
-// UnauthorizedError is returned if we received a 401 status code from the cluster i.e. the users credentials are
+// AuthorizationError is returned if we receive a 403 status code from the cluster which means the credentials are
+// correct but they don't have the needed permissions.
+type AuthorizationError struct {
+	method      Method
+	endpoint    Endpoint
+	permissions []string
+}
+
+func (e *AuthorizationError) Error() string {
+	if len(e.permissions) == 0 {
+		return fmt.Sprintf("permission error executing '%s' request to '%s', user missing required permissions",
+			e.method, e.endpoint)
+	}
+
+	return fmt.Sprintf("permission error executing '%s' request to '%s' required permissions are %v", e.method,
+		e.endpoint, e.permissions)
+}
+
+// AuthenticationError is returned if we received a 401 status code from the cluster i.e. the users credentials are
 // incorrect.
-type UnauthorizedError struct {
+type AuthenticationError struct {
 	method   Method
 	endpoint Endpoint
 }
 
-func (e *UnauthorizedError) Error() string {
+func (e *AuthenticationError) Error() string {
 	return fmt.Sprintf("authentication error executing '%s' request to '%s' check credentials", e.method, e.endpoint)
 }
 
