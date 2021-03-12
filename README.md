@@ -1,4 +1,5 @@
 # tools-common
+[![Go Reference](https://pkg.go.dev/badge/github.com/couchbase/tools-common.svg)](https://pkg.go.dev/github.com/couchbase/tools-common)
 
 Welcome to `tools-common`. This is package contains various utilities used by the Go code
 maintained by the tools team.
