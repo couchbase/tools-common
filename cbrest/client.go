@@ -433,10 +433,16 @@ func (c *Client) GetNodes() (Nodes, error) {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
+	fallback := c.authProvider.GetFallbackHost()
+
 	for _, node := range nodes {
-		// If the hostname is empty, we use the fallback hostname
-		if node.Hostname == "" {
-			node.Hostname = c.authProvider.GetFallbackHost()
+		// We should only populate the hostname if we're not bootstrapping using the alternate hostname; if we populate
+		// the internal hostname with the external hostname, then the alternate addressing mode won't be triggered. This
+		// could lead to a situtation where we're dispatching requests to the alternate hostname, but using the internal
+		// ports.
+		if node.Hostname == "" &&
+			!(node.AlternateAddresses.External != nil && fallback == node.AlternateAddresses.External.Hostname) {
+			node.Hostname = fallback
 		}
 
 		// We "reconstruct" ipv6 addresses by surrounding them with brackets

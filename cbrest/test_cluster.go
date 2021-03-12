@@ -228,12 +228,12 @@ func (t *TestCluster) createNode(n *TestNode) *Node {
 		node.Hostname = t.Hostname()
 	}
 
-	if n.OverrideHostname != nil && !n.AltAddress {
+	if n.OverrideHostname != nil {
 		node.Hostname = string(n.OverrideHostname)
 	}
 
-	if n.OverrideHostname != nil && n.AltAddress {
-		node.AlternateAddresses.External.Hostname = string(n.OverrideHostname)
+	if n.OverrideAltHostname != nil && node.AlternateAddresses.External != nil {
+		node.AlternateAddresses.External.Hostname = string(n.OverrideAltHostname)
 	}
 
 	return node

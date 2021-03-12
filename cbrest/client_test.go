@@ -747,6 +747,44 @@ func TestGetNodesHostNameEmpty(t *testing.T) {
 	)
 }
 
+func TestGetNodesHostNameEmptyWithAltAddress(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Nodes: TestNodes{
+			{AltAddress: true}, // Node to bootstrap against
+			{OverrideHostname: []byte(""), AltAddress: true},
+		},
+	})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster)
+	require.NoError(t, err)
+
+	nodes, err := client.GetNodes()
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		Nodes{
+			{
+				Hostname: cluster.Hostname(),
+				Services: &Services{Management: cluster.Port()},
+				AlternateAddresses: AlternateAddresses{
+					External: &External{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
+				},
+			},
+			{
+				// NOTE: We are validating that the 'Hostname' field is not set to the alternate hostname which we used
+				// to bootstrap against.
+				Services: &Services{Management: cluster.Port()},
+				AlternateAddresses: AlternateAddresses{
+					External: &External{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
+				},
+			},
+		},
+		nodes,
+	)
+}
+
 func TestGetNodesReconstructIPV6Address(t *testing.T) {
 	type test struct {
 		name     string
@@ -821,8 +859,8 @@ func TestGetNodesReconstructIPV6AlternateAddress(t *testing.T) {
 				Nodes: TestNodes{
 					{}, // Node to bootstrap against
 					{
-						AltAddress:       true,
-						OverrideHostname: []byte(test.address),
+						AltAddress:          true,
+						OverrideAltHostname: []byte(test.address),
 					},
 				},
 			})
