@@ -5,15 +5,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/netutil"
@@ -79,21 +76,10 @@ func NewTestCluster(t *testing.T, options TestClusterOptions) *TestCluster {
 	def(options.Handlers, http.MethodGet, EndpointPoolsDefault, cluster.PoolsDefault)
 	def(options.Handlers, http.MethodGet, EndpointNodesServices, cluster.NodeServices)
 
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", r.Intn(65535-49152)+49152))
-	require.NoError(t, err)
-
-	cluster.server = &httptest.Server{
-		Config:   &http.Server{Handler: http.HandlerFunc(cluster.Handler)},
-		Listener: listener,
-		TLS:      options.TLSConfig,
-	}
-
 	if options.TLSConfig != nil {
-		cluster.server.StartTLS()
+		cluster.server = httptest.NewTLSServer(http.HandlerFunc(cluster.Handler))
 	} else {
-		cluster.server.Start()
+		cluster.server = httptest.NewServer(http.HandlerFunc(cluster.Handler))
 	}
 
 	return cluster
