@@ -11,7 +11,8 @@ import (
 func totalMemory() (uint64, error) {
 	output, err := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory").CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("failed to run 'wmic computersystem get TotalPhysicalMemory': %s", output)
+		return 0, fmt.Errorf("failed to run 'wmic computersystem get TotalPhysicalMemory': %s",
+			formatCommandError(output, err))
 	}
 
 	matches := regexp.MustCompile(`TotalPhysicalMemory\s+(\d+)`).FindStringSubmatch(string(output))

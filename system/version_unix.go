@@ -12,7 +12,7 @@ import (
 func version() (string, error) {
 	output, err := exec.Command("uname", "-r").CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to run 'uname -r': %s", output)
+		return "", fmt.Errorf("failed to run 'uname -r': %s", formatCommandError(output, err))
 	}
 
 	return strings.TrimSpace(string(output)), nil

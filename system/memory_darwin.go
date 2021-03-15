@@ -11,7 +11,7 @@ import (
 func totalMemory() (uint64, error) {
 	output, err := exec.Command("sysctl", "hw.memsize").CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("failed to run 'sysctl hw.memsize': %s", output)
+		return 0, fmt.Errorf("failed to run 'sysctl hw.memsize': %s", formatCommandError(output, err))
 	}
 
 	matches := regexp.MustCompile(`hw\.memsize:\s+(\d+)`).FindStringSubmatch(string(output))
