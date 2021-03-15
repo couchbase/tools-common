@@ -3,14 +3,13 @@ package netutil
 // HostsToConnectionString creates a connection string using the provided hosts. The returned connection string can be
 // used when creating a new REST client or when connecting to a cluster via gocbcore.
 func HostsToConnectionString(hosts []string) string {
-	var connectionString string
+	if len(hosts) == 0 {
+		return ""
+	}
 
-	for index, host := range hosts {
-		if index == 0 {
-			connectionString = host
-		} else {
-			connectionString += "," + TrimSchema(host)
-		}
+	connectionString := hosts[0]
+	for i := 1; i < len(hosts); i++ {
+		connectionString += "," + TrimSchema(hosts[i])
 	}
 
 	return connectionString
