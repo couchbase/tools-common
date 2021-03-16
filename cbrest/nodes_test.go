@@ -90,6 +90,7 @@ func TestNodesUnmarshal(t *testing.T) {
 					},
 				},
 			},
+			BootstrapNode: true,
 		},
 		{
 			Hostname: "172.20.1.2",
@@ -378,7 +379,8 @@ func TestNodeGetHostname(t *testing.T) {
 	for _, test := range tests {
 		name := fmt.Sprintf(`{"service":"%s","use_ssl":%t,"use_alt_addr":%t}`, test.service, test.useSSL, test.useAltAddr)
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, test.expected, test.node.GetHostname(test.service, test.useSSL, test.useAltAddr))
+			hostname, _ := test.node.GetHostname(test.service, test.useSSL, test.useAltAddr)
+			require.Equal(t, test.expected, hostname)
 		})
 	}
 
@@ -392,19 +394,13 @@ func TestNodeGetHostname(t *testing.T) {
 		},
 	}
 
-	require.Zero(
-		t,
-		altAddressNode.GetHostname(ServiceData, false, true),
-		"Alternate hostname is not populated, expected to get an empty string",
-	)
+	hostname, _ := altAddressNode.GetHostname(ServiceData, false, true)
+
+	require.Zero(t, hostname, "Alternate hostname is not populated, expected to get an empty string")
 
 	altAddressNode.AlternateAddresses.External = nil
 
-	require.Zero(
-		t,
-		altAddressNode.GetHostname(ServiceData, false, true),
-		"Alternate hostname is not populated, expected to get an empty string",
-	)
+	require.Zero(t, hostname, "Alternate hostname is not populated, expected to get an empty string")
 }
 
 func TestServicesGetPort(t *testing.T) {

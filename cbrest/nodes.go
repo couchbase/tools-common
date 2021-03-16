@@ -41,6 +41,7 @@ type Node struct {
 	Hostname           string             `json:"hostname"`
 	Services           *Services          `json:"services"`
 	AlternateAddresses AlternateAddresses `json:"alternateAddresses"`
+	BootstrapNode      bool               `json:"thisNode"`
 }
 
 // Copy returns a deep copy of the the node.
@@ -66,7 +67,7 @@ func (n *Node) Copy() *Node {
 // alternative addressing.
 //
 // NOTE: Will return an empty string if there are no valid ports/addresses that we can use against this node.
-func (n *Node) GetHostname(service Service, useSSL, useAltAddr bool) string {
+func (n *Node) GetHostname(service Service, useSSL, useAltAddr bool) (string, bool) {
 	schema := "http"
 	if useSSL {
 		schema = "https"
@@ -74,15 +75,15 @@ func (n *Node) GetHostname(service Service, useSSL, useAltAddr bool) string {
 
 	hostname := n.hostname(useAltAddr)
 	if hostname == "" {
-		return ""
+		return "", n.BootstrapNode
 	}
 
 	port := n.port(service, useSSL, useAltAddr)
 	if port == 0 {
-		return ""
+		return "", n.BootstrapNode
 	}
 
-	return fmt.Sprintf("%s://%s:%d", schema, hostname, port)
+	return fmt.Sprintf("%s://%s:%d", schema, hostname, port), n.BootstrapNode
 }
 
 // hostname returns the hostname which can be used to address this node whilst honoring alternative addressing.

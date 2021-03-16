@@ -14,6 +14,11 @@ var (
 
 	// ErrNodeUninitialized is returned if the user attempts to interact with a node which has not been initialized.
 	ErrNodeUninitialized = errors.New("attempted to connect to an uninitialized node")
+
+	// ErrNotBootstrapped is returned when attempting to retrieve hosts from an auth provider which has not been
+	// bootstrapped; this error shouldn't be returned when using the 'Client' since the constructor performs
+	// bootstrapping.
+	ErrNotBootstrapped = errors.New("auth provider not bootstrapped")
 )
 
 // BootstrapFailureError is returned to the user if we've failed to bootstrap the REST client.

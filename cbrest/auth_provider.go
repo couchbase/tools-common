@@ -52,38 +52,36 @@ func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
 		return host, nil
 	}
 
-	// Search through the nodes in the cluster for an appropriate node to send the request to
-	for _, node := range a.nodes {
-		hostname := node.GetHostname(service, a.resolved.UseSSL, a.useAltAddr)
-		if hostname != "" {
-			return hostname, nil
-		}
+	hosts, err := a.GetAllServiceHosts(service)
+	if err != nil {
+		return "", err // Purposefully not wrapped
 	}
 
-	// We weren't able to find any cluster nodes for the given service, error out
-	return "", &ServiceNotAvailableError{service: service}
+	// If the bootstrap host is running the required service, it will be placed at the beginning of the slice by the
+	// 'GetAllServiceHosts' function; this means we prioritize sending requests to the node which we bootstrapped
+	// against.
+	return hosts[0], nil
 }
 
 // GetAllServiceHosts gets all the possible hosts for a given service type.
 //
 // NOTE: The returned strings are fully qualified hostnames with schemes and ports.
 func (a *AuthProvider) GetAllServiceHosts(service Service) ([]string, error) {
-	// If we haven't bootstrapped the client yet, return the next bootstrap address. In theory this function should not
-	// be used when bootstrapping; that should be handled by 'GetServiceHost'.
 	if len(a.nodes) == 0 {
-		host := a.bootstrapHost()
-		if host == "" {
-			return nil, errExhaustedBootstrapHosts
-		}
-
-		return []string{host}, nil
+		return nil, ErrNotBootstrapped
 	}
 
 	hosts := make([]string, 0)
 
 	for _, node := range a.nodes {
-		hostname := node.GetHostname(service, a.resolved.UseSSL, a.useAltAddr)
-		if hostname != "" {
+		hostname, boostrap := node.GetHostname(service, a.resolved.UseSSL, a.useAltAddr)
+		if hostname == "" {
+			continue
+		}
+
+		if boostrap {
+			hosts = append([]string{hostname}, hosts...)
+		} else {
 			hosts = append(hosts, hostname)
 		}
 	}

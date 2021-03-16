@@ -165,10 +165,11 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 	}
 
 	type test struct {
-		name     string
-		provider *AuthProvider
-		service  Service
-		expected []string
+		name          string
+		provider      *AuthProvider
+		service       Service
+		expected      []string
+		expectedError error
 	}
 
 	tests := []*test{
@@ -179,8 +180,8 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
 			},
-			service:  ServiceManagement,
-			expected: []string{"http://localhost:8091"},
+			service:       ServiceManagement,
+			expectedError: ErrNotBootstrapped,
 		},
 		{
 			name: "UseDefaultHostToBootStrapUseSSL",
@@ -190,8 +191,8 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 					UseSSL:    true,
 				},
 			},
-			service:  ServiceManagement,
-			expected: []string{"https://localhost:18091"},
+			service:       ServiceManagement,
+			expectedError: ErrNotBootstrapped,
 		},
 		{
 			name: "SingleNodeAllServices",
@@ -267,6 +268,11 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.provider.GetAllServiceHosts(test.service)
+			if test.expectedError != nil {
+				require.ErrorIs(t, err, test.expectedError)
+				return
+			}
+
 			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
 		})
@@ -307,6 +313,40 @@ func TestAuthProviderGetHostServiceNotAvailable(t *testing.T) {
 	var errServiceNotAvailable *ServiceNotAvailableError
 
 	require.ErrorAs(t, err, &errServiceNotAvailable)
+}
+
+func TestAuthProviderGetHostServiceShouldUseBootstrapHost(t *testing.T) {
+	t.Run("BootstrapNodeIsRunningService", func(t *testing.T) {
+		provider := &AuthProvider{
+			resolved: &connstr.ResolvedConnectionString{
+				Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
+			},
+			nodes: Nodes{
+				{Hostname: "localhost", Services: &Services{CBAS: 12345}},
+				{Hostname: "bootstrap", Services: &Services{CBAS: 54321}, BootstrapNode: true},
+			},
+		}
+
+		hostname, err := provider.GetServiceHost(ServiceAnalytics)
+		require.NoError(t, err)
+		require.Equal(t, hostname, "http://bootstrap:54321")
+	})
+
+	t.Run("BootstrapNodeNotRunningService", func(t *testing.T) {
+		provider := &AuthProvider{
+			resolved: &connstr.ResolvedConnectionString{
+				Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
+			},
+			nodes: Nodes{
+				{Hostname: "localhost", Services: &Services{CBAS: 12345}},
+				{Hostname: "bootstrap", Services: &Services{}, BootstrapNode: true},
+			},
+		}
+
+		hostname, err := provider.GetServiceHost(ServiceAnalytics)
+		require.NoError(t, err)
+		require.Equal(t, hostname, "http://localhost:12345")
+	})
 }
 
 func TestAuthProviderGetCredentials(t *testing.T) {
