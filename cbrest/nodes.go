@@ -107,14 +107,14 @@ func (n *Node) hostname(useAltAddr bool) string {
 // NOTE: Will return a zero value port if no valid port can be found.
 func (n *Node) port(service Service, useSSL, useAltAddr bool) uint16 {
 	if !useAltAddr {
-		return n.Services.GetPort(service, useSSL, useAltAddr)
+		return n.Services.GetPort(service, useSSL)
 	}
 
 	if n.AlternateAddresses.External == nil {
 		return 0
 	}
 
-	return n.AlternateAddresses.External.Services.GetPort(service, useSSL, useAltAddr)
+	return n.AlternateAddresses.External.Services.GetPort(service, useSSL)
 }
 
 // AlternateAddresses represents the 'alternateAddresses' payload sent the 'nodeServices' endpoint.
@@ -151,10 +151,7 @@ type Services struct {
 }
 
 // GetPort returns the port which a request should be sent to whilst honoring whether to use ssl.
-//
-// NOTE: The 'useAltAddr' is solely used by 'views' because different ports are used when sending REST requests when
-// alternative addressing is enabled.
-func (s *Services) GetPort(service Service, useSSL, useAltAddr bool) uint16 {
+func (s *Services) GetPort(service Service, useSSL bool) uint16 {
 	switch service {
 	case ServiceManagement:
 		if useSSL {
@@ -205,16 +202,8 @@ func (s *Services) GetPort(service Service, useSSL, useAltAddr bool) uint16 {
 			return 0
 		}
 
-		if useSSL && useAltAddr {
-			return s.CAPISSL
-		}
-
 		if useSSL {
 			return s.ManagementSSL
-		}
-
-		if useAltAddr {
-			return s.CAPI
 		}
 
 		return s.Management

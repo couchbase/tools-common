@@ -485,17 +485,6 @@ func TestServicesGetPort(t *testing.T) {
 			expected: 18091,
 		},
 		{
-			service:    ServiceViews,
-			useAltAddr: true,
-			expected:   8092,
-		},
-		{
-			service:    ServiceViews,
-			useSSL:     true,
-			useAltAddr: true,
-			expected:   18092,
-		},
-		{
 			service:  ServiceBackup,
 			expected: 7100,
 		},
@@ -509,7 +498,7 @@ func TestServicesGetPort(t *testing.T) {
 	for _, test := range tests {
 		name := fmt.Sprintf(`{"service":"%s","use_ssl":%t,"use_alt_addr":%t}`, test.service, test.useSSL, test.useAltAddr)
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, test.expected, testServices.GetPort(test.service, test.useSSL, test.useAltAddr))
+			require.Equal(t, test.expected, testServices.GetPort(test.service, test.useSSL))
 		})
 	}
 }
@@ -524,6 +513,6 @@ func TestServicesGetPortViewsRequireDataService(t *testing.T) {
 		CAPISSL:       18092,
 	}
 
-	require.Zero(t, services.GetPort(ServiceViews, false, false))
-	require.Zero(t, services.GetPort(ServiceViews, true, false))
+	require.Zero(t, services.GetPort(ServiceViews, false))
+	require.Zero(t, services.GetPort(ServiceViews, true))
 }
