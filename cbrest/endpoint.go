@@ -20,6 +20,16 @@ const (
 	// cluster itself.
 	EndpointPoolsDefault Endpoint = "/pools/default"
 
+	// EndpointBuckets represents the 'ns_server' endpoint used to interact with the buckets on the cluster.
+	EndpointBuckets Endpoint = "/pools/default/buckets"
+
+	// EndpointBucket represents the endpoint for interacting with a specific named bucket.
+	EndpointBucket Endpoint = "/pools/default/buckets/%s"
+
+	// EndpointBucketManifest represents the bucket collections manifest endpoint, can be used to get/update the
+	// collection manifest for a bucket.
+	EndpointBucketManifest Endpoint = "/pools/default/buckets/%s/scopes"
+
 	// EndpointNodesServices is used during the bootstrapping process to fetch a list of all the nodes in the cluster.
 	EndpointNodesServices Endpoint = "/pools/default/nodeServices"
 )

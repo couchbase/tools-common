@@ -3,17 +3,17 @@ package cbrest
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/netutil"
+	"github.com/couchbase/tools-common/testutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -27,6 +27,8 @@ type TestClusterOptions struct {
 
 	// Used for both the /pools/default and the /pools/default/nodeServices endpoint
 	Nodes TestNodes
+
+	Buckets TestBuckets
 
 	// Additional handler functions which are run to handle a REST request dispatched to the cluster
 	Handlers TestHandlers
@@ -62,19 +64,25 @@ func NewTestCluster(t *testing.T, options TestClusterOptions) *TestCluster {
 	}
 
 	// def will set the provided endpoint in the handlers if there isn't already a definition.
-	def := func(endpoints TestHandlers, method string, endpoint Endpoint,
+	def := func(method string, endpoint Endpoint,
 		handler func(writer http.ResponseWriter, request *http.Request)) {
-		_, ok := endpoints[fmt.Sprintf("%s:%s", method, endpoint)]
+		_, ok := options.Handlers[fmt.Sprintf("%s:%s", method, endpoint)]
 		if ok {
 			return
 		}
 
-		endpoints.Add(method, string(endpoint), handler)
+		options.Handlers.Add(method, string(endpoint), handler)
 	}
 
-	def(options.Handlers, http.MethodGet, EndpointPools, cluster.Pools)
-	def(options.Handlers, http.MethodGet, EndpointPoolsDefault, cluster.PoolsDefault)
-	def(options.Handlers, http.MethodGet, EndpointNodesServices, cluster.NodeServices)
+	def(http.MethodGet, EndpointPools, cluster.Pools)
+	def(http.MethodGet, EndpointPoolsDefault, cluster.PoolsDefault)
+	def(http.MethodGet, EndpointNodesServices, cluster.NodeServices)
+	def(http.MethodGet, EndpointBuckets, cluster.Buckets)
+
+	for name := range options.Buckets {
+		def(http.MethodGet, EndpointBucket.Format(name), cluster.Bucket(name))
+		def(http.MethodGet, EndpointBucketManifest.Format(name), cluster.BucketManifest(name))
+	}
 
 	if options.TLSConfig != nil {
 		cluster.server = httptest.NewTLSServer(http.HandlerFunc(cluster.Handler))
@@ -126,68 +134,97 @@ func (t *TestCluster) Certificate() *x509.Certificate {
 //
 // NOTE: The current test will fatally terminate if no valid handler is found.
 func (t *TestCluster) Handler(writer http.ResponseWriter, request *http.Request) {
-	require.Truef(
-		t.t,
-		t.options.Handlers.Handle(writer, request),
-		"Endpoint '%s' does not have a handler",
-		request.URL.Path,
-	)
+	ok := t.options.Handlers.Handle(writer, request)
+	if ok {
+		return
+	}
+
+	// This is a status endpoint which contains a variable portion, for the time being we'll always respond indicating
+	// that the test cluster has the provided manifest id. Note that this endpoint can still be overridden via a test
+	// handler if required; this is just a default fallback.
+	if regexp.MustCompile(`^\/pools/default\/buckets/\S+/scopes/@ensureManifest/\d+$`).MatchString(request.URL.Path) {
+		writer.WriteHeader(http.StatusOK)
+		testutil.Write(t.t, writer, make([]byte, 0))
+
+		return
+	}
+
+	t.t.Fatalf("Endpoint '%s' does not have a handler", request.URL.Path)
 }
 
 // Pools implements the /pools endpoint, the return values can be modified using the cluster options.
 func (t *TestCluster) Pools(writer http.ResponseWriter, request *http.Request) {
-	rJSON, err := json.Marshal(struct {
+	testutil.EncodeJSON(t.t, writer, struct {
 		Enterprise bool   `json:"isEnterprise"`
 		UUID       string `json:"uuid"`
 	}{
 		Enterprise: t.options.Enterprise,
 		UUID:       t.options.UUID,
 	})
-	require.NoError(t.t, err)
-
-	_, err = writer.Write(rJSON)
-	require.NoError(t.t, err)
 }
 
 // PoolsDefault implements the /pools/default endpoint, values can be modified by modifying the nodes in the cluster
 // using the cluster options.
 func (t *TestCluster) PoolsDefault(writer http.ResponseWriter, request *http.Request) {
-	type node struct {
-		Version cbvalue.Version `json:"version"`
-		Status  string          `json:"status"`
-	}
+	testutil.EncodeJSON(t.t, writer, struct {
+		Nodes []node `json:"nodes"`
+	}{
+		Nodes: createNodeList(t.options.Nodes),
+	})
+}
 
-	nodes := make([]node, 0, len(t.options.Nodes))
-	for _, n := range t.options.Nodes {
-		nodes = append(nodes, node{
-			Version: n.Version,
-			Status:  n.Status,
+// Buckets implements the /pools/default/buckets endpoint, values can be modified by modifying the buckets in the
+// cluster using the cluster options.
+func (t *TestCluster) Buckets(writer http.ResponseWriter, request *http.Request) {
+	buckets := make([]bucket, 0, len(t.options.Buckets))
+	for n, b := range t.options.Buckets {
+		buckets = append(buckets, bucket{
+			Name:             n,
+			UUID:             b.UUID,
+			VBucketServerMap: vbsm{VBucketMap: make([][2]int, b.NumVBuckets)},
+			Nodes:            createNodeList(t.options.Nodes),
 		})
 	}
 
-	rJSON, err := json.Marshal(struct {
-		Nodes []node `json:"nodes"`
-	}{
-		Nodes: nodes,
-	})
-	require.NoError(t.t, err)
+	testutil.EncodeJSON(t.t, writer, buckets)
+}
 
-	_, err = writer.Write(rJSON)
-	require.NoError(t.t, err)
+// Bucket implements the /pools/default/buckets/<bucket> endpoint, values can be modified by modifying the buckets in
+// the cluster using the cluster options.
+func (t *TestCluster) Bucket(name string) func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		b, ok := t.options.Buckets[name]
+		require.True(t.t, ok)
+
+		testutil.EncodeJSON(t.t, writer, bucket{
+			Name:             name,
+			UUID:             b.UUID,
+			VBucketServerMap: vbsm{VBucketMap: make([][2]int, b.NumVBuckets)},
+			Nodes:            createNodeList(t.options.Nodes),
+		})
+	}
+}
+
+// BucketManifest implements the /pools/default/buckets/<bucket>/scopes endpoint. The returned manifest may be set using
+// the cluster options.
+func (t *TestCluster) BucketManifest(name string) func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		b, ok := t.options.Buckets[name]
+		require.True(t.t, ok)
+
+		require.NotNil(t.t, writer, b.Manifest)
+		testutil.EncodeJSON(t.t, writer, b.Manifest)
+	}
 }
 
 // NodeServices implements the /pools/default/nodeServices endpoint, values can be modified by modifying the nodes in
 // the cluster using the cluster options.
 func (t *TestCluster) NodeServices(writer http.ResponseWriter, request *http.Request) {
-	rJSON, err := json.Marshal(struct {
+	testutil.EncodeJSON(t.t, writer, struct {
 		Nodes Nodes `json:"nodesExt"`
 	}{
 		Nodes: t.Nodes(),
 	})
-	require.NoError(t.t, err)
-
-	_, err = writer.Write(rJSON)
-	require.NoError(t.t, err)
 }
 
 // Nodes returns the list of nodes in the cluster, generated using the test nodes provided in the cluster options.
@@ -242,6 +279,16 @@ func (t *TestCluster) createNode(n *TestNode) *Node {
 // Close stops the server releasing any held resources.
 func (t *TestCluster) Close() {
 	t.server.Close()
+}
+
+// createNodeList is a utility function to create the basic node list which contains the node version/status.
+func createNodeList(nodes []*TestNode) []node {
+	list := make([]node, 0, len(nodes))
+	for _, n := range nodes {
+		list = append(list, node{Version: n.Version, Status: n.Status})
+	}
+
+	return list
 }
 
 // addService is a utility function to add a service to the services structure using the provided settings.

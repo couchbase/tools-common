@@ -370,7 +370,7 @@ func TestClientExecuteStandardError(t *testing.T) {
 
 	expected := &Response{
 		StatusCode: http.StatusOK,
-		Body:       []byte(`{"isEnterprise":false,"uuid":""}`),
+		Body:       []byte(`{"isEnterprise":false,"uuid":""}` + "\n"),
 	}
 
 	client, err := newTestClient(cluster)
