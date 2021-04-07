@@ -79,7 +79,7 @@ pipeline {
             steps {
                 timeout(time: 5, unit: "MINUTES") {
                     dir("${PROJECT}") {
-                        sh "golangci-lint run"
+                        sh "golangci-lint run --timeout 5m"
                     }
                 }
             }
