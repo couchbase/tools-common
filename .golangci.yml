@@ -11,7 +11,6 @@ linters:
     - golint
     - gosimple
     - ineffassign
-    - interfacer
     - lll
     - misspell
     - nakedret
@@ -25,6 +24,7 @@ linters:
     - unconvert
     - unparam
     - varcheck
+    - wastedassign
     - whitespace
     - wsl
 linters-settings:

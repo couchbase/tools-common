@@ -8,7 +8,7 @@ pipeline {
     agent { label "ubuntu-18.04&&master" }
 
     environment {
-        GO_TARBALL_URL = "https://dl.google.com/go/go1.16.linux-amd64.tar.gz"
+        GO_TARBALL_URL = "https://golang.org/dl/go1.16.2.linux-amd64.tar.gz"
 
         GOROOT = "${WORKSPACE}/go"
         GOBIN = "${GOROOT}/bin"
@@ -51,7 +51,7 @@ pipeline {
                     sh "wget -q -O- ${GO_TARBALL_URL} | tar xz"
 
                     // get golangci-lint binary
-                    sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v1.37.1/install.sh | sh -s -- -b ${GOBIN} v1.37.1"
+                    sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v1.39.0/install.sh | sh -s -- -b ${GOBIN} v1.39.0"
                     sh "golangci-lint --version"
 
                     withEnv(["GO111MODULE=off"]) {
