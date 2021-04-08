@@ -3,7 +3,7 @@ package cbrest
 import (
 	"fmt"
 
-	"github.com/couchbase/tools-common/auth"
+	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
 )
 
@@ -16,24 +16,17 @@ type AuthProvider struct {
 	index     int
 	increment bool
 
-	userAgent string
-	username  string
-	password  string
-
-	nodes    Nodes
-	mappings auth.HostMappings
-
+	nodes      Nodes
 	useAltAddr bool
+
+	provider aprov.Provider
 }
 
 // NewAuthProvider creates a new 'AuthProvider' using the provided credentials.
-func NewAuthProvider(resolved *connstr.ResolvedConnectionString, username, password, userAgent string) *AuthProvider {
+func NewAuthProvider(resolved *connstr.ResolvedConnectionString, provider aprov.Provider) *AuthProvider {
 	return &AuthProvider{
-		resolved:  resolved,
-		username:  username,
-		password:  password,
-		userAgent: userAgent,
-		mappings:  auth.GetHostMappings(),
+		resolved: resolved,
+		provider: provider,
 	}
 }
 
@@ -126,12 +119,12 @@ func (a *AuthProvider) GetFallbackHost() string {
 
 // GetCredentials returns the username/password credentials needed to authenicate against the given host.
 func (a *AuthProvider) GetCredentials(host string) (string, string) {
-	return auth.GetCredentials(a.username, a.password, host, a.mappings)
+	return a.provider.GetCredentials(host)
 }
 
 // GetUserAgent returns a string which should be used as the 'User-Agent' header of any REST requests.
 func (a *AuthProvider) GetUserAgent() string {
-	return a.userAgent
+	return a.provider.GetUserAgent()
 }
 
 // SetNodes sets the list of nodes in the cluster to the one provided and determines if we should be using alternative

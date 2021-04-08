@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/couchbase/tools-common/auth"
+	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/netutil"
@@ -35,9 +35,7 @@ func newTestClient(cluster *TestCluster) (*Client, error) {
 
 	return NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
-		Username:         username,
-		Password:         password,
-		UserAgent:        userAgent,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		TLSConfig:        &tls.Config{RootCAs: pool},
 	})
 }
@@ -57,14 +55,11 @@ func TestNewClient(t *testing.T) {
 			}},
 		},
 		increment: true,
-		userAgent: userAgent,
-		username:  username,
-		password:  password,
+		provider:  &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		nodes: Nodes{{
 			Hostname: cluster.Address(),
 			Services: &Services{Management: cluster.Port()},
 		}},
-		mappings: auth.GetHostMappings(),
 	}
 
 	require.Equal(t, expected, client.authProvider)
@@ -94,9 +89,7 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 
 	client, err := NewClient(ClientOptions{
 		ConnectionString: fmt.Sprintf("http://notahost:21345,%s:%d", cluster.Address(), cluster.Port()),
-		Username:         username,
-		Password:         password,
-		UserAgent:        userAgent,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
 	require.NoError(t, err)
 
@@ -115,11 +108,8 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 		},
 		index:     1,
 		increment: true,
-		userAgent: userAgent,
-		username:  username,
-		password:  password,
+		provider:  &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		nodes:     cluster.Nodes(),
-		mappings:  auth.GetHostMappings(),
 	}
 
 	require.Equal(t, expected, client.authProvider)
@@ -131,9 +121,7 @@ func TestNewClientFailedToBootstrapAgainstAnyHost(t *testing.T) {
 
 	_, err := NewClient(ClientOptions{
 		ConnectionString: "http://notahost:21345,notanotherhost:12355",
-		Username:         username,
-		Password:         password,
-		UserAgent:        userAgent,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
 
 	var bootstrapFailure *BootstrapFailureError
@@ -205,11 +193,8 @@ func TestNewClientAltAddress(t *testing.T) {
 			},
 		},
 		increment:  true,
-		userAgent:  userAgent,
-		username:   username,
-		password:   password,
+		provider:   &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		nodes:      cluster.Nodes(),
-		mappings:   auth.GetHostMappings(),
 		useAltAddr: true,
 	}
 
@@ -235,11 +220,8 @@ func TestNewClientTLS(t *testing.T) {
 			UseSSL: true,
 		},
 		increment: true,
-		userAgent: userAgent,
-		username:  username,
-		password:  password,
+		provider:  &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		nodes:     cluster.Nodes(),
-		mappings:  auth.GetHostMappings(),
 	}
 
 	require.Equal(t, expected, client.authProvider)
@@ -590,9 +572,7 @@ func TestClientExecuteUnknownAuthority(t *testing.T) {
 
 	_, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
-		Username:         username,
-		Password:         password,
-		UserAgent:        userAgent,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
 	require.Error(t, err)
 

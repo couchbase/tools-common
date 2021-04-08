@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/envvar"
@@ -25,9 +26,7 @@ import (
 // ClientOptions encapsulates the options for creating a new REST client.
 type ClientOptions struct {
 	ConnectionString string
-	Username         string
-	Password         string
-	UserAgent        string
+	Provider         aprov.Provider
 	TLSConfig        *tls.Config
 
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
@@ -87,7 +86,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, fmt.Errorf("failed to resolve connection string: %w", err)
 	}
 
-	authProvider := NewAuthProvider(resolved, options.Username, options.Password, options.UserAgent)
+	authProvider := NewAuthProvider(resolved, options.Provider)
 
 	client := &Client{
 		client: &http.Client{

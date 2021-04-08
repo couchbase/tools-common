@@ -2,10 +2,9 @@ package cbrest
 
 import (
 	"errors"
-	"os"
 	"testing"
 
-	"github.com/couchbase/tools-common/auth"
+	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
 
 	"github.com/stretchr/testify/require"
@@ -13,33 +12,14 @@ import (
 
 func TestNewAuthProvider(t *testing.T) {
 	expected := &AuthProvider{
-		resolved:  &connstr.ResolvedConnectionString{},
-		userAgent: "user-agent",
-		username:  "username",
-		password:  "password",
-		mappings:  make(auth.HostMappings),
+		resolved: &connstr.ResolvedConnectionString{},
+		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	}
 
-	require.Equal(t, expected,
-		NewAuthProvider(&connstr.ResolvedConnectionString{}, "username", "password", "user-agent"))
-}
-
-func TestNewAuthProviderWithHostMappings(t *testing.T) {
-	os.Setenv("CBM_SERVICES_KV_HOSTS", "172.20.1.1:8091=password")
-	defer os.Unsetenv("CBM_SERVICES_KV_HOSTS")
-
-	expected := &AuthProvider{
-		resolved:  &connstr.ResolvedConnectionString{},
-		userAgent: "user-agent",
-		username:  "username",
-		password:  "password",
-		mappings: auth.HostMappings{
-			"172.20.1.1:8091": "password",
-		},
-	}
-
-	require.Equal(t, expected,
-		NewAuthProvider(&connstr.ResolvedConnectionString{}, "username", "password", "user-agent"))
+	require.Equal(t, expected, NewAuthProvider(
+		&connstr.ResolvedConnectionString{},
+		&aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	))
 }
 
 func TestNewCouchbaseGetFallbackHost(t *testing.T) {
@@ -360,32 +340,12 @@ func TestAuthProviderGetCredentials(t *testing.T) {
 
 	tests := []*test{
 		{
-			name:             "StandardPassword",
-			provider:         &AuthProvider{username: "username", password: "password"},
+			name: "StandardPassword",
+			provider: &AuthProvider{
+				provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+			},
 			host:             "hostname",
 			expectedUsername: "username",
-			expectedPassword: "password",
-		},
-		{
-			name: "BackupUserMappedPassword",
-			provider: &AuthProvider{
-				username: auth.BackupServiceUser,
-				password: "password",
-				mappings: map[string]string{"hostname": "mapped_password"},
-			},
-			host:             "hostname",
-			expectedUsername: auth.BackupServiceUser,
-			expectedPassword: "mapped_password",
-		},
-		{
-			name: "BackupUserFallbackPassword",
-			provider: &AuthProvider{
-				username: auth.BackupServiceUser,
-				password: "password",
-				mappings: map[string]string{},
-			},
-			host:             "hostname",
-			expectedUsername: auth.BackupServiceUser,
 			expectedPassword: "password",
 		},
 	}
