@@ -39,9 +39,10 @@ type TestClusterOptions struct {
 
 // TestCluster is a mock Couchbase cluster used for unit testing functionaility which relies on the REST client.
 type TestCluster struct {
-	t       *testing.T
-	server  *httptest.Server
-	options TestClusterOptions
+	t        *testing.T
+	revision int64
+	server   *httptest.Server
+	options  TestClusterOptions
 }
 
 // NewTestCluster creates a new test cluster using the provided options.
@@ -220,10 +221,14 @@ func (t *TestCluster) BucketManifest(name string) func(writer http.ResponseWrite
 // NodeServices implements the /pools/default/nodeServices endpoint, values can be modified by modifying the nodes in
 // the cluster using the cluster options.
 func (t *TestCluster) NodeServices(writer http.ResponseWriter, request *http.Request) {
+	defer func() { t.revision++ }()
+
 	testutil.EncodeJSON(t.t, writer, struct {
-		Nodes Nodes `json:"nodesExt"`
+		Revision int64 `json:"rev"`
+		Nodes    Nodes `json:"nodesExt"`
 	}{
-		Nodes: t.Nodes(),
+		Revision: t.revision,
+		Nodes:    t.Nodes(),
 	})
 }
 
@@ -263,14 +268,6 @@ func (t *TestCluster) createNode(n *TestNode) *Node {
 		}
 
 		node.Hostname = t.Hostname()
-	}
-
-	if n.OverrideHostname != nil {
-		node.Hostname = string(n.OverrideHostname)
-	}
-
-	if n.OverrideAltHostname != nil && node.AlternateAddresses.External != nil {
-		node.AlternateAddresses.External.Hostname = string(n.OverrideAltHostname)
 	}
 
 	return node

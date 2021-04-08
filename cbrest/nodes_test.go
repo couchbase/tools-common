@@ -1,7 +1,6 @@
 package cbrest
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -51,90 +50,6 @@ var (
 		BackupSSL:         17101,
 	}
 )
-
-func TestNodesUnmarshal(t *testing.T) {
-	data := `{"rev":41,"nodesExt":[{"services":{"mgmt":8091,"mgmtSSL":18091,"kv":11210,"kvSSL":11207,` +
-		`"capi":8092,"capiSSL":18092,"projector":9999},"thisNode":true,"hostname":"172.20.1.1",` +
-		`"alternateAddresses":{"external": {"hostname":"172.20.1.5","ports":{"mgmt":8092,"mgmtSSL":18092}}}},` +
-		`{"services":{"mgmt":8091,"mgmtSSL":18091,"kv":11210,"kvSSL":11207,"capi":8092,"capiSSL":18092,` +
-		`"projector":9999},"hostname":"172.20.1.2"},{"services":{"mgmt":8091,"mgmtSSL":18091,` +
-		`"kv":11210,"kvSSL":11207,"capi":8092,"capiSSL":18092,"projector":9999},"hostname":"172.20.1.3"},` +
-		`{"services":{"mgmt":8091,"mgmtSSL":18091,"cbas":8095,"cbasSSL":18095,"eventingAdminPort":8096,` +
-		`"eventingDebug":9140,"eventingSSL":18096,"fts":8094,"ftsSSL":18094,"ftsGRPC":9130,` +
-		`"ftsGRPCSSL":19130,"indexAdmin":9100,"indexScan":9101,"indexHttp":9102,"indexStreamInit":9103,` +
-		`"indexStreamCatchup":9104,"indexStreamMaint":9105,"indexHttps":19102,"n1ql":8093,"n1qlSSL":18093},` +
-		`"hostname":"172.20.1.4"}],"clusterCapabilitiesVer":[1,0],` +
-		`"clusterCapabilities":{"n1ql":["enhancedPreparedStatements"]}}`
-
-	var nodes Nodes
-	err := json.Unmarshal([]byte(data), &nodes)
-	require.NoError(t, err)
-
-	expected := Nodes{
-		{
-			Hostname: "172.20.1.1",
-			Services: &Services{
-				Management:    8091,
-				ManagementSSL: 18091,
-				KV:            11210,
-				KVSSL:         11207,
-				CAPI:          8092,
-				CAPISSL:       18092,
-			},
-			AlternateAddresses: AlternateAddresses{
-				External: &External{
-					Hostname: "172.20.1.5",
-					Services: &Services{
-						Management:    8092,
-						ManagementSSL: 18092,
-					},
-				},
-			},
-			BootstrapNode: true,
-		},
-		{
-			Hostname: "172.20.1.2",
-			Services: &Services{
-				Management:    8091,
-				ManagementSSL: 18091,
-				KV:            11210,
-				KVSSL:         11207,
-				CAPI:          8092,
-				CAPISSL:       18092,
-			},
-		},
-		{
-			Hostname: "172.20.1.3",
-			Services: &Services{
-				Management:    8091,
-				ManagementSSL: 18091,
-				KV:            11210,
-				KVSSL:         11207,
-				CAPI:          8092,
-				CAPISSL:       18092,
-			},
-		},
-		{
-			Hostname: "172.20.1.4",
-			Services: &Services{
-				Management:        8091,
-				ManagementSSL:     18091,
-				CBAS:              8095,
-				CBASSSL:           18095,
-				Eventing:          8096,
-				EventingSSL:       18096,
-				FullText:          8094,
-				FullTextSSL:       18094,
-				SecondaryIndex:    9102,
-				SecondaryIndexSSL: 19102,
-				N1QL:              8093,
-				N1QLSSL:           18093,
-			},
-		},
-	}
-
-	require.Equal(t, expected, nodes)
-}
 
 func TestNodesCopy(t *testing.T) {
 	expected := Nodes{

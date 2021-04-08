@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/couchbase/tools-common/aprov"
@@ -29,6 +30,11 @@ type ClientOptions struct {
 	Provider         aprov.Provider
 	TLSConfig        *tls.Config
 
+	// DisableCCP stops the client from periodically updating the cluster config. This should only be used if you know
+	// what you're doing and you're only using a client for a short period of time, otherwise, it's possible for some
+	// client functions to return stale data/attempt to address missing nodes.
+	DisableCCP bool
+
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
 	ReqResLogLevel log.Level
 }
@@ -44,9 +50,17 @@ type Client struct {
 	requestTimeout time.Duration
 
 	reqResLogLevel log.Level
+
+	wg         sync.WaitGroup
+	ctx        context.Context
+	cancelFunc context.CancelFunc
 }
 
 // NewClient creates a new REST client which will connection to the provided cluster using the given credentials.
+//
+// NOTE: The returned client may (depending on the provided options) acquire resources which must be cleaned up using
+// the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
+// goroutine.
 func NewClient(options ClientOptions) (*Client, error) {
 	clientTimeout, ok := envvar.GetDurationBC("CB_REST_CLIENT_TIMEOUT_SECS")
 	if !ok {
@@ -105,12 +119,21 @@ func NewClient(options ClientOptions) (*Client, error) {
 	// Attempt to bootstrap the HTTP client, internally the auth provider will return the next available bootstrap host
 	// for successive calls until we run out of possible hosts (at which point we exit having failed to bootstrap).
 	var (
+		hostFunc          = client.authProvider.bootstrapHostFunc()
 		errAuthentication *AuthenticationError
 		errAuthorization  *AuthorizationError
 	)
 
 	for {
-		err = client.bootstrap()
+		host := hostFunc()
+
+		// If this call returned an empty hostname then we've tried all the available hostnames and we've failed to
+		// bootstrap against any of them.
+		if host == "" {
+			return nil, &BootstrapFailureError{ErrAuthentication: errAuthentication, ErrAuthorization: errAuthorization}
+		}
+
+		err := client.updateCCFromHost(host)
 
 		// We've successfully bootstrapped the client
 		if err == nil {
@@ -123,10 +146,6 @@ func NewClient(options ClientOptions) (*Client, error) {
 			return nil, err
 		}
 
-		if errors.Is(err, errExhaustedBootstrapHosts) {
-			return nil, &BootstrapFailureError{ErrAuthentication: errAuthentication, ErrAuthorization: errAuthorization}
-		}
-
 		// If we've hit an authorization/permission error, we will continue trying to bootstrap because this node may no
 		// longer be in the cluster, however, we'll slightly modify our possible returned error message to indicate that
 		// the user should check their credentials are correct.
@@ -134,6 +153,10 @@ func NewClient(options ClientOptions) (*Client, error) {
 		errors.As(err, &errAuthorization)
 
 		log.Warnf("(REST) failed to bootstrap client, will retry: %v", err)
+	}
+
+	if !options.DisableCCP {
+		client.beginCCP()
 	}
 
 	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
@@ -147,17 +170,200 @@ func NewClient(options ClientOptions) (*Client, error) {
 	return client, nil
 }
 
-// bootstrap gets the nodes in the cluster from the first address in the connection string and use those to bootstrap
-// the auth provider.
-func (c *Client) bootstrap() error {
-	nodes, err := c.GetNodes()
-	if err != nil {
-		return fmt.Errorf("failed to get cluster nodes: %w", err)
+// beginCCP is a utility function which sets up and begins the cluster config polling goroutine.
+func (c *Client) beginCCP() {
+	// Ensure we add to the wait group before spinning up the polling goroutine
+	c.wg.Add(1)
+
+	// Allow the proper cleanup of the goroutine when the user calls 'Close'
+	c.ctx, c.cancelFunc = context.WithCancel(context.Background())
+
+	// Spin up a goroutine which will periodically update the clients cluster config the client allowing it to
+	// correctly handle dynamic changes to the target cluster; this includes proper handling/detection of
+	// adding/removing nodes.
+	go c.pollCC()
+}
+
+// pollCC loops until cancelled updating the clients cluster config. This goroutine will be cleaned up after a call to
+// 'Close'.
+func (c *Client) pollCC() {
+	defer c.wg.Done()
+
+	for {
+		c.authProvider.manager.Wait(c.ctx)
+
+		if c.ctx.Err() != nil {
+			return
+		}
+
+		if err := c.updateCC(); err != nil {
+			log.Warnf("(REST) Failed to update cluster config, will retry: %w", err)
+		}
+	}
+}
+
+// updateCC attempts to update the cluster config using each of the known nodes in the cluster.
+//
+// NOTE: It's possible for this to completely fail if we were unable find a valid config from any node in the cluster.
+func (c *Client) updateCC() error {
+	config := c.authProvider.manager.GetClusterConfig()
+
+	// Always try to use the node that we initially bootstrapped against first, failing that we'll continue trying the
+	// other nodes in the cluster.
+	sort.Slice(config.Nodes, func(i, _ int) bool { return config.Nodes[i].BootstrapNode })
+
+	for _, node := range config.Nodes {
+		err := c.updateCCFromNode(node)
+
+		// We've successfully updated the config, don't continue retrying against other nodes
+		if err == nil {
+			return nil
+		}
+
+		// NOTE: This function is slightly different to the initial bootstrapping, in the event that we receive an
+		// 'UnknownAuthorityError' we continue using the next node; we do this because that node may have been removed
+		// from the cluster.
+
+		log.Debugf("(REST) (CCP) Failed to update config using host '%s': %w", node.Hostname, err)
 	}
 
-	c.authProvider.SetNodes(nodes)
+	return ErrExhaustedClusterNodes
+}
 
-	return nil
+// updateCCFromNode will attempt to update the client's 'AuthProvider' using the provided node.
+func (c *Client) updateCCFromNode(node *Node) error {
+	host, _ := node.GetQualifiedHostname(ServiceManagement, c.authProvider.resolved.UseSSL, c.authProvider.useAltAddr)
+	if host == "" {
+		return fmt.Errorf("node is not running the management service")
+	}
+
+	valid, err := c.validHost(host)
+	if err != nil {
+		return fmt.Errorf("failed to check if node is valid: %w", err)
+	}
+
+	if !valid {
+		return fmt.Errorf("node is a member of a different cluster")
+	}
+
+	return c.updateCCFromHost(host)
+}
+
+// updateCCFromHost will attempt to update the clients cluster config using the provided host.
+func (c *Client) updateCCFromHost(host string) error {
+	body, err := c.get(host, EndpointNodesServices)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	// This shouldn't really fail since we should be constructing valid hosts in the auth provider
+	parsed, err := url.Parse(host)
+	if err != nil {
+		return fmt.Errorf("failed to parse host '%s': %w", host, err)
+	}
+
+	// We must extract the raw hostname (no port) so that it can be used as the fallback host
+	host = parsed.Hostname()
+
+	config, err := c.unmarshalCC(host, body)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal cluster config: %w", err)
+	}
+
+	return c.authProvider.SetClusterConfig(host, config)
+}
+
+// validHost returns a boolean indicating whether we should use the cluster config from the provided host. This should
+// help to avoid the case where we try to get a cluster config from a node which has joined another cluster.
+func (c *Client) validHost(host string) (bool, error) {
+	body, err := c.get(host, EndpointPools)
+	if err != nil {
+		return false, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	type overlay struct {
+		UUID string `json:"uuid"`
+	}
+
+	var decoded *overlay
+
+	err = json.Unmarshal(body, &decoded)
+	if err == nil {
+		return decoded.UUID == c.clusterInfo.UUID, nil
+	}
+
+	// We will fail to unmarshal the response from the node if it's uninitialized, this is because the "uuid" field will
+	// be an empty array, instead of a string; if this is the case, return false because we shouldn't use the cluster
+	// config from this node.
+	if bytes.Contains(body, []byte(`"uuid":[]`)) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("failed to unmarshal cluster config: %w", err)
+}
+
+// get is similar to the public 'Execute' function, however, it is meant only to be used internally is less flexible and
+// doesn't support automatic retries.
+func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), defaultInternalRequestTimeout)
+	defer cancelFunc()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, host+string(endpoint), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	setAuthHeaders(host, c.authProvider, req)
+
+	resp, err := c.perform(req, log.LevelDebug, 1)
+	if err != nil {
+		return nil, handleRequestError(req, err) // Purposefully not wrapped
+	}
+	defer resp.Body.Close()
+
+	body, err := readBody(http.MethodGet, endpoint, resp.Body, resp.ContentLength)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, handleResponseError(http.MethodGet, EndpointNodesServices, resp.StatusCode, body)
+	}
+
+	return body, nil
+}
+
+// unmarshalCC is a utility function which handles unmarshalling the cluster config response whilst cleaning
+// it up so that it can be used by the client's 'AuthProvider'.
+func (c *Client) unmarshalCC(host string, body []byte) (*ClusterConfig, error) {
+	var config *ClusterConfig
+
+	err := json.Unmarshal(body, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	for _, node := range config.Nodes {
+		// We should only populate the hostname if we're not bootstrapping using the alternate hostname; if we populate
+		// the internal hostname with the external hostname, then the alternate addressing mode won't be triggered. This
+		// could lead to a situtation where we're dispatching requests to the alternate hostname, but using the internal
+		// ports.
+		if node.Hostname == "" &&
+			!(node.AlternateAddresses.External != nil && host == node.AlternateAddresses.External.Hostname) {
+			node.Hostname = host
+		}
+
+		// We "reconstruct" ipv6 addresses by surrounding them with brackets
+		node.Hostname = netutil.ReconstructIPV6(node.Hostname)
+
+		// We do the same for possible ipv6 alternate addresses
+		if node.AlternateAddresses.External != nil {
+			node.AlternateAddresses.External.Hostname =
+				netutil.ReconstructIPV6(node.AlternateAddresses.External.Hostname)
+		}
+	}
+
+	return config, nil
 }
 
 // logConnectionInfo marshals and logs the common cluster information.
@@ -171,16 +377,22 @@ func (c *Client) logConnectionInfo() {
 }
 
 // EnterpriseCluster returns a boolean indicating whether this is an enterprise cluster.
+//
+// NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterMetaData'.
 func (c *Client) EnterpriseCluster() bool {
 	return c.clusterInfo.Enterprise
 }
 
 // ClusterUUID returns the cluster uuid.
+//
+// NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterMetaData'
 func (c *Client) ClusterUUID() string {
 	return c.clusterInfo.UUID
 }
 
 // ClusterVersion returns the version information extracted from the cluster after bootstrapping.
+//
+// NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterVersion'.
 func (c *Client) ClusterVersion() cbvalue.ClusterVersion {
 	return c.clusterInfo.Version
 }
@@ -204,7 +416,11 @@ func (c *Client) RequestRetries() int {
 //
 // NOTE: This function returns a copy because this is the same data structure the client uses to dispatch REST requests.
 func (c *Client) Nodes() Nodes {
-	return c.authProvider.nodes.Copy()
+	if config := c.authProvider.manager.GetClusterConfig(); config != nil {
+		return config.Nodes
+	}
+
+	return make(Nodes, 0)
 }
 
 // TLS returns a boolean indicating whether SSL/TLS is currently enabled.
@@ -234,7 +450,7 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 		StatusCode: resp.StatusCode,
 	}
 
-	response.Body, err = readBody(request, resp)
+	response.Body, err = readBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
 	if err != nil {
 		return response, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -243,37 +459,7 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 		return response, nil
 	}
 
-	switch response.StatusCode {
-	case http.StatusForbidden:
-		type overlay struct {
-			Permissions []string `json:"permissions"`
-		}
-
-		var data overlay
-
-		// Purposely ignored as some endpoints may not return the permissions or a body at all. In this case we just set
-		// the permissions in the AuthorizationError to nil.
-		_ = json.NewDecoder(resp.Body).Decode(&data)
-
-		return response, &AuthorizationError{
-			method:      request.Method,
-			endpoint:    request.Endpoint,
-			permissions: data.Permissions,
-		}
-	case http.StatusUnauthorized:
-		return response, &AuthenticationError{method: request.Method, endpoint: request.Endpoint}
-	case http.StatusInternalServerError:
-		return response, &InternalServerError{method: request.Method, endpoint: request.Endpoint}
-	case http.StatusNotFound:
-		return response, &EndpointNotFoundError{method: request.Method, endpoint: request.Endpoint}
-	}
-
-	return response, &UnexpectedStatusCodeError{
-		Status:   response.StatusCode,
-		method:   request.Method,
-		endpoint: request.Endpoint,
-		empty:    resp.ContentLength == 0,
-	}
+	return response, handleResponseError(request.Method, request.Endpoint, response.StatusCode, response.Body)
 }
 
 // Do converts and executes the provided request returning the raw HTTP response. In general users should prefer to use
@@ -287,8 +473,8 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		err      error
 	)
 
-	for attempt := 0; attempt < c.requestRetries; attempt++ {
-		response, err = c.do(ctx, request, attempt+1)
+	for attempt := 1; attempt <= c.requestRetries; attempt++ {
+		response, err = c.do(ctx, request, attempt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to perform REST request on attempt %d: %w", attempt, err)
 		}
@@ -329,7 +515,7 @@ func (c *Client) do(ctx context.Context, request *Request, attempt int) (*http.R
 		return nil, fmt.Errorf("failed to prepare request: %w", err)
 	}
 
-	resp, err := c.perform(prep, attempt)
+	resp, err := c.perform(prep, c.reqResLogLevel, attempt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform request: %w", err)
 	}
@@ -339,9 +525,6 @@ func (c *Client) do(ctx context.Context, request *Request, attempt int) (*http.R
 
 // prepare converts the request into a raw HTTP request which can be dispatched to the cluster. Uses the same context
 // meaning the request timeout is not reset by retries.
-//
-// NOTE: Recalculates the host address/port meaning in the future we can re-bootstrap the client using CCCP to make the
-// REST client more robust.
 func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, error) {
 	// Get the fully qualified address to the node that we are sending this request to
 	host, err := c.authProvider.GetServiceHost(request.Service)
@@ -366,11 +549,7 @@ func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, 
 		req.Header.Set(key, value)
 	}
 
-	// Use the auth provider to populate the credentials
-	req.SetBasicAuth(c.authProvider.GetCredentials(host))
-
-	// Set the 'User-Agent' so that we can trace how these requests are handled by the cluster
-	req.Header.Set("User-Agent", c.authProvider.GetUserAgent())
+	setAuthHeaders(host, c.authProvider, req)
 
 	// Set the content type for the request body. Note that we don't default to a value e.g. if must be set for every
 	// request otherwise the string zero value will be used.
@@ -381,12 +560,12 @@ func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, 
 
 // perform synchronously executes the provided request returning the response and any error that occurred during the
 // process.
-func (c *Client) perform(req *http.Request, attempt int) (*http.Response, error) {
-	log.Logf(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", attempt, req.Method, req.URL)
+func (c *Client) perform(req *http.Request, level log.Level, attempt int) (*http.Response, error) {
+	log.Logf(level, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", attempt, req.Method, req.URL)
 
 	resp, err := c.client.Do(req)
 	if err == nil {
-		log.Logf(c.reqResLogLevel, "(REST) (Attempt %d) (%s) (%d) Received response from '%s'", attempt, req.Method,
+		log.Logf(level, "(REST) (Attempt %d) (%s) (%d) Received response from '%s'", attempt, req.Method,
 			resp.StatusCode, req.URL)
 
 		return resp, nil
@@ -394,67 +573,7 @@ func (c *Client) perform(req *http.Request, attempt int) (*http.Response, error)
 
 	log.Errorf("(REST) (Attempt %d) (%s) Failed to perform request to '%s': %s", attempt, req.Method, req.URL, err)
 
-	// If we received and unknown authority error, wrap it with our informative error explaining the alternatives
-	// available to the user.
-	var unknownAuth x509.UnknownAuthorityError
-	if errors.As(err, &unknownAuth) {
-		return nil, &UnknownAuthorityError{inner: err}
-	}
-
-	// If we receive an EOF error, wrap it with a useful error message containing the method/endpoint
-	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		return nil, &SocketClosedInFlightError{method: req.Method, endpoint: req.URL.Path}
-	}
-
-	return nil, err
-}
-
-// GetNodes gets a list of all the nodes (and the services they run) in the cluster. Provided to the auth provider
-// during bootstrapping to send future requests to nodes running specified services.
-func (c *Client) GetNodes() (Nodes, error) {
-	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           EndpointNodesServices,
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
-	}
-
-	response, err := c.Execute(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	var nodes Nodes
-
-	err = json.Unmarshal(response.Body, &nodes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	fallback := c.authProvider.GetFallbackHost()
-
-	for _, node := range nodes {
-		// We should only populate the hostname if we're not bootstrapping using the alternate hostname; if we populate
-		// the internal hostname with the external hostname, then the alternate addressing mode won't be triggered. This
-		// could lead to a situtation where we're dispatching requests to the alternate hostname, but using the internal
-		// ports.
-		if node.Hostname == "" &&
-			!(node.AlternateAddresses.External != nil && fallback == node.AlternateAddresses.External.Hostname) {
-			node.Hostname = fallback
-		}
-
-		// We "reconstruct" ipv6 addresses by surrounding them with brackets
-		node.Hostname = netutil.ReconstructIPV6(node.Hostname)
-
-		// We do the same for possible ipv6 alternate addresses
-		if node.AlternateAddresses.External != nil {
-			node.AlternateAddresses.External.Hostname =
-				netutil.ReconstructIPV6(node.AlternateAddresses.External.Hostname)
-		}
-	}
-
-	return nodes, nil
+	return nil, handleRequestError(req, err)
 }
 
 // GetServiceHost retrieves the address for a single node in the cluster which is running the provided service.
@@ -565,4 +684,17 @@ func (c *Client) GetClusterVersion() (cbvalue.ClusterVersion, error) {
 	}
 
 	return clusterVersion, nil
+}
+
+// Close releases any resources that are actively being consumed/used by the client.
+func (c *Client) Close() {
+	if c.ctx == nil || c.cancelFunc == nil {
+		return
+	}
+
+	c.cancelFunc()
+	c.wg.Wait()
+
+	c.ctx = nil
+	c.cancelFunc = nil
 }

@@ -12,10 +12,4 @@ type TestNode struct {
 	Services   []Service
 	SSL        bool
 	AltAddress bool
-
-	// NOTE: Overriding the nodes hostname should be done with caution since it will likely cause a bootstrap failure.
-	// It is intended to be used in conjunction with a "normal" node to ensure the hostnames are correctly
-	// updated/wrapped where required.
-	OverrideHostname    []byte
-	OverrideAltHostname []byte
 }

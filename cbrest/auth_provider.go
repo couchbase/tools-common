@@ -2,6 +2,7 @@ package cbrest
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
@@ -13,13 +14,12 @@ import (
 type AuthProvider struct {
 	resolved *connstr.ResolvedConnectionString
 
-	index     int
-	increment bool
-
-	nodes      Nodes
 	useAltAddr bool
 
 	provider aprov.Provider
+
+	manager *ClusterConfigManager
+	lock    sync.RWMutex
 }
 
 // NewAuthProvider creates a new 'AuthProvider' using the provided credentials.
@@ -27,6 +27,7 @@ func NewAuthProvider(resolved *connstr.ResolvedConnectionString, provider aprov.
 	return &AuthProvider{
 		resolved: resolved,
 		provider: provider,
+		manager:  NewClusterConfigManager(),
 	}
 }
 
@@ -35,16 +36,6 @@ func NewAuthProvider(resolved *connstr.ResolvedConnectionString, provider aprov.
 //
 // NOTE: The returned string is a fully qualified hostname with scheme and port.
 func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
-	// If we haven't bootstrapped the client yet, return the next bootstrap address
-	if len(a.nodes) == 0 {
-		host := a.bootstrapHost()
-		if host == "" {
-			return "", errExhaustedBootstrapHosts
-		}
-
-		return host, nil
-	}
-
 	hosts, err := a.GetAllServiceHosts(service)
 	if err != nil {
 		return "", err // Purposefully not wrapped
@@ -60,19 +51,26 @@ func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
 //
 // NOTE: The returned strings are fully qualified hostnames with schemes and ports.
 func (a *AuthProvider) GetAllServiceHosts(service Service) ([]string, error) {
-	if len(a.nodes) == 0 {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	config := a.manager.GetClusterConfig()
+
+	// We've not bootstrapped the client yet, this shouldn't happen in the normal case for the REST client since we
+	// bootstrap upon creation.
+	if config == nil {
 		return nil, ErrNotBootstrapped
 	}
 
 	hosts := make([]string, 0)
 
-	for _, node := range a.nodes {
-		hostname, boostrap := node.GetQualifiedHostname(service, a.resolved.UseSSL, a.useAltAddr)
+	for _, node := range config.Nodes {
+		hostname, bootstrap := node.GetQualifiedHostname(service, a.resolved.UseSSL, a.useAltAddr)
 		if hostname == "" {
 			continue
 		}
 
-		if boostrap {
+		if bootstrap {
 			hosts = append([]string{hostname}, hosts...)
 		} else {
 			hosts = append(hosts, hostname)
@@ -87,37 +85,7 @@ func (a *AuthProvider) GetAllServiceHosts(service Service) ([]string, error) {
 	return hosts, nil
 }
 
-// bootstrapHost returns the next node in the resolved connection string. This will be used to bootstrap the client i.e.
-// fetch the list of nodes in the cluster.
-func (a *AuthProvider) bootstrapHost() string {
-	// We increment the boostrap address index before returning the next address. This means calls to 'GetFallbackHost'
-	// and other similar functions will return the host for the node that we bootstrapped against.
-	if a.increment {
-		a.index++
-	}
-
-	if a.index >= len(a.resolved.Addresses) {
-		return ""
-	}
-
-	a.increment = true
-
-	scheme := "http"
-	if a.resolved.UseSSL {
-		scheme = "https"
-	}
-
-	return fmt.Sprintf("%s://%s:%d", scheme, a.resolved.Addresses[a.index].Host,
-		a.resolved.Addresses[a.index].Port)
-}
-
-// GetFallbackHost returns the hostname for the bootstrap host. Used in the fallback case where a cluster node doesn't
-// have a hostname.
-func (a *AuthProvider) GetFallbackHost() string {
-	return a.resolved.Addresses[a.index].Host
-}
-
-// GetCredentials returns the username/password credentials needed to authenicate against the given host.
+// GetCredentials returns the username/password credentials needed to authenticate against the given host.
 func (a *AuthProvider) GetCredentials(host string) (string, string) {
 	return a.provider.GetCredentials(host)
 }
@@ -127,22 +95,56 @@ func (a *AuthProvider) GetUserAgent() string {
 	return a.provider.GetUserAgent()
 }
 
-// SetNodes sets the list of nodes in the cluster to the one provided and determines if we should be using alternative
-// addressing.
-func (a *AuthProvider) SetNodes(nodes Nodes) {
-	a.nodes = nodes
-	a.useAltAddr = a.shouldUseAltAddr(a, nodes)
+// SetClusterConfig updates the auth providers cluster config in a thread safe fashion. Returns an error if the provided
+// config is older than the current config; this ensures that we don't use the config from a node which have been
+// removed from the cluster.
+func (a *AuthProvider) SetClusterConfig(host string, config *ClusterConfig) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	if err := a.manager.Update(config); err != nil {
+		return err
+	}
+
+	// Only update the alternate address settings if we've accepted the config
+	a.useAltAddr = a.shouldUseAltAddr(host, config.Nodes)
+
+	return nil
+}
+
+// bootstrapHostFunc returns a function which, when called successively will return a hostname which can be used to
+// attempt to bootstrap the client against.
+//
+// NOTE: The returned closure will return an empty string once all the addresses in the resolved connection string have
+// been exhausted.
+func (a *AuthProvider) bootstrapHostFunc() func() string {
+	var index int
+
+	return func() string {
+		defer func() { index++ }()
+
+		if index >= len(a.resolved.Addresses) {
+			return ""
+		}
+
+		scheme := "http"
+		if a.resolved.UseSSL {
+			scheme = "https"
+		}
+
+		return fmt.Sprintf("%s://%s:%d", scheme, a.resolved.Addresses[index].Host,
+			a.resolved.Addresses[index].Port)
+	}
 }
 
 // shouldUseAltAddr returns a boolean indicating whether we should send all future requests using alternative addresses.
-func (a *AuthProvider) shouldUseAltAddr(credentials *AuthProvider, nodes Nodes) bool {
+func (a *AuthProvider) shouldUseAltAddr(host string, nodes Nodes) bool {
 	for _, node := range nodes {
-		if node.Hostname == credentials.resolved.Addresses[a.index].Host {
+		if node.Hostname == host {
 			return false
 		}
 
-		if node.AlternateAddresses.External != nil &&
-			node.AlternateAddresses.External.Hostname == credentials.resolved.Addresses[a.index].Host {
+		if node.AlternateAddresses.External != nil && node.AlternateAddresses.External.Hostname == host {
 			return true
 		}
 	}

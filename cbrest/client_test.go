@@ -4,10 +4,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/cbvalue"
@@ -26,7 +28,7 @@ const (
 // newTestClient returns a client which is boostrapped against the provided cluster.
 //
 // NOTE: Returns an error because some tests expect bootstrapping to fail.
-func newTestClient(cluster *TestCluster) (*Client, error) {
+func newTestClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
 	pool := x509.NewCertPool()
 
 	if cluster.Certificate() != nil {
@@ -35,6 +37,7 @@ func newTestClient(cluster *TestCluster) (*Client, error) {
 
 	return NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
+		DisableCCP:       disableCCP,
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		TLSConfig:        &tls.Config{RootCAs: pool},
 	})
@@ -44,8 +47,11 @@ func TestNewClient(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	// Don't compare the time attribute from the config manager
+	client.authProvider.manager.last = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -54,12 +60,17 @@ func TestNewClient(t *testing.T) {
 				Port: cluster.Port(),
 			}},
 		},
-		increment: true,
-		provider:  &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		nodes: Nodes{{
-			Hostname: cluster.Address(),
-			Services: &Services{Management: cluster.Port()},
-		}},
+		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: Nodes{{
+					Hostname:           cluster.Address(),
+					Services:           &Services{Management: cluster.Port()},
+					AlternateAddresses: AlternateAddresses{},
+				}},
+			},
+			maxAge: DefaultCCMaxAge,
+		},
 	}
 
 	require.Equal(t, expected, client.authProvider)
@@ -74,7 +85,7 @@ func TestNewClientClusterNotInitialized(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	_, err := newTestClient(cluster)
+	_, err := newTestClient(cluster, true)
 	require.ErrorIs(t, err, ErrNodeUninitialized)
 }
 
@@ -89,9 +100,13 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 
 	client, err := NewClient(ClientOptions{
 		ConnectionString: fmt.Sprintf("http://notahost:21345,%s:%d", cluster.Address(), cluster.Port()),
+		DisableCCP:       true,
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
 	require.NoError(t, err)
+
+	// Don't compare the time attribute from the config manager
+	client.authProvider.manager.last = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -106,10 +121,13 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 				},
 			},
 		},
-		index:     1,
-		increment: true,
-		provider:  &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		nodes:     cluster.Nodes(),
+		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: cluster.Nodes(),
+			},
+			maxAge: DefaultCCMaxAge,
+		},
 	}
 
 	require.Equal(t, expected, client.authProvider)
@@ -121,6 +139,7 @@ func TestNewClientFailedToBootstrapAgainstAnyHost(t *testing.T) {
 
 	_, err := NewClient(ClientOptions{
 		ConnectionString: "http://notahost:21345,notanotherhost:12355",
+		DisableCCP:       true,
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
 
@@ -144,7 +163,7 @@ func TestNewClientFailedToBootstrapAgainstAnyHostUnauthorized(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	_, err := newTestClient(cluster)
+	_, err := newTestClient(cluster, true)
 
 	var bootstrapFailure *BootstrapFailureError
 
@@ -166,7 +185,7 @@ func TestNewClientFailedToBootstrapAgainstAnyHostForbidden(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	_, err := newTestClient(cluster)
+	_, err := newTestClient(cluster, true)
 
 	var bootstrapFailure *BootstrapFailureError
 
@@ -180,8 +199,11 @@ func TestNewClientAltAddress(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	// Don't compare the time attribute from the config manager
+	client.authProvider.manager.last = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -192,9 +214,13 @@ func TestNewClientAltAddress(t *testing.T) {
 				},
 			},
 		},
-		increment:  true,
-		provider:   &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		nodes:      cluster.Nodes(),
+		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: cluster.Nodes(),
+			},
+			maxAge: DefaultCCMaxAge,
+		},
 		useAltAddr: true,
 	}
 
@@ -208,8 +234,11 @@ func TestNewClientTLS(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	// Don't compare the time attribute from the config manager
+	client.authProvider.manager.last = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -219,9 +248,13 @@ func TestNewClientTLS(t *testing.T) {
 			}},
 			UseSSL: true,
 		},
-		increment: true,
-		provider:  &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		nodes:     cluster.Nodes(),
+		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: cluster.Nodes(),
+			},
+			maxAge: DefaultCCMaxAge,
+		},
 	}
 
 	require.Equal(t, expected, client.authProvider)
@@ -249,7 +282,7 @@ func TestClientExecute(t *testing.T) {
 		Body:       []byte("body"),
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	actual, err := client.Execute(request)
@@ -287,7 +320,7 @@ func TestClientExecuteWithDefaultRetries(t *testing.T) {
 				Body:       []byte("body"),
 			}
 
-			client, err := newTestClient(cluster)
+			client, err := newTestClient(cluster, true)
 			require.NoError(t, err)
 
 			actual, err := client.Execute(request)
@@ -325,7 +358,7 @@ func TestClientExecuteWithRetries(t *testing.T) {
 		Body:       []byte("body"),
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	actual, err := client.Execute(request)
@@ -355,7 +388,7 @@ func TestClientExecuteStandardError(t *testing.T) {
 		Body:       []byte(`{"isEnterprise":false,"uuid":""}` + "\n"),
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	actual, err := client.Execute(request)
@@ -385,7 +418,7 @@ func TestClientExecuteWithRetriesExhausted(t *testing.T) {
 		Service:            ServiceManagement,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -413,7 +446,7 @@ func TestClientExecuteSpecificServiceNotAvailable(t *testing.T) {
 		Service:            ServiceAnalytics,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -441,7 +474,7 @@ func TestClientExecuteAuthError(t *testing.T) {
 		Service:            ServiceManagement,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -469,7 +502,7 @@ func TestClientExecuteInternalServerError(t *testing.T) {
 		Service:            ServiceManagement,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -497,7 +530,7 @@ func TestClientExecute404Status(t *testing.T) {
 		Service:            ServiceManagement,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -525,7 +558,7 @@ func TestClientExecuteUnexpectedEOF(t *testing.T) {
 		Service:            ServiceManagement,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -553,7 +586,7 @@ func TestClientExecuteSocketClosedInFlight(t *testing.T) {
 		Service:            ServiceManagement,
 	}
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	_, err = client.Execute(request)
@@ -572,6 +605,7 @@ func TestClientExecuteUnknownAuthority(t *testing.T) {
 
 	_, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
+		DisableCCP:       true,
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
 	require.Error(t, err)
@@ -581,23 +615,11 @@ func TestClientExecuteUnknownAuthority(t *testing.T) {
 	require.ErrorAs(t, err, &unknownAuthority)
 }
 
-func TestGetNodes(t *testing.T) {
-	cluster := NewTestCluster(t, TestClusterOptions{})
-	defer cluster.Close()
-
-	client, err := newTestClient(cluster)
-	require.NoError(t, err)
-
-	nodes, err := client.GetNodes()
-	require.NoError(t, err)
-	require.Equal(t, cluster.Nodes(), nodes)
-}
-
 func TestGetServiceHost(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	host, err := client.GetServiceHost(ServiceManagement)
@@ -612,7 +634,7 @@ func TestGetServiceHostTLS(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	host, err := client.GetServiceHost(ServiceManagement)
@@ -630,7 +652,7 @@ func TestGetAllServiceHosts(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster)
+	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
 	hosts, err := client.GetAllServiceHosts(ServiceManagement)
@@ -682,7 +704,7 @@ func TestGetAllServiceHostsTLS(t *testing.T) {
 			})
 			defer cluster.Close()
 
-			client, err := newTestClient(cluster)
+			client, err := newTestClient(cluster, true)
 
 			if test.expected == 0 {
 				require.Error(t, err)
@@ -702,70 +724,25 @@ func TestGetAllServiceHostsTLS(t *testing.T) {
 	}
 }
 
-func TestGetNodesHostNameEmpty(t *testing.T) {
-	cluster := NewTestCluster(t, TestClusterOptions{
-		Nodes: TestNodes{
-			{}, // Node to bootstrap against
-			{OverrideHostname: []byte("")},
-		},
-	})
-	defer cluster.Close()
+func TestClientUnmarshalCCHostNameEmpty(t *testing.T) {
+	client := &Client{}
 
-	client, err := newTestClient(cluster)
+	config, err := client.unmarshalCC("localhost", []byte(`{"nodesExt":[{"hostname":""}]}`))
 	require.NoError(t, err)
-
-	nodes, err := client.GetNodes()
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		Nodes{
-			{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
-			{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
-		},
-		nodes,
-	)
+	require.Equal(t, "localhost", config.Nodes[0].Hostname)
 }
 
-func TestGetNodesHostNameEmptyWithAltAddress(t *testing.T) {
-	cluster := NewTestCluster(t, TestClusterOptions{
-		Nodes: TestNodes{
-			{AltAddress: true}, // Node to bootstrap against
-			{OverrideHostname: []byte(""), AltAddress: true},
-		},
-	})
-	defer cluster.Close()
+func TestClientUnmarshalCCHostNameEmptyWithAltAddress(t *testing.T) {
+	client := &Client{}
 
-	client, err := newTestClient(cluster)
+	config, err := client.unmarshalCC("localhost", []byte(
+		`{"nodesExt":[{"hostname":"","alternateAddresses":{"external":{"hostname":""}}}]}`,
+	))
 	require.NoError(t, err)
-
-	nodes, err := client.GetNodes()
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		Nodes{
-			{
-				Hostname: cluster.Hostname(),
-				Services: &Services{Management: cluster.Port()},
-				AlternateAddresses: AlternateAddresses{
-					External: &External{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
-				},
-			},
-			{
-				// NOTE: We are validating that the 'Hostname' field is not set to the alternate hostname which we used
-				// to bootstrap against.
-				Services: &Services{Management: cluster.Port()},
-				AlternateAddresses: AlternateAddresses{
-					External: &External{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
-				},
-			},
-		},
-		nodes,
-	)
+	require.NotEqual(t, "localhost", config.Nodes[0].AlternateAddresses.External.Hostname)
 }
 
-func TestGetNodesReconstructIPV6Address(t *testing.T) {
+func TestClientUnmarshalCCReconstructIPV6Address(t *testing.T) {
 	type test struct {
 		name     string
 		address  string
@@ -787,33 +764,18 @@ func TestGetNodesReconstructIPV6Address(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cluster := NewTestCluster(t, TestClusterOptions{
-				Nodes: TestNodes{
-					{}, // Node to bootstrap against
-					{
-						OverrideHostname: []byte(test.address),
-					},
-				},
-			})
-			defer cluster.Close()
+			client := &Client{}
 
-			client, err := newTestClient(cluster)
+			config, err := client.unmarshalCC("localhost", []byte(
+				fmt.Sprintf(`{"nodesExt":[{"hostname":"%s"}]}`, test.address),
+			))
 			require.NoError(t, err)
-
-			nodes, err := client.GetNodes()
-			require.NoError(t, err)
-
-			expected := Nodes{
-				{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
-				{Hostname: test.expected, Services: &Services{Management: cluster.Port()}},
-			}
-
-			require.Equal(t, expected, nodes)
+			require.Equal(t, test.expected, config.Nodes[0].Hostname)
 		})
 	}
 }
 
-func TestGetNodesReconstructIPV6AlternateAddress(t *testing.T) {
+func TestClientUnmarshalCCReconstructIPV6AlternateAddress(t *testing.T) {
 	type test struct {
 		name     string
 		address  string
@@ -835,40 +797,14 @@ func TestGetNodesReconstructIPV6AlternateAddress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cluster := NewTestCluster(t, TestClusterOptions{
-				Nodes: TestNodes{
-					{}, // Node to bootstrap against
-					{
-						AltAddress:          true,
-						OverrideAltHostname: []byte(test.address),
-					},
-				},
-			})
-			defer cluster.Close()
+			client := &Client{}
 
-			client, err := newTestClient(cluster)
+			config, err := client.unmarshalCC("localhost", []byte(
+				fmt.Sprintf(`{"nodesExt":[{"hostname":"","alternateAddresses":{"external":{"hostname":"%s"}}}]}`,
+					test.address),
+			))
 			require.NoError(t, err)
-
-			nodes, err := client.GetNodes()
-			require.NoError(t, err)
-
-			expected := Nodes{
-				{Hostname: cluster.Address(), Services: &Services{Management: cluster.Port()}},
-				{
-					Hostname: cluster.Hostname(),
-					Services: &Services{
-						Management: cluster.Port(),
-					},
-					AlternateAddresses: AlternateAddresses{
-						External: &External{
-							Hostname: test.expected,
-							Services: &Services{Management: cluster.Port()},
-						},
-					},
-				},
-			}
-
-			require.Equal(t, expected, nodes)
+			require.Equal(t, test.expected, config.Nodes[0].AlternateAddresses.External.Hostname)
 		})
 	}
 }
@@ -914,7 +850,7 @@ func TestGetClusterVersion(t *testing.T) {
 			})
 			defer cluster.Close()
 
-			client, err := newTestClient(cluster)
+			client, err := newTestClient(cluster, true)
 			require.NoError(t, err)
 
 			version, err := client.GetClusterVersion()
@@ -949,7 +885,7 @@ func TestGetClusterMetaData(t *testing.T) {
 			})
 			defer cluster.Close()
 
-			client, err := newTestClient(cluster)
+			client, err := newTestClient(cluster, true)
 			require.NoError(t, err)
 
 			enterprise, _, err := client.GetClusterMetaData()
@@ -957,4 +893,201 @@ func TestGetClusterMetaData(t *testing.T) {
 			require.Equal(t, test.expected, enterprise)
 		})
 	}
+}
+
+func TestClientBeginCCP(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	var closed bool
+
+	go func() {
+		client.wg.Wait()
+
+		closed = true
+	}()
+
+	client.Close()
+	time.Sleep(50 * time.Millisecond)
+
+	require.True(t, closed)
+	require.Nil(t, client.ctx)
+	require.Nil(t, client.cancelFunc)
+}
+
+func TestClientPollCC(t *testing.T) {
+	os.Setenv("CB_REST_CC_MAX_AGE", "50ms")
+	defer os.Unsetenv("CB_REST_CC_MAX_AGE")
+
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, false)
+	require.NoError(t, err)
+
+	// The test cluster currently doesn't return a revision, we can exploit this to detect whether the cluster config
+	// has been updated or not.
+	client.authProvider.manager.config.Revision = math.MaxInt64
+
+	time.Sleep(100 * time.Millisecond)
+
+	require.Equal(t, int64(math.MaxInt64), client.authProvider.manager.config.Revision)
+}
+
+func TestClientPollCCOldRevisionIgnore(t *testing.T) {
+	os.Setenv("CB_REST_CC_MAX_AGE", "50ms")
+	defer os.Unsetenv("CB_REST_CC_MAX_AGE")
+
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, false)
+	require.NoError(t, err)
+
+	rev := client.authProvider.manager.config.Revision
+
+	time.Sleep(75 * time.Millisecond)
+
+	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+}
+
+func TestClientUpdateCC(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	rev := client.authProvider.manager.config.Revision
+
+	require.NoError(t, client.updateCC())
+	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+}
+
+func TestClientUpdateCCExhaustedClusterNodes(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	client.authProvider.manager.config.Nodes = make(Nodes, 0)
+	rev := client.authProvider.manager.config.Revision
+
+	require.ErrorIs(t, client.updateCC(), ErrExhaustedClusterNodes)
+	require.Equal(t, rev, client.authProvider.manager.config.Revision)
+}
+
+func TestClientUpdateCCFromNode(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	rev := client.authProvider.manager.config.Revision
+
+	require.NoError(t, client.updateCCFromNode(client.authProvider.manager.config.Nodes[0]))
+	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+}
+
+func TestClientUpdateCCFromHost(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	rev := client.authProvider.manager.config.Revision
+
+	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port())))
+	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+}
+
+func TestClientValidHost(t *testing.T) {
+	type test struct {
+		name     string
+		uuid     string
+		body     []byte
+		expected bool
+	}
+
+	tests := []*test{
+		{
+			name:     "ValidHost",
+			uuid:     "uuid",
+			body:     []byte(`{"uuid":"uuid"}`),
+			expected: true,
+		},
+		{
+			name: "InvalidHostFromAnotherCluster",
+			uuid: "uuid",
+			body: []byte(`{"uuid":"another_uuid"}`),
+		},
+		{
+			name: "InvalidHostUninitialized",
+			uuid: "uuid",
+			body: []byte(`{"uuid":[]}`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handlers := make(TestHandlers)
+			handlers.Add(http.MethodGet, string(EndpointPools), NewTestHandler(t, http.StatusOK, test.body))
+
+			cluster := NewTestCluster(t, TestClusterOptions{UUID: test.uuid, Handlers: handlers})
+			defer cluster.Close()
+
+			client := &Client{
+				client: &http.Client{},
+				authProvider: NewAuthProvider(
+					&connstr.ResolvedConnectionString{},
+					&aprov.Static{Username: "username", Password: "password"},
+				),
+				clusterInfo: &cbvalue.ClusterInfo{UUID: test.uuid},
+			}
+
+			valid, err := client.validHost(fmt.Sprintf("http://localhost:%d", cluster.Port()))
+			require.NoError(t, err)
+			require.Equal(t, test.expected, valid)
+		})
+	}
+}
+
+func TestClientGetWithRequestError(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithHijack(t))
+
+	cluster := NewTestCluster(t, TestClusterOptions{Handlers: handlers})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), Endpoint("/test"))
+
+	var socketClosedInFlight *SocketClosedInFlightError
+
+	require.ErrorAs(t, err, &socketClosedInFlight)
+}
+
+func TestClientGetWithUnexpectedStatusCode(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusTeapot, make([]byte, 0)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{Handlers: handlers})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), Endpoint("/test"))
+
+	var unexpectedStatus *UnexpectedStatusCodeError
+
+	require.ErrorAs(t, err, &unexpectedStatus)
 }

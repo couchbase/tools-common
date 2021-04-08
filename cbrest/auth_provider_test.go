@@ -1,7 +1,6 @@
 package cbrest
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/couchbase/tools-common/aprov"
@@ -11,23 +10,21 @@ import (
 )
 
 func TestNewAuthProvider(t *testing.T) {
+	actual := NewAuthProvider(
+		&connstr.ResolvedConnectionString{},
+		&aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	)
+
+	// Don't compare the time attribute from the config manager
+	actual.manager.last = nil
+
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{},
 		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		manager:  &ClusterConfigManager{maxAge: DefaultCCMaxAge},
 	}
 
-	require.Equal(t, expected, NewAuthProvider(
-		&connstr.ResolvedConnectionString{},
-		&aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-	))
-}
-
-func TestNewCouchbaseGetFallbackHost(t *testing.T) {
-	provider := &AuthProvider{
-		resolved: &connstr.ResolvedConnectionString{Addresses: []connstr.Address{{Host: "hostname"}}},
-	}
-
-	require.Equal(t, "hostname", provider.GetFallbackHost())
+	require.Equal(t, expected, actual)
 }
 
 func TestAuthProviderGetServiceHost(t *testing.T) {
@@ -40,33 +37,16 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 
 	tests := []*test{
 		{
-			name: "UseDefaultHostToBootStrap",
-			provider: &AuthProvider{
-				resolved: &connstr.ResolvedConnectionString{
-					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
-				},
-			},
-			service:  ServiceManagement,
-			expected: "http://localhost:8091",
-		},
-		{
-			name: "UseDefaultHostToBootStrapUseSSL",
-			provider: &AuthProvider{
-				resolved: &connstr.ResolvedConnectionString{
-					Addresses: []connstr.Address{{Host: "localhost", Port: 18091}},
-					UseSSL:    true,
-				},
-			},
-			service:  ServiceManagement,
-			expected: "https://localhost:18091",
-		},
-		{
 			name: "SingleNode",
 			provider: &AuthProvider{
 				resolved: &connstr.ResolvedConnectionString{
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
-				nodes: Nodes{{Hostname: "localhost", Services: testServices}},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{{Hostname: "localhost", Services: testServices}},
+					},
+				},
 			},
 			service:  ServiceManagement,
 			expected: "http://localhost:8091",
@@ -78,7 +58,11 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 					UseSSL:    true,
 				},
-				nodes: Nodes{{Hostname: "localhost", Services: testServices}},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{{Hostname: "localhost", Services: testServices}},
+					},
+				},
 			},
 			service:  ServiceManagement,
 			expected: "https://localhost:18091",
@@ -90,13 +74,17 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
 				useAltAddr: true,
-				nodes: Nodes{{
-					Hostname: "localhost",
-					Services: testServices,
-					AlternateAddresses: AlternateAddresses{
-						External: &External{Hostname: "hostname", Services: testAltServices},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{{
+							Hostname: "localhost",
+							Services: testServices,
+							AlternateAddresses: AlternateAddresses{
+								External: &External{Hostname: "hostname", Services: testAltServices},
+							},
+						}},
 					},
-				}},
+				},
 			},
 			service:  ServiceManagement,
 			expected: "http://hostname:8092",
@@ -109,16 +97,18 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 					UseSSL:    true,
 				},
 				useAltAddr: true,
-				nodes: Nodes{
-					{
-						Hostname: "localhost",
-						Services: testServices,
-						AlternateAddresses: AlternateAddresses{
-							External: &External{
-								Hostname: "hostname",
-								Services: testAltServices,
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{{
+							Hostname: "localhost",
+							Services: testServices,
+							AlternateAddresses: AlternateAddresses{
+								External: &External{
+									Hostname: "hostname",
+									Services: testAltServices,
+								},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -154,33 +144,16 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 
 	tests := []*test{
 		{
-			name: "UseDefaultHostNotBootStrapped",
-			provider: &AuthProvider{
-				resolved: &connstr.ResolvedConnectionString{
-					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
-				},
-			},
-			service:       ServiceManagement,
-			expectedError: ErrNotBootstrapped,
-		},
-		{
-			name: "UseDefaultHostToBootStrapUseSSL",
-			provider: &AuthProvider{
-				resolved: &connstr.ResolvedConnectionString{
-					Addresses: []connstr.Address{{Host: "localhost", Port: 18091}},
-					UseSSL:    true,
-				},
-			},
-			service:       ServiceManagement,
-			expectedError: ErrNotBootstrapped,
-		},
-		{
 			name: "SingleNodeAllServices",
 			provider: &AuthProvider{
 				resolved: &connstr.ResolvedConnectionString{
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
-				nodes: Nodes{{Hostname: "localhost", Services: testServices}},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{{Hostname: "localhost", Services: testServices}},
+					},
+				},
 			},
 			service:  ServiceManagement,
 			expected: []string{"http://localhost:8091"},
@@ -191,7 +164,13 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 				resolved: &connstr.ResolvedConnectionString{
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
-				nodes: Nodes{{Hostname: "host1", Services: testServices}, {Hostname: "host2", Services: testServices}},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{
+							{Hostname: "host1", Services: testServices}, {Hostname: "host2", Services: testServices},
+						},
+					},
+				},
 			},
 			service:  ServiceManagement,
 			expected: []string{"http://host1:8091", "http://host2:8091"},
@@ -202,7 +181,13 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 				resolved: &connstr.ResolvedConnectionString{
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
-				nodes: Nodes{{Hostname: "host1", Services: testServices}, {Hostname: "host2", Services: kvOnlyService}},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{
+							{Hostname: "host1", Services: testServices}, {Hostname: "host2", Services: kvOnlyService},
+						},
+					},
+				},
 			},
 			service:  ServiceManagement,
 			expected: []string{"http://host1:8091"},
@@ -214,7 +199,13 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 					UseSSL:    true,
 				},
-				nodes: Nodes{{Hostname: "host1", Services: testServices}, {Hostname: "host2", Services: kvOnlyService}},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{
+							{Hostname: "host1", Services: testServices}, {Hostname: "host2", Services: kvOnlyService},
+						},
+					},
+				},
 			},
 			service:  ServiceManagement,
 			expected: []string{"https://host1:18091"},
@@ -226,17 +217,21 @@ func TestAuthProviderGetAllServiceHosts(t *testing.T) {
 					Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 				},
 				useAltAddr: true,
-				nodes: Nodes{
-					{
-						Hostname: "host1",
-						Services: testServices,
-						AlternateAddresses: AlternateAddresses{
-							External: &External{Hostname: "althost1", Services: testAltServices},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{
+						Nodes: Nodes{
+							{
+								Hostname: "host1",
+								Services: testServices,
+								AlternateAddresses: AlternateAddresses{
+									External: &External{Hostname: "althost1", Services: testAltServices},
+								},
+							},
+							{
+								Hostname: "host2",
+								Services: kvOnlyService,
+							},
 						},
-					},
-					{
-						Hostname: "host2",
-						Services: kvOnlyService,
 					},
 				},
 			},
@@ -269,7 +264,11 @@ func TestAuthProviderGetAllServiceHostsServiceNotAvailable(t *testing.T) {
 		resolved: &connstr.ResolvedConnectionString{
 			Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 		},
-		nodes: Nodes{{Hostname: "localhost", Services: services}},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: Nodes{{Hostname: "localhost", Services: services}},
+			},
+		},
 	}
 
 	_, err := provider.GetAllServiceHosts(ServiceData)
@@ -285,7 +284,11 @@ func TestAuthProviderGetHostServiceNotAvailable(t *testing.T) {
 		resolved: &connstr.ResolvedConnectionString{
 			Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 		},
-		nodes: Nodes{{Hostname: "localhost", Services: &Services{}}},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: Nodes{{Hostname: "localhost", Services: &Services{}}},
+			},
+		},
 	}
 
 	_, err := provider.GetServiceHost(ServiceAnalytics)
@@ -301,9 +304,13 @@ func TestAuthProviderGetHostServiceShouldUseBootstrapHost(t *testing.T) {
 			resolved: &connstr.ResolvedConnectionString{
 				Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 			},
-			nodes: Nodes{
-				{Hostname: "localhost", Services: &Services{CBAS: 12345}},
-				{Hostname: "bootstrap", Services: &Services{CBAS: 54321}, BootstrapNode: true},
+			manager: &ClusterConfigManager{
+				config: &ClusterConfig{
+					Nodes: Nodes{
+						{Hostname: "localhost", Services: &Services{CBAS: 12345}},
+						{Hostname: "bootstrap", Services: &Services{CBAS: 54321}, BootstrapNode: true},
+					},
+				},
 			},
 		}
 
@@ -317,9 +324,13 @@ func TestAuthProviderGetHostServiceShouldUseBootstrapHost(t *testing.T) {
 			resolved: &connstr.ResolvedConnectionString{
 				Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
 			},
-			nodes: Nodes{
-				{Hostname: "localhost", Services: &Services{CBAS: 12345}},
-				{Hostname: "bootstrap", Services: &Services{}, BootstrapNode: true},
+			manager: &ClusterConfigManager{
+				config: &ClusterConfig{
+					Nodes: Nodes{
+						{Hostname: "localhost", Services: &Services{CBAS: 12345}},
+						{Hostname: "bootstrap", Services: &Services{}, BootstrapNode: true},
+					},
+				},
 			},
 		}
 
@@ -401,17 +412,16 @@ func TestAuthProviderSuccessiveBootstrapping(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			hosts := make([]string, 0)
-			provider := &AuthProvider{resolved: test.input}
+			var (
+				hosts    = make([]string, 0)
+				provider = &AuthProvider{resolved: test.input}
+				hostFunc = provider.bootstrapHostFunc()
+			)
 
 			for {
-				host, err := provider.GetServiceHost(ServiceManagement)
-				if err != nil {
-					if errors.Is(err, errExhaustedBootstrapHosts) {
-						break
-					}
-
-					t.Fatalf("Expected to be able to get host: %v", err)
+				host := hostFunc()
+				if host == "" {
+					break
 				}
 
 				hosts = append(hosts, host)

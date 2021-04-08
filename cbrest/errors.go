@@ -8,10 +8,6 @@ import (
 )
 
 var (
-	// errExhaustedBootstrapHosts is an internal error, which signals that we've run out of valid hosts to bootstrap
-	// from.
-	errExhaustedBootstrapHosts = errors.New("exhausted bootstrap hosts")
-
 	// ErrNodeUninitialized is returned if the user attempts to interact with a node which has not been initialized.
 	ErrNodeUninitialized = errors.New("attempted to connect to an uninitialized node")
 
@@ -19,6 +15,10 @@ var (
 	// bootstrapped; this error shouldn't be returned when using the 'Client' since the constructor performs
 	// bootstrapping.
 	ErrNotBootstrapped = errors.New("auth provider not bootstrapped")
+
+	// ErrExhaustedClusterNodes is returned if we've failed to update the clients cluster config and have run out of
+	// nodes.
+	ErrExhaustedClusterNodes = errors.New("exhausted cluster nodes")
 )
 
 // BootstrapFailureError is returned to the user if we've failed to bootstrap the REST client.
@@ -75,9 +75,14 @@ func (e *AuthenticationError) Error() string {
 type InternalServerError struct {
 	method   Method
 	endpoint Endpoint
+	body     []byte
 }
 
 func (e *InternalServerError) Error() string {
+	if e.body != nil {
+		return fmt.Sprintf("internal server error executing '%s' request to '%s': %s", e.method, e.endpoint, e.body)
+	}
+
 	return fmt.Sprintf("internal server error executing '%s' request to '%s' check the logs for more details",
 		e.method, e.endpoint)
 }
@@ -186,4 +191,14 @@ type RetriesExhaustedError struct {
 
 func (e RetriesExhaustedError) Error() string {
 	return fmt.Sprintf("exhausted retry count after %d retries with status codes %v", e.retries, e.codes)
+}
+
+// OldClusterConfigError is returned when the client attempts to bootstrap against a node which returns a cluster config
+// which is older than the one we already have.
+type OldClusterConfigError struct {
+	old, curr int64
+}
+
+func (e *OldClusterConfigError) Error() string {
+	return fmt.Sprintf("cluster config revision %d is older than the current revision %d", e.old, e.curr)
 }

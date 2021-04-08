@@ -1,7 +1,6 @@
 package cbrest
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -16,24 +15,6 @@ func (n Nodes) Copy() Nodes {
 	}
 
 	return nodes
-}
-
-// UnmarshalJSON implements the JSON unmarshaler interface for a slice of nodes.
-func (n *Nodes) UnmarshalJSON(data []byte) error {
-	type overlay struct {
-		NodeExt []*Node `json:"nodesExt"`
-	}
-
-	var decoded overlay
-
-	err := json.Unmarshal(data, &decoded)
-	if err != nil {
-		return err
-	}
-
-	*n = decoded.NodeExt
-
-	return nil
 }
 
 // Node encapsulates the addressing information for a single node in a Couchbase Cluster.
@@ -60,6 +41,7 @@ func (n *Node) Copy() *Node {
 		Hostname:           n.Hostname,
 		Services:           &services,
 		AlternateAddresses: AlternateAddresses{External: &external},
+		BootstrapNode:      n.BootstrapNode,
 	}
 }
 
