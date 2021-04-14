@@ -2,17 +2,15 @@ package system
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strconv"
 )
 
 // totalMemory returns the total physical memory available on the host machine in bytes.
 func totalMemory() (uint64, error) {
-	output, err := exec.Command("wmic", "computersystem", "get", "TotalPhysicalMemory").CombinedOutput()
+	output, err := Execute("wmic computersystem get TotalPhysicalMemory")
 	if err != nil {
-		return 0, fmt.Errorf("failed to run 'wmic computersystem get TotalPhysicalMemory': %s",
-			formatCommandError(output, err))
+		return 0, err // Purposefully not wrapped
 	}
 
 	matches := regexp.MustCompile(`TotalPhysicalMemory\s+(\d+)`).FindStringSubmatch(string(output))

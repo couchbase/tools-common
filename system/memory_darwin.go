@@ -2,16 +2,15 @@ package system
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strconv"
 )
 
 // totalMemory returns the total physical memory available on the host machine in bytes.
 func totalMemory() (uint64, error) {
-	output, err := exec.Command("sysctl", "hw.memsize").CombinedOutput()
+	output, err := Execute("sysctl hw.memsize")
 	if err != nil {
-		return 0, fmt.Errorf("failed to run 'sysctl hw.memsize': %s", formatCommandError(output, err))
+		return 0, err // Purposefully not wrapped
 	}
 
 	matches := regexp.MustCompile(`hw\.memsize:\s+(\d+)`).FindStringSubmatch(string(output))
