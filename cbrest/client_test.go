@@ -1,6 +1,7 @@
 package cbrest
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -52,6 +53,8 @@ func TestNewClient(t *testing.T) {
 
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
+	client.authProvider.manager.signal = nil
+	client.authProvider.manager.cond = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -107,6 +110,8 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
+	client.authProvider.manager.signal = nil
+	client.authProvider.manager.cond = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -204,6 +209,8 @@ func TestNewClientAltAddress(t *testing.T) {
 
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
+	client.authProvider.manager.signal = nil
+	client.authProvider.manager.cond = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -239,6 +246,8 @@ func TestNewClientTLS(t *testing.T) {
 
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
+	client.authProvider.manager.signal = nil
+	client.authProvider.manager.cond = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{
@@ -290,8 +299,102 @@ func TestClientExecute(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
+func TestClientExecuteContextCancelledDoNotContinueRetries(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusTooEarly, []byte("body")))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		RetryOnStatusCodes: []int{http.StatusTooEarly},
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	client.requestRetries = math.MaxInt64
+	client.requestTimeout = 50 * time.Millisecond
+
+	_, err = client.Execute(request)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestClientExecuteRetryWithCCUpdate(t *testing.T) {
+	for _, disableCCP := range []bool{false, true} {
+		t.Run(fmt.Sprintf(`{"disable_ccp":"%t"}`, disableCCP), func(t *testing.T) {
+			handlers := make(TestHandlers)
+			handlers.Add(http.MethodGet, "/test", NewTestHandlerWithHijack(t))
+
+			cluster := NewTestCluster(t, TestClusterOptions{
+				Handlers: handlers,
+			})
+			defer cluster.Close()
+
+			request := &Request{
+				ContentType:        ContentTypeURLEncoded,
+				Endpoint:           "/test",
+				ExpectedStatusCode: http.StatusOK,
+				Method:             http.MethodGet,
+				Service:            ServiceManagement,
+			}
+
+			client, err := newTestClient(cluster, disableCCP)
+			require.NoError(t, err)
+			defer client.Close()
+
+			_, err = client.Execute(request)
+
+			var retriesExhausted *RetriesExhaustedError
+
+			require.ErrorAs(t, err, &retriesExhausted)
+			require.Equal(t, int64(3), client.authProvider.manager.config.Revision)
+		})
+	}
+}
+
+func TestClientExecuteRetryResponseWithCCUpdate(t *testing.T) {
+	for _, disableCCP := range []bool{false, true} {
+		t.Run(fmt.Sprintf(`{"disable_ccp":"%t"}`, disableCCP), func(t *testing.T) {
+			handlers := make(TestHandlers)
+			handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusUnauthorized, make([]byte, 0)))
+
+			cluster := NewTestCluster(t, TestClusterOptions{
+				Handlers: handlers,
+			})
+			defer cluster.Close()
+
+			request := &Request{
+				ContentType:        ContentTypeURLEncoded,
+				Endpoint:           "/test",
+				ExpectedStatusCode: http.StatusOK,
+				Method:             http.MethodGet,
+				Service:            ServiceManagement,
+			}
+
+			client, err := newTestClient(cluster, disableCCP)
+			require.NoError(t, err)
+			defer client.Close()
+
+			_, err = client.Execute(request)
+
+			var retriesExhausted *RetriesExhaustedError
+
+			require.ErrorAs(t, err, &retriesExhausted)
+			require.Equal(t, int64(3), client.authProvider.manager.config.Revision)
+		})
+	}
+}
+
 func TestClientExecuteWithDefaultRetries(t *testing.T) {
-	for _, status := range netutil.TemproraryFailureStatusCodes {
+	for status := range netutil.TemporaryFailureStatusCodes {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
 			handlers := make(TestHandlers)
 
@@ -928,6 +1031,8 @@ func TestClientPollCC(t *testing.T) {
 	client, err := newTestClient(cluster, false)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	// The test cluster currently doesn't return a revision, we can exploit this to detect whether the cluster config
 	// has been updated or not.
 	client.authProvider.manager.config.Revision = math.MaxInt64
@@ -946,6 +1051,8 @@ func TestClientPollCCOldRevisionIgnore(t *testing.T) {
 
 	client, err := newTestClient(cluster, false)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	rev := client.authProvider.manager.config.Revision
 

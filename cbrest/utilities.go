@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+
+	"github.com/couchbase/tools-common/netutil"
 )
 
 // readBody returns the entire response body returning an informative error in the case where the response body is less
@@ -90,4 +92,14 @@ func handleResponseError(method Method, endpoint Endpoint, statusCode int, body 
 		endpoint: endpoint,
 		empty:    len(body) == 0,
 	}
+}
+
+// shouldRetry returns a boolean indicating whether the request which returned the given error should be retried.
+func shouldRetry(err error) bool {
+	var (
+		socketClosed *SocketClosedInFlightError
+		unknownAuth  *UnknownAuthorityError
+	)
+
+	return err != nil && netutil.IsTemporaryError(err) || errors.As(err, &socketClosed) || errors.As(err, &unknownAuth)
 }

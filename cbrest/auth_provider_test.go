@@ -17,6 +17,8 @@ func TestNewAuthProvider(t *testing.T) {
 
 	// Don't compare the time attribute from the config manager
 	actual.manager.last = nil
+	actual.manager.signal = nil
+	actual.manager.cond = nil
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{},

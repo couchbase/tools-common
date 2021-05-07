@@ -190,14 +190,14 @@ func (c *Client) pollCC() {
 	defer c.wg.Done()
 
 	for {
-		c.authProvider.manager.Wait(c.ctx)
+		c.authProvider.manager.WaitUntilExpired(c.ctx)
 
 		if c.ctx.Err() != nil {
 			return
 		}
 
 		if err := c.updateCC(); err != nil {
-			log.Warnf("(REST) Failed to update cluster config, will retry: %w", err)
+			log.Warnf("(REST) Failed to update cluster config, will retry: %v", err)
 		}
 	}
 }
@@ -224,7 +224,7 @@ func (c *Client) updateCC() error {
 		// 'UnknownAuthorityError' we continue using the next node; we do this because that node may have been removed
 		// from the cluster.
 
-		log.Debugf("(REST) (CCP) Failed to update config using host '%s': %w", node.Hostname, err)
+		log.Warnf("(REST) (CCP) Failed to update config using host '%s': %v", node.Hostname, err)
 	}
 
 	return ErrExhaustedClusterNodes
@@ -469,13 +469,22 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, error) {
 	var (
 		response *http.Response
-		codes    []int
 		err      error
 	)
 
 	for attempt := 1; attempt <= c.requestRetries; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		response, err = c.do(ctx, request, attempt)
 		if err != nil {
+			if c.shouldRetry(ctx, err) {
+				log.Warnf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s' which failed due to error: %v",
+					attempt, request.Method, request.Endpoint, err)
+				continue
+			}
+
 			return nil, fmt.Errorf("failed to perform REST request on attempt %d: %w", attempt, err)
 		}
 
@@ -489,23 +498,73 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 			request.Method, request.Endpoint, response.StatusCode)
 
 		// We've failed with a status code which can't be retried return the response to the caller
-		if !(netutil.IsTemporaryFailure(response.StatusCode) ||
-			slice.ContainsInt(request.RetryOnStatusCodes, response.StatusCode)) {
+		if !c.shouldRetryWithReqRes(ctx, request, response) {
 			return response, nil
 		}
 
 		// We're going to be retrying this request, ensure the response body is closed to avoid resource leaks
 		response.Body.Close()
 
-		// Add the status code to the list of retried status code; this information is returned to the called if we
-		// exhaust the maximum number of retries.
-		codes = append(codes, response.StatusCode)
-
 		log.Warnf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s' which failed with status code %d",
 			attempt, request.Method, request.Endpoint, response.StatusCode)
 	}
 
-	return nil, &RetriesExhaustedError{retries: c.requestRetries, codes: codes}
+	// If we have a non-nil response try an convert the error into one of our more informative errors
+	if err == nil && response != nil {
+		err = handleResponseError(request.Method, request.Endpoint, response.StatusCode, nil)
+	}
+
+	return nil, &RetriesExhaustedError{retries: c.requestRetries, err: err}
+}
+
+// shouldRetry returns a boolean indicating whether the given error is retryable.
+func (c *Client) shouldRetry(ctx context.Context, err error) bool {
+	if !shouldRetry(err) {
+		return false
+	}
+
+	// We always update the cluster config after a failed request, since some connection failures may be due to an
+	// attempt to address a node which is no longer a member of the cluster or even running Couchbase Server. For
+	// example, the 'connection refused' error.
+	c.waitUntilUpdated(ctx)
+
+	return true
+}
+
+// shouldRetryWithReqRes returns a boolean indicating whether the given request is retryable.
+//
+// NOTE: When CCP is enabled, this function may block until the client has the latest available cluster config.
+func (c *Client) shouldRetryWithReqRes(ctx context.Context, request *Request, response *http.Response) bool {
+	updateCC := slice.ContainsInt([]int{http.StatusUnauthorized}, response.StatusCode)
+
+	// This could be a failure which is retryable without requiring the cluster config to be updated
+	if !updateCC {
+		return netutil.IsTemporaryFailure(response.StatusCode) ||
+			slice.ContainsInt(request.RetryOnStatusCodes, response.StatusCode)
+	}
+
+	c.waitUntilUpdated(ctx)
+
+	return true
+}
+
+// waitUntilUpdated blocks the calling goroutine until the cluster config has been updated.
+func (c *Client) waitUntilUpdated(ctx context.Context) {
+	// If we've got a CCP poller running, we can just wake it up and wait for the update to complete; this is more
+	// efficient because we can have multiple requests waiting for the CCP goroutine to update the cluster config
+	// at once.
+	if !(c.ctx == nil || c.cancelFunc == nil) {
+		c.authProvider.manager.WaitUntilUpdated(ctx)
+		return
+	}
+
+	// Otherwise we're going to have to manually update the config; this isn't ideal because it means more than one
+	// failed request may be updating the config concurrently. This should be handled correctly but may result in
+	// poorer performance/wasted time.
+	err := c.updateCC()
+	if err != nil {
+		log.Warnf("(REST) Failed to update cluster config, will retry: %v", err)
+	}
 }
 
 // do is a convenience which prepares then performs the provided request.

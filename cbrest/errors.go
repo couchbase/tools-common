@@ -186,11 +186,15 @@ func (e *UnexpectedEndOfBodyError) Error() string {
 // constructor for more information.
 type RetriesExhaustedError struct {
 	retries int
-	codes   []int
+	err     error
 }
 
-func (e RetriesExhaustedError) Error() string {
-	return fmt.Sprintf("exhausted retry count after %d retries with status codes %v", e.retries, e.codes)
+func (e *RetriesExhaustedError) Error() string {
+	return fmt.Sprintf("exhausted retry count after %d retries, last error: %s", e.retries, e.Unwrap())
+}
+
+func (e *RetriesExhaustedError) Unwrap() error {
+	return e.err
 }
 
 // OldClusterConfigError is returned when the client attempts to bootstrap against a node which returns a cluster config
