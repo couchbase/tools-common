@@ -2,8 +2,11 @@ package fsutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -190,4 +193,43 @@ func Sync(path string) error {
 	defer file.Close()
 
 	return file.Sync()
+}
+
+// Atomic will perform the provided function in an "atmoic" fashion. It's required that the provided function create the
+// file at the given path if it doesn't already exist.
+//
+// NOTE: This only works to the degree that the underlying operating system guarantees that renames are atomic.
+func Atomic(path string, fn func(path string) error) error {
+	temp, err := temporaryPath(path)
+	if err != nil {
+		return err
+	}
+
+	err = fn(temp)
+	if err != nil {
+		return err
+	}
+
+	return os.Rename(temp, path)
+}
+
+// temporaryPath returns a temporary path which resembles the provided path but is not the same; this may be used as a
+// temporary file which may be removed/renamed but leaves implicit context as to why the file itself was created.
+func temporaryPath(path string) (string, error) {
+	var (
+		rnd  = rand.NewSource(time.Now().Unix())
+		temp = filepath.Join(filepath.Dir(path), fmt.Sprintf(".temporary_%d_%s", rnd.Int63(), filepath.Base(path)))
+	)
+
+	exists, err := FileExists(temp)
+	if err != nil {
+		return "", err
+	}
+
+	// We generated a path to a file that already exists, try again
+	if exists {
+		return temporaryPath(path)
+	}
+
+	return temp, nil
 }

@@ -512,3 +512,39 @@ func TestOpenRandAccess(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, file.Close())
 }
+
+func TestAtomic(t *testing.T) {
+	for _, exists := range []bool{false, true} {
+		t.Run(strconv.FormatBool(exists), func(t *testing.T) {
+			var (
+				testDir = t.TempDir()
+				path    = filepath.Join(testDir, "file")
+			)
+
+			if exists {
+				require.NoError(t, os.WriteFile(path, []byte("<existing data>"), 0o777))
+			}
+
+			err := Atomic(path, func(path string) error { return WriteFile(path, []byte("Hello, World!"), 0) })
+			require.NoError(t, err)
+
+			stats, err := os.Stat(path)
+			require.NoError(t, err)
+			require.Equal(t, DefaultFileMode, stats.Mode())
+			require.Equal(t, int64(13), stats.Size())
+
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, []byte("Hello, World!"), data)
+		})
+	}
+}
+
+func TestTemporaryPath(t *testing.T) {
+	testDir := t.TempDir()
+
+	temp, err := temporaryPath(filepath.Join(testDir, "path/to/a/test/file"))
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(testDir, "path/to/a/test"), filepath.Dir(temp))
+	require.NotEqual(t, "file", filepath.Base(temp))
+}
