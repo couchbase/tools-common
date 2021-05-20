@@ -63,22 +63,22 @@ func (n *Node) Copy() *Node {
 	}
 }
 
-// GetHostname returns the fully qualified hostname to this node whilst honoring whether to use ssl or
+// GetQualifiedHostname returns the fully qualified hostname to this node whilst honoring whether to use ssl or
 // alternative addressing.
 //
 // NOTE: Will return an empty string if there are no valid ports/addresses that we can use against this node.
-func (n *Node) GetHostname(service Service, useSSL, useAltAddr bool) (string, bool) {
+func (n *Node) GetQualifiedHostname(service Service, useSSL, useAltAddr bool) (string, bool) {
 	schema := "http"
 	if useSSL {
 		schema = "https"
 	}
 
-	hostname := n.hostname(useAltAddr)
+	hostname := n.GetHostname(useAltAddr)
 	if hostname == "" {
 		return "", n.BootstrapNode
 	}
 
-	port := n.port(service, useSSL, useAltAddr)
+	port := n.GetPort(service, useSSL, useAltAddr)
 	if port == 0 {
 		return "", n.BootstrapNode
 	}
@@ -86,10 +86,10 @@ func (n *Node) GetHostname(service Service, useSSL, useAltAddr bool) (string, bo
 	return fmt.Sprintf("%s://%s:%d", schema, hostname, port), n.BootstrapNode
 }
 
-// hostname returns the hostname which can be used to address this node whilst honoring alternative addressing.
+// GetHostname returns the hostname which can be used to address this node whilst honoring alternative addressing.
 //
 // NOTE: Will return an empty string if this node doesn't have alternative addressing enabled.
-func (n *Node) hostname(useAltAddr bool) string {
+func (n *Node) GetHostname(useAltAddr bool) string {
 	if !useAltAddr {
 		return n.Hostname
 	}
@@ -101,11 +101,11 @@ func (n *Node) hostname(useAltAddr bool) string {
 	return n.AlternateAddresses.External.Hostname
 }
 
-// port returns the port which will be used to address this node whilst honoring whether to use ssl and alternative
+// GetPort returns the port which will be used to address this node whilst honoring whether to use ssl and alternative
 // addressing.
 //
 // NOTE: Will return a zero value port if no valid port can be found.
-func (n *Node) port(service Service, useSSL, useAltAddr bool) uint16 {
+func (n *Node) GetPort(service Service, useSSL, useAltAddr bool) uint16 {
 	if !useAltAddr {
 		return n.Services.GetPort(service, useSSL)
 	}

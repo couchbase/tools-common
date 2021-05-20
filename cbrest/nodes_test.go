@@ -379,7 +379,7 @@ func TestNodeGetHostname(t *testing.T) {
 	for _, test := range tests {
 		name := fmt.Sprintf(`{"service":"%s","use_ssl":%t,"use_alt_addr":%t}`, test.service, test.useSSL, test.useAltAddr)
 		t.Run(name, func(t *testing.T) {
-			hostname, _ := test.node.GetHostname(test.service, test.useSSL, test.useAltAddr)
+			hostname, _ := test.node.GetQualifiedHostname(test.service, test.useSSL, test.useAltAddr)
 			require.Equal(t, test.expected, hostname)
 		})
 	}
@@ -394,7 +394,7 @@ func TestNodeGetHostname(t *testing.T) {
 		},
 	}
 
-	hostname, _ := altAddressNode.GetHostname(ServiceData, false, true)
+	hostname, _ := altAddressNode.GetQualifiedHostname(ServiceData, false, true)
 
 	require.Zero(t, hostname, "Alternate hostname is not populated, expected to get an empty string")
 

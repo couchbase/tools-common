@@ -67,7 +67,7 @@ func (a *AuthProvider) GetAllServiceHosts(service Service) ([]string, error) {
 	hosts := make([]string, 0)
 
 	for _, node := range a.nodes {
-		hostname, boostrap := node.GetHostname(service, a.resolved.UseSSL, a.useAltAddr)
+		hostname, boostrap := node.GetQualifiedHostname(service, a.resolved.UseSSL, a.useAltAddr)
 		if hostname == "" {
 			continue
 		}
