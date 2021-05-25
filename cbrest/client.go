@@ -502,8 +502,11 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 			return response, nil
 		}
 
-		// We're going to be retrying this request, ensure the response body is closed to avoid resource leaks
-		response.Body.Close()
+		// We're going to be retrying this request, ensure the response body is closed to avoid resource leaks, we don't
+		// close the response body for the final attempt since we'll include the body in the returned error.
+		if attempt != c.requestRetries {
+			response.Body.Close()
+		}
 
 		log.Warnf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s' which failed with status code %d",
 			attempt, request.Method, request.Endpoint, response.StatusCode)
@@ -511,7 +514,11 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 
 	// If we have a non-nil response try an convert the error into one of our more informative errors
 	if err == nil && response != nil {
-		err = handleResponseError(request.Method, request.Endpoint, response.StatusCode, nil)
+		// Attempt to read the response body, this will help improve the returned error message
+		defer response.Body.Close()
+		body, _ := readBody(request.Method, request.Endpoint, response.Body, response.ContentLength)
+
+		err = handleResponseError(request.Method, request.Endpoint, response.StatusCode, body)
 	}
 
 	return nil, &RetriesExhaustedError{retries: c.requestRetries, err: err}
@@ -535,6 +542,11 @@ func (c *Client) shouldRetry(ctx context.Context, err error) bool {
 //
 // NOTE: When CCP is enabled, this function may block until the client has the latest available cluster config.
 func (c *Client) shouldRetryWithReqRes(ctx context.Context, request *Request, response *http.Response) bool {
+	// The user has explicitly stated that they don't want this status code retried, don't retry
+	if slice.ContainsInt(request.NoRetryOnStatusCodes, response.StatusCode) {
+		return false
+	}
+
 	updateCC := slice.ContainsInt([]int{http.StatusUnauthorized}, response.StatusCode)
 
 	// This could be a failure which is retryable without requiring the cluster config to be updated

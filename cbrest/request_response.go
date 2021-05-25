@@ -52,6 +52,9 @@ type Request struct {
 
 	// RetryOnStatusCodes is a list of status codes which will be used to indicate that we should retry the request.
 	RetryOnStatusCodes []int
+
+	// NoRetryOnStatusCodes is a list of status codes which will explicitly not be retried.
+	NoRetryOnStatusCodes []int
 }
 
 // Response represents a REST response from the Couchbase Cluster.

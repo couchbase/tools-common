@@ -393,6 +393,46 @@ func TestClientExecuteRetryResponseWithCCUpdate(t *testing.T) {
 	}
 }
 
+func TestClientExecuteWithSkipRetry(t *testing.T) {
+	var (
+		attempts int
+		handlers = make(TestHandlers)
+	)
+
+	handlers.Add(http.MethodGet, "/test", func(writer http.ResponseWriter, request *http.Request) {
+		attempts++
+
+		writer.WriteHeader(http.StatusGatewayTimeout)
+
+		_, err := writer.Write(make([]byte, 0))
+		require.NoError(t, err)
+	})
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:          ContentTypeURLEncoded,
+		Endpoint:             "/test",
+		ExpectedStatusCode:   http.StatusOK,
+		Method:               http.MethodGet,
+		NoRetryOnStatusCodes: []int{http.StatusGatewayTimeout},
+		Service:              ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	_, err = client.Execute(request)
+
+	var unexpectedStatus *UnexpectedStatusCodeError
+
+	require.ErrorAs(t, err, &unexpectedStatus)
+	require.Equal(t, 1, attempts)
+}
+
 func TestClientExecuteWithDefaultRetries(t *testing.T) {
 	for status := range netutil.TemporaryFailureStatusCodes {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
@@ -590,7 +630,7 @@ func TestClientExecuteAuthError(t *testing.T) {
 
 func TestClientExecuteInternalServerError(t *testing.T) {
 	handlers := make(TestHandlers)
-	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusInternalServerError, make([]byte, 0)))
+	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusInternalServerError, []byte("response body")))
 
 	cluster := NewTestCluster(t, TestClusterOptions{
 		Handlers: handlers,
@@ -614,6 +654,7 @@ func TestClientExecuteInternalServerError(t *testing.T) {
 	var internalServerError *InternalServerError
 
 	require.ErrorAs(t, err, &internalServerError)
+	require.Equal(t, []byte("response body"), internalServerError.body)
 }
 
 func TestClientExecute404Status(t *testing.T) {

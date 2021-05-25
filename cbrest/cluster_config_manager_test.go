@@ -188,7 +188,8 @@ func TestClusterConfigManagerWaitUntilExpired(t *testing.T) {
 		woken = true
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	// Sleep for less than the max age to avoid racing for the condition below
+	time.Sleep(25 * time.Millisecond)
 
 	require.False(t, woken)
 
