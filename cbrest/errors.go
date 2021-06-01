@@ -113,16 +113,18 @@ type UnexpectedStatusCodeError struct {
 	Status   int
 	method   Method
 	endpoint Endpoint
-	empty    bool
+	body     []byte
 }
 
 func (e *UnexpectedStatusCodeError) Error() string {
 	msg := fmt.Sprintf("unexpected status code %d for '%s' request to '%s'", e.Status, e.method, e.endpoint)
-	if e.empty {
-		msg += " response body was empty"
+	if len(e.body) == 0 {
+		msg += ", check the logs for more details"
+	} else {
+		msg += fmt.Sprintf(", %s", e.body)
 	}
 
-	return msg + ", check the logs for more details"
+	return msg
 }
 
 // ServiceNotAvailableError is returned if the requested service is is unavailable i.e. there are no nodes in the

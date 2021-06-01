@@ -404,7 +404,7 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 
 		writer.WriteHeader(http.StatusGatewayTimeout)
 
-		_, err := writer.Write(make([]byte, 0))
+		_, err := writer.Write([]byte("Hello, World!"))
 		require.NoError(t, err)
 	})
 
@@ -430,6 +430,7 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 	var unexpectedStatus *UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
+	require.Equal(t, []byte("Hello, World!"), unexpectedStatus.body)
 	require.Equal(t, 1, attempts)
 }
 

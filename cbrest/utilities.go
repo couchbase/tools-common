@@ -90,7 +90,7 @@ func handleResponseError(method Method, endpoint Endpoint, statusCode int, body 
 		Status:   statusCode,
 		method:   method,
 		endpoint: endpoint,
-		empty:    len(body) == 0,
+		body:     body,
 	}
 }
 
