@@ -20,7 +20,6 @@ import (
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/envvar"
 	"github.com/couchbase/tools-common/log"
-	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/slice"
 )
@@ -48,7 +47,6 @@ type Client struct {
 
 	pollTimeout    time.Duration
 	requestRetries int
-	requestTimeout time.Duration
 
 	reqResLogLevel log.Level
 
@@ -68,13 +66,6 @@ func NewClient(options ClientOptions) (*Client, error) {
 		clientTimeout = DefaultClientTimeout
 	} else {
 		log.Infof("(REST) Set HTTP client timeout to: %s", clientTimeout)
-	}
-
-	requestTimeout, ok := envvar.GetDuration("CB_REST_CLIENT_REQUEST_TIMEOUT")
-	if !ok {
-		requestTimeout = DefaultRequestTimeout
-	} else {
-		log.Infof("(REST) Set request timeout to: %s", requestTimeout)
 	}
 
 	requestRetries, ok := envvar.GetInt("CB_REST_CLIENT_NUM_RETRIES")
@@ -105,9 +96,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 
 	client := &Client{
 		client: &http.Client{
-			// NOTE: The HTTP client timeout should be the larger of the two configurable timeouts to avoid one cutting
-			// the other short.
-			Timeout: time.Duration(maths.Max(int(requestTimeout), int(clientTimeout))),
+			Timeout: clientTimeout,
 			Transport: &http.Transport{
 				DialContext: (&net.Dialer{
 					Timeout:   30 * time.Second,
@@ -125,7 +114,6 @@ func NewClient(options ClientOptions) (*Client, error) {
 		authProvider:   authProvider,
 		pollTimeout:    pollTimeout,
 		requestRetries: requestRetries,
-		requestTimeout: requestTimeout,
 		reqResLogLevel: options.ReqResLogLevel,
 	}
 
@@ -328,7 +316,7 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 
 	setAuthHeaders(host, c.authProvider, req)
 
-	resp, err := c.perform(req, log.LevelDebug, 1)
+	resp, err := c.perform(req, log.LevelDebug, 1, 0)
 	if err != nil {
 		return nil, handleRequestError(req, err) // Purposefully not wrapped
 	}
@@ -415,11 +403,6 @@ func (c *Client) PollTimeout() time.Duration {
 	return c.pollTimeout
 }
 
-// RequestTimeout returns the request timeout used by the current client.
-func (c *Client) RequestTimeout() time.Duration {
-	return c.requestTimeout
-}
-
 // RequestRetries returns the number of times a request will be retried for known failure cases.
 func (c *Client) RequestRetries() int {
 	return c.requestRetries
@@ -449,11 +432,7 @@ func (c *Client) AltAddr() bool {
 // Execute the given request to completion reading the entire response body whilst honoring request level
 // retries/timeout.
 func (c *Client) Execute(request *Request) (*Response, error) {
-	// Create a context which allows use to control the timeout for this request over multiple retries
-	ctx, cancelFunc := context.WithTimeout(context.Background(), c.requestTimeout)
-	defer cancelFunc()
-
-	resp, err := c.Do(ctx, request)
+	resp, err := c.Do(context.Background(), request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -599,7 +578,7 @@ func (c *Client) do(ctx context.Context, request *Request, attempt int) (*http.R
 		return nil, fmt.Errorf("failed to prepare request: %w", err)
 	}
 
-	resp, err := c.perform(prep, c.reqResLogLevel, attempt)
+	resp, err := c.perform(prep, c.reqResLogLevel, attempt, request.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform request: %w", err)
 	}
@@ -644,10 +623,21 @@ func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, 
 
 // perform synchronously executes the provided request returning the response and any error that occurred during the
 // process.
-func (c *Client) perform(req *http.Request, level log.Level, attempt int) (*http.Response, error) {
+func (c *Client) perform(req *http.Request, level log.Level, attempt int,
+	customTimeout time.Duration) (*http.Response, error) {
 	log.Logf(level, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", attempt, req.Method, req.URL)
 
-	resp, err := c.client.Do(req)
+	client := c.client
+	// We only use the custom timeout if it is bigger than the client one. This is so that it can be overridden via
+	// environmental variables.
+	if customTimeout > 0 && customTimeout > client.Timeout {
+		client = &http.Client{
+			Timeout:   customTimeout,
+			Transport: client.Transport,
+		}
+	}
+
+	resp, err := client.Do(req)
 	if err == nil {
 		log.Logf(level, "(REST) (Attempt %d) (%s) (%d) Received response from '%s'", attempt, req.Method,
 			resp.StatusCode, req.URL)

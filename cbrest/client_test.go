@@ -1,7 +1,6 @@
 package cbrest
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -316,34 +315,6 @@ func TestClientExecute(t *testing.T) {
 	actual, err := client.Execute(request)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
-}
-
-func TestClientExecuteContextCancelledDoNotContinueRetries(t *testing.T) {
-	handlers := make(TestHandlers)
-	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusTooEarly, []byte("body")))
-
-	cluster := NewTestCluster(t, TestClusterOptions{
-		Handlers: handlers,
-	})
-	defer cluster.Close()
-
-	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		RetryOnStatusCodes: []int{http.StatusTooEarly},
-		Service:            ServiceManagement,
-	}
-
-	client, err := newTestClient(cluster, true)
-	require.NoError(t, err)
-
-	client.requestRetries = math.MaxInt64
-	client.requestTimeout = 50 * time.Millisecond
-
-	_, err = client.Execute(request)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
 func TestClientExecuteRetryWithCCUpdate(t *testing.T) {
@@ -1258,4 +1229,56 @@ func TestClientGetWithUnexpectedStatusCode(t *testing.T) {
 	var unexpectedStatus *UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
+}
+
+func TestClientDoRequestWithCustomTimeout(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(400 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	defer client.Close()
+
+	t.Run("custom larger than client", func(t *testing.T) {
+		client.client.Timeout = 100 * time.Millisecond
+
+		res, err := client.Execute(
+			&Request{
+				Method:             http.MethodGet,
+				Endpoint:           "/test",
+				ExpectedStatusCode: http.StatusOK,
+				Service:            ServiceManagement,
+				Timeout:            800 * time.Millisecond,
+			},
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+	})
+
+	t.Run("custom smaller than client", func(t *testing.T) {
+		client.client.Timeout = 800 * time.Millisecond
+
+		res, err := client.Execute(
+			&Request{
+				Method:             http.MethodGet,
+				Endpoint:           "/test",
+				ExpectedStatusCode: http.StatusOK,
+				Service:            ServiceManagement,
+				Timeout:            100 * time.Millisecond,
+			},
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+	})
 }

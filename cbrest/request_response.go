@@ -2,6 +2,7 @@ package cbrest
 
 import (
 	"net/url"
+	"time"
 )
 
 // Method is a readability wrapper around the method for a given REST request; only the methods defined in the 'http'
@@ -55,6 +56,9 @@ type Request struct {
 
 	// NoRetryOnStatusCodes is a list of status codes which will explicitly not be retried.
 	NoRetryOnStatusCodes []int
+
+	// Timeout overrides the default client timeout. If not set the client timeout will be used instead.
+	Timeout time.Duration
 }
 
 // Response represents a REST response from the Couchbase Cluster.
