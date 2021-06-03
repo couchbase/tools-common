@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -106,8 +107,20 @@ func NewClient(options ClientOptions) (*Client, error) {
 		client: &http.Client{
 			// NOTE: The HTTP client timeout should be the larger of the two configurable timeouts to avoid one cutting
 			// the other short.
-			Timeout:   time.Duration(maths.Max(int(requestTimeout), int(clientTimeout))),
-			Transport: &http.Transport{TLSClientConfig: options.TLSConfig},
+			Timeout: time.Duration(maths.Max(int(requestTimeout), int(clientTimeout))),
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				ExpectContinueTimeout: 1 * time.Second,
+				ForceAttemptHTTP2:     true,
+				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConns:          100,
+				Proxy:                 http.ProxyFromEnvironment,
+				TLSClientConfig:       options.TLSConfig,
+				TLSHandshakeTimeout:   10 * time.Second,
+			},
 		},
 		authProvider:   authProvider,
 		pollTimeout:    pollTimeout,
