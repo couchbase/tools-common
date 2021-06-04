@@ -156,10 +156,6 @@ func NewClient(options ClientOptions) (*Client, error) {
 		log.Warnf("(REST) failed to bootstrap client, will retry: %v", err)
 	}
 
-	if !options.DisableCCP {
-		client.beginCCP()
-	}
-
 	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
 	client.clusterInfo, err = client.GetClusterInfo()
 	if err != nil {
@@ -167,6 +163,12 @@ func NewClient(options ClientOptions) (*Client, error) {
 	}
 
 	client.logConnectionInfo()
+
+	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
+	// having the cluster uuid to determine whether it's safe to use a given cluster config.
+	if !options.DisableCCP {
+		client.beginCCP()
+	}
 
 	return client, nil
 }

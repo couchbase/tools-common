@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/netutil"
+	"github.com/couchbase/tools-common/testutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -95,6 +96,31 @@ func TestNewClient(t *testing.T) {
 	}
 
 	require.Equal(t, expected, client.authProvider)
+}
+
+// This is a smoke test to assert that the cluster config poller doesn't attempt to dereference a <nil> pointer. See
+// MB-46754 for more information.
+func TestNewClientBeginCCPAfterClusterInfo(t *testing.T) {
+	os.Setenv("CB_REST_CC_MAX_AGE", "50ms")
+	defer os.Unsetenv("CB_REST_CC_MAX_AGE")
+
+	handlers := make(TestHandlers)
+
+	handlers.Add(http.MethodGet, string(EndpointPoolsDefault), func(writer http.ResponseWriter, request *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+
+		testutil.EncodeJSON(t, writer, struct {
+			Nodes []node `json:"nodes"`
+		}{
+			Nodes: createNodeList(TestNodes{{}}),
+		})
+	})
+
+	cluster := NewTestCluster(t, TestClusterOptions{Handlers: handlers})
+	defer cluster.Close()
+
+	_, err := newTestClient(cluster, false)
+	require.NoError(t, err)
 }
 
 func TestNewClientClusterNotInitialized(t *testing.T) {
