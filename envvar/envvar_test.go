@@ -254,3 +254,45 @@ func TestGetDurationBC(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBytes(t *testing.T) {
+	type test struct {
+		name          string
+		value         string
+		envName       string
+		expectedBool  bool
+		expectedBytes uint64
+	}
+
+	tests := []test{
+		{
+			name:          "SetToKiB",
+			value:         "1KiB",
+			envName:       "CB_TEST_ABCDEFG",
+			expectedBool:  true,
+			expectedBytes: 1024,
+		},
+		{
+			name:    "UnsetEnv",
+			value:   "",
+			envName: "CB_TEST_ABCDEFG_amdkasd",
+		},
+		{
+			name:    "InvalidByteString",
+			value:   "7.87.232.498",
+			envName: "CB_TEST_ABCDEFG",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.NoError(t, os.Setenv(test.envName, test.value))
+			defer os.Unsetenv(test.envName)
+
+			out, ok := GetBytes(test.envName)
+
+			require.Equal(t, test.expectedBool, ok)
+			require.Equal(t, test.expectedBytes, out)
+		})
+	}
+}

@@ -4,6 +4,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/couchbase/tools-common/parse"
 )
 
 // GetInt returns the int value of the environmental variable varName  if the env var is not an int or empty it will
@@ -87,4 +89,15 @@ func GetDurationBC(varName string) (time.Duration, bool) {
 	}
 
 	return 0, false
+}
+
+// GetBytes returns the number of bytes represented by the environmental variable varName if the env var is empty or not
+// a valid byte string it will return 0, false.
+func GetBytes(varName string) (uint64, bool) {
+	b, err := parse.Bytes(os.Getenv(varName))
+	if err != nil {
+		return 0, false
+	}
+
+	return b, true
 }
