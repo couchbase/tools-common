@@ -58,7 +58,7 @@ func Create(path string) (*os.File, error) {
 	return CreateFile(path, os.O_RDWR, 0)
 }
 
-// CreateFile creates a new function (or truncates an existing one) at the provided path using the given flags/mode.
+// CreateFile creates a new file (or truncates an existing one) at the provided path using the given flags/mode.
 //
 // NOTE: If a zero value file mode is suppled, the default will be used.
 func CreateFile(path string, flags int, mode os.FileMode) (*os.File, error) {
@@ -83,8 +83,10 @@ func CreateFile(path string, flags int, mode os.FileMode) (*os.File, error) {
 }
 
 // WriteAt writes data to the given offset in the file at the provided path.
+//
+// NOTE: The file at the given path must already exist.
 func WriteAt(path string, data []byte, offset int64) error {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, DefaultFileMode)
+	file, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -128,6 +130,24 @@ func WriteToFile(path string, reader io.Reader, mode os.FileMode) error {
 	}
 
 	return file.Sync()
+}
+
+// CopyFile copies the source file to the sink file truncating it if it already exists.
+//
+// NOTE: The sink file will be given the same permissions as the source file.
+func CopyFile(source, sink string) error {
+	stats, err := os.Stat(source)
+	if err != nil {
+		return err
+	}
+
+	file, err := CreateFile(sink, os.O_WRONLY, stats.Mode())
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return CopyFileTo(source, file)
 }
 
 // CopyFileTo copies all the data from the file at the provided path into the given writer.

@@ -2,6 +2,7 @@ package fsutil
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -263,6 +264,7 @@ func TestWriteAt(t *testing.T) {
 			path    = filepath.Join(testDir, "file")
 		)
 
+		require.NoError(t, Touch(path))
 		require.NoError(t, WriteAt(path, []byte("Hello, World!"), 4096))
 
 		data, err := os.ReadFile(path)
@@ -321,6 +323,72 @@ func TestWriteToFile(t *testing.T) {
 			require.Equal(t, []byte("Hello, World!"), data)
 		})
 	}
+}
+
+func TestCopyFile(t *testing.T) {
+	t.Run("Exists", func(t *testing.T) {
+		var (
+			testDir = t.TempDir()
+			source  = filepath.Join(testDir, "source")
+			sink    = filepath.Join(testDir, "sink")
+		)
+
+		require.NoError(t, WriteFile(source, []byte("Hello, World!"), 0))
+		require.NoError(t, WriteFile(sink, []byte("Goodbye, Cruel World!"), 0o777))
+
+		require.NoError(t, CopyFile(source, sink))
+		require.FileExists(t, sink)
+
+		stats, err := os.Stat(sink)
+		require.NoError(t, err)
+		require.Equal(t, DefaultFileMode, stats.Mode())
+
+		data, err := os.ReadFile(sink)
+		require.NoError(t, err)
+		require.Equal(t, []byte("Hello, World!"), data)
+	})
+
+	t.Run("NotExists", func(t *testing.T) {
+		var (
+			testDir = t.TempDir()
+			source  = filepath.Join(testDir, "source")
+			sink    = filepath.Join(testDir, "sink")
+		)
+
+		require.NoError(t, WriteFile(source, []byte("Hello, World!"), 0))
+
+		require.NoError(t, CopyFile(source, sink))
+
+		stats, err := os.Stat(sink)
+		require.NoError(t, err)
+		fmt.Println(DefaultFileMode)
+		fmt.Println(stats.Mode())
+		require.Equal(t, DefaultFileMode, stats.Mode())
+
+		data, err := os.ReadFile(sink)
+		require.NoError(t, err)
+		require.Equal(t, []byte("Hello, World!"), data)
+	})
+
+	t.Run("NonDefaultMode", func(t *testing.T) {
+		var (
+			testDir = t.TempDir()
+			source  = filepath.Join(testDir, "source")
+			sink    = filepath.Join(testDir, "sink")
+		)
+
+		require.NoError(t, WriteFile(source, []byte("Hello, World!"), 0o777))
+
+		require.NoError(t, CopyFile(source, sink))
+
+		stats, err := os.Stat(sink)
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0o777), stats.Mode())
+
+		data, err := os.ReadFile(sink)
+		require.NoError(t, err)
+		require.Equal(t, []byte("Hello, World!"), data)
+	})
 }
 
 func TestCopyFileTo(t *testing.T) {
