@@ -53,7 +53,7 @@ func TestNewClientWithTransportDefaults(t *testing.T) {
 
 	transport := client.client.Transport.(*http.Transport)
 
-	require.Equal(t, 1*time.Second, transport.ExpectContinueTimeout)
+	require.Zero(t, transport.ExpectContinueTimeout)
 	require.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout)
 	require.Equal(t, 100, transport.MaxIdleConns)
 	require.Equal(t, 90*time.Second, transport.IdleConnTimeout)
