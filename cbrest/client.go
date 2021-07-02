@@ -35,6 +35,10 @@ type ClientOptions struct {
 	// client functions to return stale data/attempt to address missing nodes.
 	DisableCCP bool
 
+	// SkipBootstrap is only meant to be used if you only want to exclusively communicate with the given host. It should
+	// only be used for short lived clients, ideally doing a couple of requests at most.
+	SkipBootstrap bool
+
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
 	ReqResLogLevel log.Level
 }
@@ -123,6 +127,14 @@ func NewClient(options ClientOptions) (*Client, error) {
 		errAuthentication *AuthenticationError
 		errAuthorization  *AuthorizationError
 	)
+
+	if options.SkipBootstrap {
+		if err = client.singleNodeConfig(hostFunc()); err != nil {
+			return nil, fmt.Errorf("failed to get node information: %w", err)
+		}
+
+		return client, nil
+	}
 
 	for {
 		host := hostFunc()
@@ -230,6 +242,36 @@ func (c *Client) updateCC() error {
 	}
 
 	return ErrExhaustedClusterNodes
+}
+
+func (c *Client) singleNodeConfig(host string) error {
+	body, err := c.get(host, EndpointNodesServices)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	// This shouldn't really fail since we should be constructing valid hosts in the auth provider
+	parsed, err := url.Parse(host)
+	if err != nil {
+		return fmt.Errorf("failed to parse host '%s': %w", host, err)
+	}
+
+	config, err := c.unmarshalCC(parsed.Hostname(), body)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal cluster config: %w", err)
+	}
+
+	// Filter everything except the bootstrap node
+	conf := &ClusterConfig{Revision: config.Revision}
+
+	for _, node := range config.Nodes {
+		if node.BootstrapNode {
+			conf.Nodes = Nodes{node}
+			break
+		}
+	}
+
+	return c.authProvider.SetClusterConfig(host, conf)
 }
 
 // updateCCFromNode will attempt to update the client's 'AuthProvider' using the provided node.
