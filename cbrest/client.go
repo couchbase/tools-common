@@ -133,6 +133,14 @@ func NewClient(options ClientOptions) (*Client, error) {
 			return nil, fmt.Errorf("failed to get node information: %w", err)
 		}
 
+		// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
+		client.clusterInfo, err = client.GetClusterInfo()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cluster information: %w", err)
+		}
+
+		client.logConnectionInfo()
+
 		return client, nil
 	}
 
