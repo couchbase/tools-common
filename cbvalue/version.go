@@ -17,26 +17,32 @@ const (
 	// development build and therefore is treated as being the latest version during comparisons.
 	VersionUnknown = Version("0.0.0")
 
-	// Version5_0_0 represents the 5.0.0 release of Couchbase Server.
+	// Version5_0_0 represents the 5.0.0 release of Couchbase Server (Spock).
 	Version5_0_0 = Version("5.0.0")
 
-	// Version5_5_0 represents the 5.5.0 release of Couchbase Server.
+	// Version5_5_0 represents the 5.5.0 release of Couchbase Server (Vulcan).
 	Version5_5_0 = Version("5.5.0")
 
-	// Version6_0_0 represents the 6.0.0 release of Couchbase Server.
+	// Version6_0_0 represents the 6.0.0 release of Couchbase Server (Alice).
 	Version6_0_0 = Version("6.0.0")
 
-	// Version6_5_0 represents the 6.5.0 release of Couchbase Server.
+	// Version6_5_0 represents the 6.5.0 release of Couchbase Server (Mad-Hatter).
 	Version6_5_0 = Version("6.5.0")
 
-	// Version6_6_0 represents the 6.6.0 release of Couchbase Server.
+	// Version6_6_0 represents the 6.6.0 release of Couchbase Server (Mad-Hatter).
 	Version6_6_0 = Version("6.6.0")
 
-	// Version7_0_0 represents the 7.0.0 release of Couchbase Server.
+	// Version7_0_0 represents the 7.0.0 release of Couchbase Server (Cheshire-Cat).
 	Version7_0_0 = Version("7.0.0")
 
+	// Version7_0_1 represents the 7.0.1 release of Couchbase Server (Cheshire-Cat).
+	Version7_0_1 = Version("7.0.1")
+
+	// Version7_1_0 represents the 7.1.0 release of Couchbase Server (Neo).
+	Version7_1_0 = Version("7.1.0")
+
 	// VersionLatest represents the latest known version of Couchbase server, this may be an unreleased version.
-	VersionLatest = Version7_0_0
+	VersionLatest = Version7_1_0
 )
 
 // Older returns a boolean indicating whether the current version is older than the provided version.
