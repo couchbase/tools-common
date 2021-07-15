@@ -4,6 +4,12 @@
 Welcome to `tools-common`. This is package contains various utilities used by the Go code
 maintained by the tools team.
 
+# Dependencies
+
+This package utilizes the [`go-sqlite3`](https://github.com/mattn/go-sqlite3) package which requires GCC to be
+installed, and CGO to be enabled (`CGO_ENABLED=1`). For more information, see the latest
+[README](https://github.com/mattn/go-sqlite3/blob/master/README.md) for the most up-to-date information.
+
 ## Contributing
 
 To contribute to this code base you can upload patches through [Gerrit](http://review.couchbase.org). Make sure you have
