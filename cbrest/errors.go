@@ -144,7 +144,7 @@ func IsServiceNotAvailable(err error) bool {
 	return err != nil && errors.As(err, &notAvailable)
 }
 
-// UnknownAuthorityError returned when the dispatched REST request receives an 'UnknownAuthorityError'.
+// UnknownAuthorityError is returned when the dispatched REST request receives an 'UnknownAuthorityError'.
 type UnknownAuthorityError struct {
 	inner error
 }
@@ -155,6 +155,19 @@ func (e *UnknownAuthorityError) Error() string {
 		"vulnerable to man-in-the-middle attacks.\n\nFor the most secure access to Couchbase make sure that you "+
 		"have X.509\ncertificates set up in your cluster and use the --cacert flag to specify\nyour client "+
 		"certificate.", e.inner)
+}
+
+// UnknownX509Error is returned when the dispatched REST request receives a generic (unhandled) x509 error.
+type UnknownX509Error struct {
+	inner error
+}
+
+func (e *UnknownX509Error) Unwrap() error {
+	return e.inner
+}
+
+func (e *UnknownX509Error) Error() string {
+	return e.inner.Error()
 }
 
 // SocketClosedInFlightError is returned if the client socket was closed during an active request. This is usually due

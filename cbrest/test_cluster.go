@@ -86,7 +86,9 @@ func NewTestCluster(t *testing.T, options TestClusterOptions) *TestCluster {
 	}
 
 	if options.TLSConfig != nil {
-		cluster.server = httptest.NewTLSServer(http.HandlerFunc(cluster.Handler))
+		cluster.server = httptest.NewUnstartedServer(http.HandlerFunc(cluster.Handler))
+		cluster.server.TLS = options.TLSConfig
+		cluster.server.StartTLS()
 	} else {
 		cluster.server = httptest.NewServer(http.HandlerFunc(cluster.Handler))
 	}

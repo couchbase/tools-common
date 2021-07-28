@@ -7,7 +7,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
+	"github.com/couchbase/tools-common/errutil"
 	"github.com/couchbase/tools-common/netutil"
 )
 
@@ -48,6 +50,12 @@ func handleRequestError(req *http.Request, err error) error {
 	var unknownAuth x509.UnknownAuthorityError
 	if errors.As(err, &unknownAuth) {
 		return &UnknownAuthorityError{inner: err}
+	}
+
+	// String comparisons aren't ideal for error handling, but this allows us to handle future x509 error types without
+	// modification.
+	if strings.HasPrefix(errutil.Unwrap(err).Error(), "x509") {
+		return &UnknownX509Error{inner: err}
 	}
 
 	// If we receive an EOF error, wrap it with a useful error message containing the method/endpoint

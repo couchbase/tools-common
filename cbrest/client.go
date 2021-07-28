@@ -160,9 +160,13 @@ func NewClient(options ClientOptions) (*Client, error) {
 			break
 		}
 
-		// For security reasons, return immediately if one of the provided nodes is an unknown authority
-		var errUnknownAuthority *UnknownAuthorityError
-		if errors.As(err, &errUnknownAuthority) {
+		var (
+			errUnknownAuthority *UnknownAuthorityError
+			errUnknownX509Error *UnknownX509Error
+		)
+
+		// For security reasons, return immediately if the user is connecting using TLS and we've received an x509 error
+		if errors.As(err, &errUnknownAuthority) || errors.As(err, &errUnknownX509Error) {
 			return nil, err
 		}
 
