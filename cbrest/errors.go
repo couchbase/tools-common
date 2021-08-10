@@ -32,8 +32,7 @@ type BootstrapFailureError struct {
 func (e *BootstrapFailureError) Error() string {
 	msg := "failed to connect to any host(s) from the connection string"
 	if e.ErrAuthentication != nil {
-		msg += ", check username and password (CLI user reminder – if the password includes special characters, " +
-			"the password should be enclosed in quotes to prevent issues due to interaction with the shell)"
+		msg += ", check username and password"
 	} else if e.ErrAuthorization != nil {
 		msg += ", user does not have the required permissions"
 	} else {
