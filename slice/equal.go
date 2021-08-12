@@ -3,7 +3,7 @@ package slice
 // EqualStrings - Returns a boolean indicating whether the given strings slices are the same.
 //
 // NOTE: This function considers:
-// 1) that a <nil>/zero length slices are equal
+// 1) that <nil>/zero length slices are equal
 // 2) that unsorted slices are not equal (because we shouldn't modify the given slices)
 func EqualStrings(a, b []string) bool {
 	if len(a) != len(b) {
