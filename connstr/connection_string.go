@@ -191,7 +191,7 @@ func (c *ConnectionString) resolveSRV() *ResolvedConnectionString {
 	for _, server := range servers {
 		resolved.Addresses = append(resolved.Addresses, Address{
 			Host: strings.TrimSuffix(server.Target, "."),
-			Port: server.Port,
+			Port: srvPort(c.Scheme),
 		})
 	}
 
