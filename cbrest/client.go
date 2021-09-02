@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/envvar"
 	"github.com/couchbase/tools-common/log"
+	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/slice"
 )
@@ -35,9 +36,9 @@ type ClientOptions struct {
 	// client functions to return stale data/attempt to address missing nodes.
 	DisableCCP bool
 
-	// SkipBootstrap is only meant to be used if you only want to exclusively communicate with the given host. It should
+	// ThisNodeOnly is only meant to be used if you only want to exclusively communicate with the given host. It should
 	// only be used for short lived clients, ideally doing a couple of requests at most.
-	SkipBootstrap bool
+	ThisNodeOnly bool
 
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
 	ReqResLogLevel log.Level
@@ -120,29 +121,38 @@ func NewClient(options ClientOptions) (*Client, error) {
 		reqResLogLevel: options.ReqResLogLevel,
 	}
 
+	err = client.bootstrap(options.ThisNodeOnly)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bootstrap client: %w", err)
+	}
+
+	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
+	client.clusterInfo, err = client.GetClusterInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster information: %w", err)
+	}
+
+	client.logConnectionInfo()
+
+	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
+	// having the cluster uuid to determine whether it's safe to use a given cluster config.
+	if !(options.ThisNodeOnly || options.DisableCCP) {
+		client.beginCCP()
+	}
+
+	return client, nil
+}
+
+// bootstrap attempts to bootstrap the client using the hosts from the given collection string provided by the user. The
+// optional argument 'thisNodeOnly' may be supplied to force all communication with the bootstrap node.
+func (c *Client) bootstrap(thisNodeOnly bool) error {
 	// Attempt to bootstrap the HTTP client, internally the auth provider will return the next available bootstrap host
 	// for successive calls until we run out of possible hosts (at which point we exit having failed to bootstrap).
 	var (
-		hostFunc          = client.authProvider.bootstrapHostFunc()
+		hostFunc          = c.authProvider.bootstrapHostFunc()
 		errAuthentication *AuthenticationError
 		errAuthorization  *AuthorizationError
 	)
-
-	if options.SkipBootstrap {
-		if err = client.singleNodeConfig(hostFunc()); err != nil {
-			return nil, fmt.Errorf("failed to get node information: %w", err)
-		}
-
-		// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
-		client.clusterInfo, err = client.GetClusterInfo()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get cluster information: %w", err)
-		}
-
-		client.logConnectionInfo()
-
-		return client, nil
-	}
 
 	for {
 		host := hostFunc()
@@ -150,10 +160,10 @@ func NewClient(options ClientOptions) (*Client, error) {
 		// If this call returned an empty hostname then we've tried all the available hostnames and we've failed to
 		// bootstrap against any of them.
 		if host == "" {
-			return nil, &BootstrapFailureError{ErrAuthentication: errAuthentication, ErrAuthorization: errAuthorization}
+			return &BootstrapFailureError{ErrAuthentication: errAuthentication, ErrAuthorization: errAuthorization}
 		}
 
-		err := client.updateCCFromHost(host)
+		err := c.updateCCFromHost(host, thisNodeOnly)
 
 		// We've successfully bootstrapped the client
 		if err == nil {
@@ -167,7 +177,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 
 		// For security reasons, return immediately if the user is connecting using TLS and we've received an x509 error
 		if errors.As(err, &errUnknownAuthority) || errors.As(err, &errUnknownX509Error) {
-			return nil, err
+			return err
 		}
 
 		// If we've hit an authorization/permission error, we will continue trying to bootstrap because this node may no
@@ -179,21 +189,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 		log.Warnf("(REST) failed to bootstrap client, will retry: %v", err)
 	}
 
-	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
-	client.clusterInfo, err = client.GetClusterInfo()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster information: %w", err)
-	}
-
-	client.logConnectionInfo()
-
-	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
-	// having the cluster uuid to determine whether it's safe to use a given cluster config.
-	if !options.DisableCCP {
-		client.beginCCP()
-	}
-
-	return client, nil
+	return nil
 }
 
 // beginCCP is a utility function which sets up and begins the cluster config polling goroutine.
@@ -256,36 +252,6 @@ func (c *Client) updateCC() error {
 	return ErrExhaustedClusterNodes
 }
 
-func (c *Client) singleNodeConfig(host string) error {
-	body, err := c.get(host, EndpointNodesServices)
-	if err != nil {
-		return fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	// This shouldn't really fail since we should be constructing valid hosts in the auth provider
-	parsed, err := url.Parse(host)
-	if err != nil {
-		return fmt.Errorf("failed to parse host '%s': %w", host, err)
-	}
-
-	config, err := c.unmarshalCC(parsed.Hostname(), body)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal cluster config: %w", err)
-	}
-
-	// Filter everything except the bootstrap node
-	conf := &ClusterConfig{Revision: config.Revision}
-
-	for _, node := range config.Nodes {
-		if node.BootstrapNode {
-			conf.Nodes = Nodes{node}
-			break
-		}
-	}
-
-	return c.authProvider.SetClusterConfig(host, conf)
-}
-
 // updateCCFromNode will attempt to update the client's 'AuthProvider' using the provided node.
 func (c *Client) updateCCFromNode(node *Node) error {
 	host, _ := node.GetQualifiedHostname(ServiceManagement, c.authProvider.resolved.UseSSL, c.authProvider.useAltAddr)
@@ -302,11 +268,11 @@ func (c *Client) updateCCFromNode(node *Node) error {
 		return fmt.Errorf("node is a member of a different cluster")
 	}
 
-	return c.updateCCFromHost(host)
+	return c.updateCCFromHost(host, false)
 }
 
 // updateCCFromHost will attempt to update the clients cluster config using the provided host.
-func (c *Client) updateCCFromHost(host string) error {
+func (c *Client) updateCCFromHost(host string, thisNodeOnly bool) error {
 	body, err := c.get(host, EndpointNodesServices)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
@@ -324,6 +290,10 @@ func (c *Client) updateCCFromHost(host string) error {
 	config, err := c.unmarshalCC(host, body)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal cluster config: %w", err)
+	}
+
+	if thisNodeOnly {
+		config.FilterOtherNodes()
 	}
 
 	return c.authProvider.SetClusterConfig(host, config)
@@ -451,6 +421,20 @@ func (c *Client) ClusterUUID() string {
 // NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterVersion'.
 func (c *Client) ClusterVersion() cbvalue.ClusterVersion {
 	return c.clusterInfo.Version
+}
+
+// MaxVBuckets returns the maximum number of vBuckets on the target cluster.
+//
+// NOTE: This function may return stale data, for the most up-to-date information, use 'GetMaxVBuckets'.
+func (c *Client) MaxVBuckets() uint16 {
+	return c.clusterInfo.MaxVBuckets
+}
+
+// UniformVBuckets returns a boolean indicating whether all the buckets on the cluster have the same amount of vBuckets.
+//
+// NOTE: This function may return stale data, for the most up-to-date information, use 'GetMaxVBuckets'.
+func (c *Client) UniformVBuckets() bool {
+	return c.clusterInfo.UniformVBuckets
 }
 
 // PollTimeout returns the poll timeout used by the current client.
@@ -727,7 +711,18 @@ func (c *Client) GetClusterInfo() (*cbvalue.ClusterInfo, error) {
 		return nil, fmt.Errorf("failed to get cluster version: %w", err)
 	}
 
-	return &cbvalue.ClusterInfo{Enterprise: enterprise, UUID: uuid, Version: version}, nil
+	maxVBuckets, uniformVBuckets, err := c.GetMaxVBuckets()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get max number of vBuckets: %w", err)
+	}
+
+	return &cbvalue.ClusterInfo{
+		Enterprise:      enterprise,
+		UUID:            uuid,
+		Version:         version,
+		MaxVBuckets:     maxVBuckets,
+		UniformVBuckets: uniformVBuckets,
+	}, nil
 }
 
 // GetClusterMetaData extracts some common metadata from the cluster. Returns a boolean indicating if this is an
@@ -813,6 +808,52 @@ func (c *Client) GetClusterVersion() (cbvalue.ClusterVersion, error) {
 	}
 
 	return clusterVersion, nil
+}
+
+// GetMaxVBuckets uses the bucket vBucket maps to determine the maximum number of vBuckets on the target cluster.
+func (c *Client) GetMaxVBuckets() (uint16, bool, error) {
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           EndpointBuckets,
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	response, err := c.Execute(request)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	type overlay struct {
+		VBucketServerMap struct {
+			VBucketMap [][2]int `json:"vBucketMap"`
+		} `json:"VBucketServerMap"`
+	}
+
+	var decoded []*overlay
+
+	err = json.Unmarshal(response.Body, &decoded)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if len(decoded) == 0 {
+		return 0, true, nil
+	}
+
+	var (
+		uniform = true
+		max     = len(decoded[0].VBucketServerMap.VBucketMap)
+	)
+
+	for _, bucket := range decoded {
+		num := len(bucket.VBucketServerMap.VBucketMap)
+		uniform = uniform && max == num
+		max = maths.Max(max, num)
+	}
+
+	return uint16(max), uniform, nil
 }
 
 // Close releases any resources that are actively being consumed/used by the client.

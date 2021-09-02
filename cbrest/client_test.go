@@ -98,6 +98,19 @@ func TestNewClient(t *testing.T) {
 	require.Equal(t, expected, client.authProvider)
 }
 
+func TestNewClientThisNodeOnly(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
+	defer cluster.Close()
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		ThisNodeOnly:     true,
+	})
+	require.NoError(t, err)
+	require.Len(t, client.authProvider.manager.config.Nodes, 1)
+}
+
 // This is a smoke test to assert that the cluster config poller doesn't attempt to dereference a <nil> pointer. See
 // MB-46754 for more information.
 func TestNewClientBeginCCPAfterClusterInfo(t *testing.T) {
@@ -1131,6 +1144,73 @@ func TestGetClusterMetaData(t *testing.T) {
 	}
 }
 
+func TestGetMaxVBuckets(t *testing.T) {
+	type test struct {
+		name    string
+		buckets TestBuckets
+		max     uint16
+		uniform bool
+	}
+
+	tests := []*test{
+		{
+			name:    "NoBuckets",
+			uniform: true,
+		},
+		{
+			name: "AllTheSame",
+			buckets: TestBuckets{
+				"bucket1": {NumVBuckets: 64},
+				"bucket2": {NumVBuckets: 64},
+			},
+			max:     64,
+			uniform: true,
+		},
+		{
+			name: "FirstWithMore",
+			buckets: TestBuckets{
+				"bucket1": {NumVBuckets: 1024},
+				"bucket2": {NumVBuckets: 64},
+				"bucket3": {NumVBuckets: 64},
+			},
+			max: 1024,
+		},
+		{
+			name: "MiddleWithMore",
+			buckets: TestBuckets{
+				"bucket1": {NumVBuckets: 64},
+				"bucket2": {NumVBuckets: 1024},
+				"bucket3": {NumVBuckets: 64},
+			},
+			max: 1024,
+		},
+		{
+			name: "LastWithMore",
+			buckets: TestBuckets{
+				"bucket1": {NumVBuckets: 64},
+				"bucket2": {NumVBuckets: 64},
+				"bucket3": {NumVBuckets: 1024},
+			},
+			max: 1024,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cluster := NewTestCluster(t, TestClusterOptions{Buckets: test.buckets})
+			defer cluster.Close()
+
+			client, err := newTestClient(cluster, true)
+			require.NoError(t, err)
+
+			maxVBuckets, uniformVBuckets, err := client.GetMaxVBuckets()
+			require.NoError(t, err)
+			require.Equal(t, test.max, maxVBuckets)
+			require.Equal(t, test.uniform, uniformVBuckets)
+		})
+	}
+}
+
 func TestClientBeginCCP(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
@@ -1235,7 +1315,7 @@ func TestClientUpdateCCFromNode(t *testing.T) {
 }
 
 func TestClientUpdateCCFromHost(t *testing.T) {
-	cluster := NewTestCluster(t, TestClusterOptions{})
+	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
 	defer cluster.Close()
 
 	client, err := newTestClient(cluster, true)
@@ -1243,8 +1323,23 @@ func TestClientUpdateCCFromHost(t *testing.T) {
 
 	rev := client.authProvider.manager.config.Revision
 
-	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port())))
+	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port()), false))
 	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+	require.Len(t, client.authProvider.manager.config.Nodes, 4)
+}
+
+func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	rev := client.authProvider.manager.config.Revision
+
+	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port()), true))
+	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+	require.Len(t, client.authProvider.manager.config.Nodes, 1)
 }
 
 func TestClientValidHost(t *testing.T) {

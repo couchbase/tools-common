@@ -1,11 +1,14 @@
+MODULE=
+TESTS=
+
 coverage:
-	@go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out
+	@go test ./$(MODULE)/... -run=$(TESTS) -count=1 -covermode=atomic -coverprofile=coverage.out -failfast -shuffle=on && go tool cover -html=coverage.out
 
 lint:
 	@golangci-lint run
 
 test:
-	@go test -count=1 -cover ./...
+	@go test ./$(MODULE)/... -run=$(TESTS) -count=1 -cover -failfast -shuffle=on
 
 clean:
 	@rm -f coverage.out

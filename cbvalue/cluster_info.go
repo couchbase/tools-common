@@ -9,4 +9,8 @@ type ClusterInfo struct {
 
 	// Retrieved via the /pools/default endpoint
 	Version ClusterVersion `json:"version"`
+
+	// Retrieved via the /pools/default/buckets endpoint
+	MaxVBuckets     uint16 `json:"max_vbuckets"`
+	UniformVBuckets bool   `json:"uniform_vbuckets"`
 }

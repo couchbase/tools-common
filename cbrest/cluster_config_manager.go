@@ -19,6 +19,24 @@ type ClusterConfig struct {
 	Nodes    Nodes `json:"nodesExt"`
 }
 
+// BootstrapNode returns the node which we bootstrapped against.
+func (c *ClusterConfig) BootstrapNode() *Node {
+	for _, node := range c.Nodes {
+		if node.BootstrapNode {
+			return node
+		}
+	}
+
+	// Our unit testing currently doesn't set the 'BootstrapNode' value, use a sane value
+	return c.Nodes[0]
+}
+
+// FilterOtherNodes filters out all nodes which aren't the bootstrap node; this has the effect of forcing all
+// communication via the bootstrap node.
+func (c *ClusterConfig) FilterOtherNodes() {
+	c.Nodes = Nodes{c.BootstrapNode()}
+}
+
 // ClusterConfigManager is a utility wrapper around the current cluster config which provides utility functions required
 // when periodically updating the REST clients cluster config.
 type ClusterConfigManager struct {
