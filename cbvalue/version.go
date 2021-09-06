@@ -38,6 +38,9 @@ const (
 	// Version7_0_1 represents the 7.0.1 release of Couchbase Server (Cheshire-Cat).
 	Version7_0_1 = Version("7.0.1")
 
+	// Version7_0_2 represents the 7.0.2 release of Couchbase Server (Cheshire-Cat).
+	Version7_0_2 = Version("7.0.2")
+
 	// Version7_1_0 represents the 7.1.0 release of Couchbase Server (Neo).
 	Version7_1_0 = Version("7.1.0")
 
