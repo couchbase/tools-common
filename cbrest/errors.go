@@ -19,6 +19,11 @@ var (
 	// ErrExhaustedClusterNodes is returned if we've failed to update the clients cluster config and have run out of
 	// nodes.
 	ErrExhaustedClusterNodes = errors.New("exhausted cluster nodes")
+
+	// ErrThisNodeOnlyExpectsASingleAddress is returned if the user attempts to connect to a single node, but provides
+	// more than one node in the connection string.
+	ErrThisNodeOnlyExpectsASingleAddress = errors.New("when using 'ThisNodeOnly', a connection string with a single " +
+		"address should be supplied")
 )
 
 // BootstrapFailureError is returned to the user if we've failed to bootstrap the REST client.

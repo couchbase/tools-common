@@ -77,6 +77,18 @@ func TestNewClientWithThisNodeOnly(t *testing.T) {
 	require.True(t, client.thisNodeOnly)
 }
 
+func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	_, err := NewClient(ClientOptions{
+		ConnectionString: fmt.Sprintf("%s,secondhostname:8091", cluster.URL()),
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		ThisNodeOnly:     true,
+	})
+	require.ErrorIs(t, err, ErrThisNodeOnlyExpectsASingleAddress)
+}
+
 func TestNewClient(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()

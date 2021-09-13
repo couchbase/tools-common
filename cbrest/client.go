@@ -94,6 +94,10 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 
+	if options.ThisNodeOnly && len(parsed.Addresses) > 1 {
+		return nil, ErrThisNodeOnlyExpectsASingleAddress
+	}
+
 	resolved, err := parsed.Resolve()
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve connection string: %w", err)
