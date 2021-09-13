@@ -302,6 +302,10 @@ func (c *Client) updateCCFromHost(host string, thisNodeOnly bool) error {
 // validHost returns a boolean indicating whether we should use the cluster config from the provided host. This should
 // help to avoid the case where we try to get a cluster config from a node which has joined another cluster.
 func (c *Client) validHost(host string) (bool, error) {
+	if c.clusterInfo == nil {
+		return true, nil
+	}
+
 	body, err := c.get(host, EndpointPools)
 	if err != nil {
 		return false, fmt.Errorf("failed to execute request: %w", err)

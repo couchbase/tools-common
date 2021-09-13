@@ -1345,7 +1345,7 @@ func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
 func TestClientValidHost(t *testing.T) {
 	type test struct {
 		name     string
-		uuid     string
+		info     *cbvalue.ClusterInfo
 		body     []byte
 		expected bool
 	}
@@ -1353,19 +1353,23 @@ func TestClientValidHost(t *testing.T) {
 	tests := []*test{
 		{
 			name:     "ValidHost",
-			uuid:     "uuid",
+			info:     &cbvalue.ClusterInfo{UUID: "uuid"},
 			body:     []byte(`{"uuid":"uuid"}`),
 			expected: true,
 		},
 		{
 			name: "InvalidHostFromAnotherCluster",
-			uuid: "uuid",
+			info: &cbvalue.ClusterInfo{UUID: "uuid"},
 			body: []byte(`{"uuid":"another_uuid"}`),
 		},
 		{
 			name: "InvalidHostUninitialized",
-			uuid: "uuid",
+			info: &cbvalue.ClusterInfo{UUID: "uuid"},
 			body: []byte(`{"uuid":[]}`),
+		},
+		{
+			name:     "ValidHostNotGotClusterInfoYet",
+			expected: true,
 		},
 	}
 
@@ -1374,7 +1378,12 @@ func TestClientValidHost(t *testing.T) {
 			handlers := make(TestHandlers)
 			handlers.Add(http.MethodGet, string(EndpointPools), NewTestHandler(t, http.StatusOK, test.body))
 
-			cluster := NewTestCluster(t, TestClusterOptions{UUID: test.uuid, Handlers: handlers})
+			var uuid string
+			if test.info != nil {
+				uuid = test.info.UUID
+			}
+
+			cluster := NewTestCluster(t, TestClusterOptions{UUID: uuid, Handlers: handlers})
 			defer cluster.Close()
 
 			client := &Client{
@@ -1383,7 +1392,7 @@ func TestClientValidHost(t *testing.T) {
 					&connstr.ResolvedConnectionString{},
 					&aprov.Static{Username: "username", Password: "password"},
 				),
-				clusterInfo: &cbvalue.ClusterInfo{UUID: test.uuid},
+				clusterInfo: test.info,
 			}
 
 			valid, err := client.validHost(fmt.Sprintf("http://localhost:%d", cluster.Port()))
