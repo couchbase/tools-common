@@ -353,7 +353,7 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, handleResponseError(http.MethodGet, EndpointNodesServices, resp.StatusCode, body)
+		return nil, handleResponseError(http.MethodGet, endpoint, resp.StatusCode, body)
 	}
 
 	return body, nil
