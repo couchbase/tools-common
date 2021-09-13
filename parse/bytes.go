@@ -39,7 +39,7 @@ func Bytes(s string) (uint64, error) {
 		m = 1024
 	}
 
-	var p float64 = 0
+	var p float64
 
 	switch g[4] {
 	case "k":

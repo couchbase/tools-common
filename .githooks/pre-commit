@@ -1,12 +1,18 @@
 #!/bin/bash -e
 
 # ensure that we have the required dependencies installed
-for dep in gofmt gofumpt goimports sponge; do
+for dep in gofmt gofumpt goimports sponge wget; do
     if ! type -t $dep > /dev/null; then
         echo "Error: '$dep' is not installed" 1>&2
         exit 1
     fi
 done
+
+# ensure the 'commit-msg' git hook has been downloaded and is marked as executable (otherwise it will be ignored by Git)
+if [[ ! -x .githooks/commit-msg ]]; then
+    wget -q -P .githooks/ http://review.couchbase.org/tools/hooks/commit-msg
+    chmod +x .githooks/commit-msg
+fi
 
 # only modify currently staged Go files
 staged_go_files=$(git diff --cached --name-only --diff-filter=d | grep -E '\.*\.go$' || true)
