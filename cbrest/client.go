@@ -50,6 +50,8 @@ type Client struct {
 	authProvider *AuthProvider
 	clusterInfo  *cbvalue.ClusterInfo
 
+	thisNodeOnly bool
+
 	pollTimeout    time.Duration
 	requestRetries int
 
@@ -116,12 +118,13 @@ func NewClient(options ClientOptions) (*Client, error) {
 			},
 		},
 		authProvider:   authProvider,
+		thisNodeOnly:   options.ThisNodeOnly,
 		pollTimeout:    pollTimeout,
 		requestRetries: requestRetries,
 		reqResLogLevel: options.ReqResLogLevel,
 	}
 
-	err = client.bootstrap(options.ThisNodeOnly)
+	err = client.bootstrap()
 	if err != nil {
 		return nil, fmt.Errorf("failed to bootstrap client: %w", err)
 	}
@@ -145,7 +148,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 
 // bootstrap attempts to bootstrap the client using the hosts from the given collection string provided by the user. The
 // optional argument 'thisNodeOnly' may be supplied to force all communication with the bootstrap node.
-func (c *Client) bootstrap(thisNodeOnly bool) error {
+func (c *Client) bootstrap() error {
 	// Attempt to bootstrap the HTTP client, internally the auth provider will return the next available bootstrap host
 	// for successive calls until we run out of possible hosts (at which point we exit having failed to bootstrap).
 	var (
@@ -163,7 +166,7 @@ func (c *Client) bootstrap(thisNodeOnly bool) error {
 			return &BootstrapFailureError{ErrAuthentication: errAuthentication, ErrAuthorization: errAuthorization}
 		}
 
-		err := c.updateCCFromHost(host, thisNodeOnly)
+		err := c.updateCCFromHost(host)
 
 		// We've successfully bootstrapped the client
 		if err == nil {
@@ -268,11 +271,11 @@ func (c *Client) updateCCFromNode(node *Node) error {
 		return fmt.Errorf("node is a member of a different cluster")
 	}
 
-	return c.updateCCFromHost(host, false)
+	return c.updateCCFromHost(host)
 }
 
 // updateCCFromHost will attempt to update the clients cluster config using the provided host.
-func (c *Client) updateCCFromHost(host string, thisNodeOnly bool) error {
+func (c *Client) updateCCFromHost(host string) error {
 	body, err := c.get(host, EndpointNodesServices)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
@@ -292,7 +295,7 @@ func (c *Client) updateCCFromHost(host string, thisNodeOnly bool) error {
 		return fmt.Errorf("failed to unmarshal cluster config: %w", err)
 	}
 
-	if thisNodeOnly {
+	if c.thisNodeOnly {
 		config.FilterOtherNodes()
 	}
 
@@ -597,6 +600,13 @@ func (c *Client) shouldRetryWithReqRes(ctx context.Context, request *Request, re
 
 // waitUntilUpdated blocks the calling goroutine until the cluster config has been updated.
 func (c *Client) waitUntilUpdated(ctx context.Context) {
+	// We don't update the cluster config when we're only communicating with the bootstrap node since it's unlikely that
+	// a refresh will resolve any issues. For example, we normally refresh to detect when a node has been added/removed
+	// from the cluster.
+	if c.thisNodeOnly {
+		return
+	}
+
 	// If we've got a CCP poller running, we can just wake it up and wait for the update to complete; this is more
 	// efficient because we can have multiple requests waiting for the CCP goroutine to update the cluster config
 	// at once.

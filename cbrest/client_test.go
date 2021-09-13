@@ -1,6 +1,7 @@
 package cbrest
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -61,6 +62,19 @@ func TestNewClientWithTransportDefaults(t *testing.T) {
 	require.NotNil(t, transport.Proxy)
 	require.NotNil(t, transport.TLSClientConfig)
 	require.True(t, transport.ForceAttemptHTTP2)
+}
+
+func TestNewClientWithThisNodeOnly(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		ThisNodeOnly:     true,
+	})
+	require.NoError(t, err)
+	require.True(t, client.thisNodeOnly)
 }
 
 func TestNewClient(t *testing.T) {
@@ -1314,6 +1328,25 @@ func TestClientUpdateCCFromNode(t *testing.T) {
 	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
 }
 
+func TestClientUpdateCCFromNodeThisNodeOnly(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
+	defer cluster.Close()
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		ThisNodeOnly:     true,
+		DisableCCP:       true,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	})
+	require.NoError(t, err)
+
+	rev := client.authProvider.manager.config.Revision
+
+	require.NoError(t, client.updateCCFromNode(client.authProvider.manager.config.Nodes[0]))
+	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
+	require.Len(t, client.authProvider.manager.config.Nodes, 1)
+}
+
 func TestClientUpdateCCFromHost(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
 	defer cluster.Close()
@@ -1323,7 +1356,7 @@ func TestClientUpdateCCFromHost(t *testing.T) {
 
 	rev := client.authProvider.manager.config.Revision
 
-	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port()), false))
+	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port())))
 	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
 	require.Len(t, client.authProvider.manager.config.Nodes, 4)
 }
@@ -1332,12 +1365,17 @@ func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster, true)
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		ThisNodeOnly:     true,
+		DisableCCP:       true,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	})
 	require.NoError(t, err)
 
 	rev := client.authProvider.manager.config.Revision
 
-	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port()), true))
+	require.NoError(t, client.updateCCFromHost(fmt.Sprintf("http://localhost:%d", cluster.Port())))
 	require.Equal(t, rev+1, client.authProvider.manager.config.Revision)
 	require.Len(t, client.authProvider.manager.config.Nodes, 1)
 }
@@ -1451,8 +1489,6 @@ func TestClientDoRequestWithCustomTimeout(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
-	defer client.Close()
-
 	t.Run("custom larger than client", func(t *testing.T) {
 		client.client.Timeout = 100 * time.Millisecond
 
@@ -1486,4 +1522,31 @@ func TestClientDoRequestWithCustomTimeout(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
 	})
+}
+
+func TestClientWaitUntilUpdated(t *testing.T) {
+	for _, thisNodeOnly := range []bool{false, true} {
+		t.Run(fmt.Sprintf(`{"this_node_only":%s}`, strconv.FormatBool(thisNodeOnly)), func(t *testing.T) {
+			cluster := NewTestCluster(t, TestClusterOptions{})
+			defer cluster.Close()
+
+			client, err := NewClient(ClientOptions{
+				ConnectionString: cluster.URL(),
+				Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+				ThisNodeOnly:     thisNodeOnly,
+				DisableCCP:       true,
+			})
+			require.NoError(t, err)
+
+			rev := client.authProvider.manager.config.Revision
+
+			client.waitUntilUpdated(context.Background())
+
+			if thisNodeOnly {
+				require.Equal(t, rev, client.authProvider.manager.config.Revision)
+			} else {
+				require.NotEqual(t, rev, client.authProvider.manager.config.Revision)
+			}
+		})
+	}
 }
