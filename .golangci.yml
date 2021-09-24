@@ -1,4 +1,8 @@
+issues:
+  max-issues-per-linter: 0 # Unlimited
+  max-same-issues: 0 # Unlimited
 linters:
+  fast: false
   enable:
     - asciicheck
     - bodyclose
@@ -30,3 +34,5 @@ linters:
 linters-settings:
   lll:
     line-length: 120
+  unparam:
+    check-exported: true
