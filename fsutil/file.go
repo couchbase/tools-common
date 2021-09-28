@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
@@ -116,6 +115,33 @@ func WriteFile(path string, data []byte, mode os.FileMode) error {
 	return file.Sync()
 }
 
+// WriteTempFile writes out the provided data to a temporary file in the given directory (OS temporary directory if
+// omitted) and returns the path to that file.
+//
+// NOTE: It's the job of the caller to correctly handle cleaning up the file.
+func WriteTempFile(dir string, data []byte) (string, error) {
+	if dir == "" {
+		dir = os.TempDir()
+	}
+
+	file, err := os.CreateTemp(dir, "temporary_")
+	if err != nil {
+		return "", err
+	}
+
+	_, err = file.Write(data)
+	if err != nil {
+		return "", err
+	}
+
+	err = file.Sync()
+	if err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
 // WriteToFile copies all the data from the provided reader and writes it to the file at the given path.
 func WriteToFile(path string, reader io.Reader, mode os.FileMode) error {
 	file, err := CreateFile(path, os.O_WRONLY, mode)
@@ -220,36 +246,20 @@ func Sync(path string) error {
 //
 // NOTE: This only works to the degree that the underlying operating system guarantees that renames are atomic.
 func Atomic(path string, fn func(path string) error) error {
-	temp, err := temporaryPath(path)
+	file, err := os.CreateTemp(filepath.Dir(path), fmt.Sprintf("temporary_%s_", filepath.Base(path)))
 	if err != nil {
 		return err
 	}
 
-	err = fn(temp)
+	err = file.Close()
 	if err != nil {
 		return err
 	}
 
-	return os.Rename(temp, path)
-}
-
-// temporaryPath returns a temporary path which resembles the provided path but is not the same; this may be used as a
-// temporary file which may be removed/renamed but leaves implicit context as to why the file itself was created.
-func temporaryPath(path string) (string, error) {
-	var (
-		rnd  = rand.NewSource(time.Now().Unix())
-		temp = filepath.Join(filepath.Dir(path), fmt.Sprintf(".temporary_%d_%s", rnd.Int63(), filepath.Base(path)))
-	)
-
-	exists, err := FileExists(temp)
+	err = fn(file.Name())
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	// We generated a path to a file that already exists, try again
-	if exists {
-		return temporaryPath(path)
-	}
-
-	return temp, nil
+	return os.Rename(file.Name(), path)
 }

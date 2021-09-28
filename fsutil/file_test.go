@@ -299,6 +299,36 @@ func TestWriteFile(t *testing.T) {
 	}
 }
 
+func TestWriteTempFileUseProvidedDir(t *testing.T) {
+	testDir := t.TempDir()
+
+	path, err := WriteTempFile(testDir, []byte("Hello, World!"))
+	require.NoError(t, err)
+	require.Equal(t, testDir, filepath.Dir(path))
+	require.FileExists(t, path)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, []byte("Hello, World!"), data)
+
+	require.NoError(t, Remove(path, false))
+	require.NoFileExists(t, path)
+}
+
+func TestWriteTempFileUseOSTempDir(t *testing.T) {
+	path, err := WriteTempFile("", []byte("Hello, World!"))
+	require.NoError(t, err)
+	require.Equal(t, os.TempDir(), filepath.Dir(path))
+	require.FileExists(t, path)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, []byte("Hello, World!"), data)
+
+	require.NoError(t, Remove(path, false))
+	require.NoFileExists(t, path)
+}
+
 func TestWriteToFile(t *testing.T) {
 	for _, exists := range []bool{false, true} {
 		t.Run(strconv.FormatBool(exists), func(t *testing.T) {
@@ -606,13 +636,4 @@ func TestAtomic(t *testing.T) {
 			require.Equal(t, []byte("Hello, World!"), data)
 		})
 	}
-}
-
-func TestTemporaryPath(t *testing.T) {
-	testDir := t.TempDir()
-
-	temp, err := temporaryPath(filepath.Join(testDir, "path/to/a/test/file"))
-	require.NoError(t, err)
-	require.Equal(t, filepath.Join(testDir, "path/to/a/test"), filepath.Dir(temp))
-	require.NotEqual(t, "file", filepath.Base(temp))
 }
