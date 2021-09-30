@@ -20,7 +20,7 @@ func TestTLSConfigOptionsValidate(t *testing.T) {
 		},
 		{
 			name:   "ServerCAs",
-			config: TLSConfigOptions{ServerCAs: "/path/to/certs"},
+			config: TLSConfigOptions{ServerCAs: []byte("certdata")},
 			valid:  true,
 		},
 		{
@@ -31,16 +31,16 @@ func TestTLSConfigOptionsValidate(t *testing.T) {
 		{
 			name: "UnencryptedKey",
 			config: TLSConfigOptions{
-				ClientCert: "/path/to/certs",
-				ClientKey:  "/path/to/key",
+				ClientCert: []byte("certdata"),
+				ClientKey:  []byte("keydata"),
 			},
 			valid: true,
 		},
 		{
 			name: "PKCS#8",
 			config: TLSConfigOptions{
-				ClientCert: "/path/to/certs",
-				ClientKey:  "/path/to/key",
+				ClientCert: []byte("certdata"),
+				ClientKey:  []byte("keydata"),
 				Password:   []byte("asdasd"),
 			},
 			valid: true,
@@ -48,14 +48,14 @@ func TestTLSConfigOptionsValidate(t *testing.T) {
 		{
 			name: "PKCS#12",
 			config: TLSConfigOptions{
-				ClientCert: "/path/to/certs",
+				ClientCert: []byte("certdata"),
 				Password:   []byte("asdasd"),
 			},
 			valid: true,
 		},
 		{
 			name:   "ExpectAKeyOrPassword",
-			config: TLSConfigOptions{ClientCert: "/path/to/certs"},
+			config: TLSConfigOptions{ClientCert: []byte("certdata")},
 		},
 		{
 			name:   "PasswordOnItsOwn",
@@ -63,7 +63,7 @@ func TestTLSConfigOptionsValidate(t *testing.T) {
 		},
 		{
 			name:   "KeyOnItsOwn",
-			config: TLSConfigOptions{ClientKey: "/path/to/a/key"},
+			config: TLSConfigOptions{ClientKey: []byte("keydata")},
 		},
 	}
 

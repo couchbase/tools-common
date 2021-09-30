@@ -5,10 +5,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
-	"path/filepath"
 	"testing"
 
-	"github.com/couchbase/tools-common/fsutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,14 +75,9 @@ func TestNewTLSConfigMiscOptions(t *testing.T) {
 }
 
 func TestNewTLSConfigValidClientKeyPair(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), validKeyPEM, 0))
-
 	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validKeyPEM,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 	require.NoError(t, err)
@@ -93,14 +86,9 @@ func TestNewTLSConfigValidClientKeyPair(t *testing.T) {
 }
 
 func TestNewTLSConfigInvalidClientKeyPair(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), invalidCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), validKeyPEM, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     invalidCertPEM,
+		ClientKey:      validKeyPEM,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 
@@ -112,14 +100,10 @@ func TestNewTLSConfigInvalidClientKeyPair(t *testing.T) {
 }
 
 func TestNewTLSConfigClientCAs(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-
 	t.Run("Valid", func(t *testing.T) {
 		config, err := NewTLSConfig(TLSConfigOptions{
 			ClientAuthType: tls.VerifyClientCertIfGiven,
-			ClientCAs:      filepath.Join(testDir, "cert.pem"),
+			ClientCAs:      validCertPEM,
 		})
 		require.NoError(t, err)
 		require.Len(t, config.ClientCAs.Subjects(), 1)
@@ -129,7 +113,7 @@ func TestNewTLSConfigClientCAs(t *testing.T) {
 	t.Run("Disabled", func(t *testing.T) {
 		config, err := NewTLSConfig(TLSConfigOptions{
 			ClientAuthType: tls.NoClientCert,
-			ClientCAs:      filepath.Join(testDir, "cert.pem"),
+			ClientCAs:      validCertPEM,
 		})
 		require.NoError(t, err)
 		require.Len(t, config.ClientCAs.Subjects(), 0)
@@ -145,22 +129,18 @@ func TestNewTLSConfigClientCAs(t *testing.T) {
 }
 
 func TestNewTLSConfigValidServerCAs(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-
 	pool, err := x509.SystemCertPool()
 	if err != nil {
 		pool = x509.NewCertPool()
 	}
 
-	config, err := NewTLSConfig(TLSConfigOptions{ServerCAs: filepath.Join(testDir, "cert.pem")})
+	config, err := NewTLSConfig(TLSConfigOptions{ServerCAs: validCertPEM})
 	require.NoError(t, err)
 	require.False(t, config.InsecureSkipVerify)
 	require.Len(t, config.RootCAs.Subjects(), len(pool.Subjects())+1)
 	require.Nil(t, config.Certificates)
 
-	config, err = NewTLSConfig(TLSConfigOptions{ServerCAs: filepath.Join(testDir, "cert.pem"), NoSSLVerify: true})
+	config, err = NewTLSConfig(TLSConfigOptions{ServerCAs: validCertPEM, NoSSLVerify: true})
 	require.NoError(t, err)
 	require.True(t, config.InsecureSkipVerify)
 	require.Equal(t, config.RootCAs.Subjects(), pool.Subjects())
@@ -168,11 +148,7 @@ func TestNewTLSConfigValidServerCAs(t *testing.T) {
 }
 
 func TestNewTLSConfigInvalidCert(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), invalidCertPEM, 0))
-
-	_, err := NewTLSConfig(TLSConfigOptions{ServerCAs: filepath.Join(testDir, "cert.pem")})
+	_, err := NewTLSConfig(TLSConfigOptions{ServerCAs: invalidCertPEM})
 
 	var parseCertKeyError ParseCertKeyError
 
@@ -182,14 +158,9 @@ func TestNewTLSConfigInvalidCert(t *testing.T) {
 }
 
 func TestNewTLSConfigEmptyCert(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.Touch(filepath.Join(testDir, "cert.pem")))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), validKeyPEM, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     make([]byte, 0),
+		ClientKey:      validKeyPEM,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 
@@ -201,14 +172,9 @@ func TestNewTLSConfigEmptyCert(t *testing.T) {
 }
 
 func TestNewTLSConfigInvalidKey(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), invalidKeyPEM, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     validCertPEM,
+		ClientKey:      invalidKeyPEM,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 
@@ -220,14 +186,9 @@ func TestNewTLSConfigInvalidKey(t *testing.T) {
 }
 
 func TestNewTLSConfigEmptyKey(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.Touch(filepath.Join(testDir, "key.pem")))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     validCertPEM,
+		ClientKey:      make([]byte, 0),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 
@@ -239,14 +200,9 @@ func TestNewTLSConfigEmptyKey(t *testing.T) {
 }
 
 func TestNewTLSConfigUnencryptedWithPassword(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), validKeyPEM, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validKeyPEM,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -254,12 +210,8 @@ func TestNewTLSConfigUnencryptedWithPassword(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS12(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert_and_key.p12"), validCertAndKeyPKCS12, 0))
-
 	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert_and_key.p12"),
+		ClientCert:     validCertAndKeyPKCS12,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -270,12 +222,8 @@ func TestNewTLSConfigValidEncryptedPKCS12(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS12WrongPassword(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert_and_key.p12"), validCertAndKeyPKCS12, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert_and_key.p12"),
+		ClientCert:     validCertAndKeyPKCS12,
 		Password:       []byte("not-the-password"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -283,24 +231,16 @@ func TestNewTLSConfigValidEncryptedPKCS12WrongPassword(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS12WithoutPassword(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert_and_key.p12"), validCertAndKeyPKCS12, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert_and_key.p12"),
+		ClientCert:     validCertAndKeyPKCS12,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 	require.Error(t, err)
 }
 
 func TestNewTLSConfigInvalidEncryptedPKCS12(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert_and_key.p12"), invalidCertAndKeyPKCS12, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert_and_key.p12"),
+		ClientCert:     invalidCertAndKeyPKCS12,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -313,14 +253,9 @@ func TestNewTLSConfigInvalidEncryptedPKCS12(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS8(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.p8"), validKeyPKCS8, 0))
-
 	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.p8"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validKeyPKCS8,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -331,14 +266,9 @@ func TestNewTLSConfigValidEncryptedPKCS8(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS8WrongPassword(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.p8"), validKeyPKCS8, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.p8"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validKeyPKCS8,
 		Password:       []byte("not-the-password"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -346,14 +276,9 @@ func TestNewTLSConfigValidEncryptedPKCS8WrongPassword(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS8WithoutPassword(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.p8"), validKeyPKCS8, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.p8"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validKeyPKCS8,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 
@@ -365,14 +290,9 @@ func TestNewTLSConfigValidEncryptedPKCS8WithoutPassword(t *testing.T) {
 }
 
 func TestNewTLSConfigInvalidEncryptedPKCS8(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.p8"), invalidKeyPKCS8, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.p8"),
+		ClientCert:     validCertPEM,
+		ClientKey:      invalidKeyPKCS8,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -380,14 +300,9 @@ func TestNewTLSConfigInvalidEncryptedPKCS8(t *testing.T) {
 }
 
 func TestNewTLSConfigMultipleCertsPEM(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "certs.pem"), validCertsPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), validKeyPEM, 0))
-
 	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "certs.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     validCertsPEM,
+		ClientKey:      validKeyPEM,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 	require.NoError(t, err)
@@ -397,12 +312,8 @@ func TestNewTLSConfigMultipleCertsPEM(t *testing.T) {
 }
 
 func TestNewTLSConfigMultipleCertsPKCS12(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "certs_and_key.p12"), validCertsAndKeyPKCS12, 0))
-
 	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "certs_and_key.p12"),
+		ClientCert:     validCertsAndKeyPKCS12,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -435,14 +346,9 @@ func TestNewTLSConfigMismatchedKeys(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testDir := t.TempDir()
-
-			require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-			require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), test.key, 0))
-
 			_, err := NewTLSConfig(TLSConfigOptions{
-				ClientCert:     filepath.Join(testDir, "cert.pem"),
-				ClientKey:      filepath.Join(testDir, "key.pem"),
+				ClientCert:     validCertPEM,
+				ClientKey:      test.key,
 				ClientAuthType: tls.VerifyClientCertIfGiven,
 			})
 			require.ErrorIs(t, err, ErrInvalidPublicPrivateKeyPair)
@@ -451,26 +357,17 @@ func TestNewTLSConfigMismatchedKeys(t *testing.T) {
 }
 
 func TestNewTLSConfigUnsupportedPublicPrivateKeyUnencrypted(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.pem"), validED488KeyPEM, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.pem"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validED488KeyPEM,
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
 	require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
 }
 
 func TestNewTLSConfigUnsupportedPublicPrivateKeyPKCS12(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertAndED488KeyPKCS12, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
+		ClientCert:     validCertAndED488KeyPKCS12,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})
@@ -478,14 +375,9 @@ func TestNewTLSConfigUnsupportedPublicPrivateKeyPKCS12(t *testing.T) {
 }
 
 func TestNewTLSConfigUnsupportedPublicPrivateKeyPKCS8(t *testing.T) {
-	testDir := t.TempDir()
-
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "cert.pem"), validCertPEM, 0))
-	require.NoError(t, fsutil.WriteFile(filepath.Join(testDir, "key.p8"), validED488KeyPKCS8, 0))
-
 	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     filepath.Join(testDir, "cert.pem"),
-		ClientKey:      filepath.Join(testDir, "key.p8"),
+		ClientCert:     validCertPEM,
+		ClientKey:      validED488KeyPKCS8,
 		Password:       []byte("asdasd"),
 		ClientAuthType: tls.VerifyClientCertIfGiven,
 	})

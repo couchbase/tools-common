@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/couchbase/tools-common/errutil"
@@ -67,7 +66,7 @@ func NewTLSConfig(options TLSConfigOptions) (*tls.Config, error) {
 func populateClientCert(config *tls.Config, options TLSConfigOptions) error {
 	// All of the formats expect at least one client certificate to be provided, if one hasn't we're not using
 	// certificate authentication, exit early.
-	if options.ClientCert == "" {
+	if options.ClientCert == nil {
 		return nil
 	}
 
@@ -108,17 +107,15 @@ func populateClientCert(config *tls.Config, options TLSConfigOptions) error {
 
 // parseCerts returns a slice of all the certificates parsed from the provided client ca file.
 func parseCerts(options TLSConfigOptions) ([][]byte, error) {
-	data, err := os.ReadFile(options.ClientCert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read client certificates: %w", err)
-	}
+	var (
+		blocks []*pem.Block
+		err    error
+	)
 
-	var blocks []*pem.Block
-
-	if len(options.Password) != 0 && options.ClientKey == "" {
-		blocks, err = parseEncryptedPKCS12Blocks(data, options.Password)
+	if len(options.Password) != 0 && options.ClientKey == nil {
+		blocks, err = parseEncryptedPKCS12Blocks(options.ClientCert, options.Password)
 	} else {
-		blocks = parseUnencryptedBlocks(data)
+		blocks = parseUnencryptedBlocks(options.ClientCert)
 	}
 
 	if err != nil {
@@ -173,16 +170,11 @@ func parseEncryptedPKCS12Blocks(data, password []byte) ([]*pem.Block, error) {
 
 // parseKey returns the private key which should be used for mTLS authentication.
 func parseKey(options TLSConfigOptions) (interface{}, error) {
-	path := options.ClientKey
+	data := options.ClientKey
 
 	// For PKCS#12 we don't expect a client ca and a client key, they're both stored in the same file
-	if path == "" {
-		path = options.ClientCert
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %w", err)
+	if data == nil {
+		data = options.ClientCert
 	}
 
 	key, err := parseEncryptedKey(data, options)
@@ -209,7 +201,7 @@ func parseKey(options TLSConfigOptions) (interface{}, error) {
 // parseEncryptedKey attempts to decrypt, parse and return private key which should be used for mTLS, the key is
 // expected to be in either PKCS#8 or PKCS#12 format.
 func parseEncryptedKey(data []byte, options TLSConfigOptions) (interface{}, error) {
-	if options.ClientKey != "" {
+	if options.ClientKey != nil {
 		return parseEncryptedPKCS8Key(data, options.Password)
 	}
 
@@ -266,16 +258,11 @@ func parseUnencryptedPrivateKey(data []byte) interface{} {
 // populateClientCAs reads the certificates from the given path and populates the required attributes of the given TLS
 // configuration.
 func populateClientCAs(config *tls.Config, options TLSConfigOptions) error {
-	if options.ClientAuthType == tls.NoClientCert || options.ClientCAs == "" {
+	if options.ClientAuthType == tls.NoClientCert || options.ClientCAs == nil {
 		return nil
 	}
 
-	cacert, err := os.ReadFile(options.ClientCAs)
-	if err != nil {
-		return fmt.Errorf("failed to read certificate at '%s': %w", options.ClientCAs, err)
-	}
-
-	ok := config.ClientCAs.AppendCertsFromPEM(cacert)
+	ok := config.ClientCAs.AppendCertsFromPEM(options.ClientCAs)
 	if !ok {
 		return ParseCertKeyError{what: "certificates"}
 	}
@@ -286,16 +273,11 @@ func populateClientCAs(config *tls.Config, options TLSConfigOptions) error {
 // populateRootCAs reads the certificates from the given path and populates the required attributes of the given TLS
 // configuration.
 func populateRootCAs(config *tls.Config, options TLSConfigOptions) error {
-	if options.ServerCAs == "" || options.NoSSLVerify {
+	if options.ServerCAs == nil || options.NoSSLVerify {
 		return nil
 	}
 
-	cacert, err := os.ReadFile(options.ServerCAs)
-	if err != nil {
-		return fmt.Errorf("failed to read certificate at '%s': %w", options.ServerCAs, err)
-	}
-
-	ok := config.RootCAs.AppendCertsFromPEM(cacert)
+	ok := config.RootCAs.AppendCertsFromPEM(options.ServerCAs)
 	if !ok {
 		return ParseCertKeyError{what: "certificates"}
 	}
