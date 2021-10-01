@@ -2,7 +2,6 @@ package fsutil
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -391,8 +390,6 @@ func TestCopyFile(t *testing.T) {
 
 		stats, err := os.Stat(sink)
 		require.NoError(t, err)
-		fmt.Println(DefaultFileMode)
-		fmt.Println(stats.Mode())
 		require.Equal(t, DefaultFileMode, stats.Mode())
 
 		data, err := os.ReadFile(sink)
@@ -481,6 +478,27 @@ func TestCopyFileRangeTo(t *testing.T) {
 			require.Equal(t, test.expected, buffer.Bytes())
 		})
 	}
+}
+
+func TestReadIfProvided(t *testing.T) {
+	t.Run("NotProvided", func(t *testing.T) {
+		data, err := ReadIfProvided("")
+		require.Nil(t, data)
+		require.NoError(t, err)
+	})
+
+	t.Run("Provided", func(t *testing.T) {
+		var (
+			testDir = t.TempDir()
+			path    = filepath.Join(testDir, "file")
+		)
+
+		require.NoError(t, WriteFile(path, []byte(`data`), 0))
+
+		actual, err := ReadIfProvided(path)
+		require.NoError(t, err)
+		require.Equal(t, []byte("data"), actual)
+	})
 }
 
 func TestReadJSONFile(t *testing.T) {

@@ -203,6 +203,15 @@ func CopyFileRangeTo(path string, offset, length int64, writer io.Writer) error 
 	return err
 }
 
+// ReadIfProvided is the equvilent to 'os.ReadFile' but will return <nil>, <nil> if no path is provided.
+func ReadIfProvided(path string) ([]byte, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	return os.ReadFile(path)
+}
+
 // ReadJSONFile unmarshals data from the provided file into the given interface.
 func ReadJSONFile(path string, data interface{}) error {
 	file, err := os.Open(path)
