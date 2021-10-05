@@ -589,17 +589,20 @@ func (c *Client) shouldRetryWithReqRes(ctx context.Context, request *Request, re
 		return false
 	}
 
-	updateCC := slice.ContainsInt([]int{http.StatusUnauthorized}, response.StatusCode)
-
-	// This could be a failure which is retryable without requiring the cluster config to be updated
-	if !updateCC {
-		return netutil.IsTemporaryFailure(response.StatusCode) ||
+	var (
+		updateCC = slice.ContainsInt([]int{http.StatusUnauthorized}, response.StatusCode)
+		retry    = updateCC || netutil.IsTemporaryFailure(response.StatusCode) ||
 			slice.ContainsInt(request.RetryOnStatusCodes, response.StatusCode)
+	)
+
+	if updateCC {
+		c.waitUntilUpdated(ctx)
 	}
 
-	c.waitUntilUpdated(ctx)
+	// If we're not retrying, this won't trigger because 'netutil.IsTemporaryFailure(503) == true'
+	waitForRetryAfter(response)
 
-	return true
+	return retry
 }
 
 // waitUntilUpdated blocks the calling goroutine until the cluster config has been updated.

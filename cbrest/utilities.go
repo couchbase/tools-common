@@ -7,9 +7,12 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/couchbase/tools-common/errutil"
+	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 )
 
@@ -40,6 +43,42 @@ func setAuthHeaders(host string, authProvider *AuthProvider, req *http.Request) 
 
 	// Set the 'User-Agent' so that we can trace how these requests are handled by the cluster
 	req.Header.Set("User-Agent", authProvider.GetUserAgent())
+}
+
+// waitForRetryAfter sleeps until we can retry the request for the given response.
+//
+// NOTE: Truncates the value from the 'Retry-After' header to a maximum of 60s.
+func waitForRetryAfter(resp *http.Response) {
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		return
+	}
+
+	after := resp.Header.Get("Retry-After")
+	if after == "" {
+		return
+	}
+
+	duration := waitForRetryDuration(after)
+	if duration == 0 {
+		return
+	}
+
+	time.Sleep(time.Duration(maths.MinInt64(int64(duration), int64(time.Minute))))
+}
+
+// waitForRetryDuration returns the duration to wait until we've satisfied the given 'Retry-After' header.
+func waitForRetryDuration(after string) time.Duration {
+	seconds, err := strconv.Atoi(after)
+	if seconds != 0 || err == nil {
+		return time.Duration(seconds) * time.Second
+	}
+
+	date, err := time.Parse(time.RFC1123, after)
+	if err == nil {
+		return time.Until(date.UTC())
+	}
+
+	return 0
 }
 
 // handleRequestError is a utility function which converts a failed REST request error (hard failure as returned by the

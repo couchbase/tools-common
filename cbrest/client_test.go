@@ -572,7 +572,7 @@ func TestClientExecuteWithDefaultRetries(t *testing.T) {
 			handlers.Add(
 				http.MethodGet,
 				"/test",
-				NewTestHandlerWithRetries(t, 2, status, http.StatusOK, []byte("body")),
+				NewTestHandlerWithRetries(t, 2, status, http.StatusOK, "", []byte("body")),
 			)
 
 			cluster := NewTestCluster(t, TestClusterOptions{
@@ -610,7 +610,7 @@ func TestClientExecuteWithRetries(t *testing.T) {
 	handlers.Add(
 		http.MethodGet,
 		"/test",
-		NewTestHandlerWithRetries(t, 2, http.StatusTooEarly, http.StatusOK, []byte("body")),
+		NewTestHandlerWithRetries(t, 2, http.StatusTooEarly, http.StatusOK, "", []byte("body")),
 	)
 
 	cluster := NewTestCluster(t, TestClusterOptions{
@@ -638,6 +638,87 @@ func TestClientExecuteWithRetries(t *testing.T) {
 	actual, err := client.Execute(request)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
+}
+
+func TestClientExecuteWithRetryAfter(t *testing.T) {
+	type test struct {
+		name   string
+		status int
+		after  func() string // We use a function to ensure durations aren't calculated in advance
+		waited bool
+	}
+
+	tests := []*test{
+		{
+			name:   "IntegerNumberOfSeconds",
+			status: http.StatusServiceUnavailable,
+			after:  func() string { return "1" },
+			waited: true,
+		},
+		{
+			name:   "IntegerNumberOfSecondsNot503",
+			status: http.StatusGatewayTimeout,
+			after:  func() string { return "1" },
+		},
+		{
+			name:   "Date",
+			status: http.StatusServiceUnavailable,
+			after:  func() string { return time.Now().UTC().Add(2 * time.Second).Format(time.RFC1123) },
+			waited: true,
+		},
+		{
+			name:   "DateNotUTC",
+			status: http.StatusServiceUnavailable,
+			after:  func() string { return time.Now().Add(2 * time.Second).Format(time.RFC1123) },
+			waited: true,
+		},
+		{
+			name:   "DateNot503",
+			status: http.StatusGatewayTimeout,
+			after:  func() string { return time.Now().UTC().Add(2 * time.Second).Format(time.RFC1123) },
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handlers := make(TestHandlers)
+
+			handlers.Add(
+				http.MethodGet,
+				"/test",
+				NewTestHandlerWithRetries(t, 1, test.status, http.StatusOK, test.after(), make([]byte, 0)),
+			)
+
+			cluster := NewTestCluster(t, TestClusterOptions{
+				Handlers: handlers,
+			})
+			defer cluster.Close()
+
+			request := &Request{
+				ContentType:        ContentTypeURLEncoded,
+				Endpoint:           "/test",
+				ExpectedStatusCode: http.StatusOK,
+				Method:             http.MethodGet,
+				Service:            ServiceManagement,
+			}
+
+			expected := &Response{
+				StatusCode: http.StatusOK,
+				Body:       make([]byte, 0),
+			}
+
+			client, err := newTestClient(cluster, true)
+			require.NoError(t, err)
+
+			start := time.Now()
+
+			actual, err := client.Execute(request)
+			require.NoError(t, err)
+			require.Equal(t, expected, actual)
+
+			require.Equal(t, test.waited, time.Since(start) >= time.Second)
+		})
+	}
 }
 
 func TestClientExecuteStandardError(t *testing.T) {
