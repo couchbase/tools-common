@@ -1,3 +1,5 @@
+// Package hofp exposes a generic higher order function pool which abstracts aways the logic/error handling required to
+// perform tasks concurrently by wrapping complex tasks into a common 'func() error' interface.
 package hofp
 
 import (
@@ -35,7 +37,7 @@ func NewPool(opts Options) *Pool {
 
 	pool := &Pool{
 		opts:   opts,
-		hofs:   make(chan func() error, opts.Size),
+		hofs:   make(chan func() error, opts.Size*opts.BufferMultiplier),
 		ctx:    ctx,
 		cancel: cancel,
 	}

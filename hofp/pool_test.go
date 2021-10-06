@@ -12,7 +12,7 @@ import (
 func TestNewPool(t *testing.T) {
 	pool := NewPool(Options{Size: 1})
 	require.Equal(t, pool.opts.Size, 1)
-	require.Equal(t, "(HOFP)", pool.opts.LogPrefix)
+	require.Equal(t, "(hofp)", pool.opts.LogPrefix)
 	require.NotNil(t, pool.ctx)
 	require.NotNil(t, pool.cancel)
 	require.Equal(t, 1, cap(pool.hofs))
