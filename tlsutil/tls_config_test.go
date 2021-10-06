@@ -116,39 +116,45 @@ func TestNewTLSConfigClientCAs(t *testing.T) {
 			ClientCAs:      validCertPEM,
 		})
 		require.NoError(t, err)
-		require.Len(t, config.ClientCAs.Subjects(), 0)
+		require.Nil(t, config.ClientCAs)
 		require.Nil(t, config.Certificates)
 	})
 
 	t.Run("EnabledButMissing", func(t *testing.T) {
 		config, err := NewTLSConfig(TLSConfigOptions{ClientAuthType: tls.VerifyClientCertIfGiven})
 		require.NoError(t, err)
-		require.Len(t, config.ClientCAs.Subjects(), 0)
+		require.Nil(t, config.ClientCAs)
 		require.Nil(t, config.Certificates)
 	})
 }
 
-func TestNewTLSConfigValidServerCAs(t *testing.T) {
+func TestNewTLSConfigValidRootCAs(t *testing.T) {
 	pool, err := x509.SystemCertPool()
 	if err != nil {
 		pool = x509.NewCertPool()
 	}
 
-	config, err := NewTLSConfig(TLSConfigOptions{ServerCAs: validCertPEM})
+	config, err := NewTLSConfig(TLSConfigOptions{RootCAs: validCertPEM})
 	require.NoError(t, err)
 	require.False(t, config.InsecureSkipVerify)
 	require.Len(t, config.RootCAs.Subjects(), len(pool.Subjects())+1)
 	require.Nil(t, config.Certificates)
 
-	config, err = NewTLSConfig(TLSConfigOptions{ServerCAs: validCertPEM, NoSSLVerify: true})
+	config, err = NewTLSConfig(TLSConfigOptions{})
+	require.NoError(t, err)
+	require.False(t, config.InsecureSkipVerify)
+	require.Nil(t, config.RootCAs)
+	require.Nil(t, config.Certificates)
+
+	config, err = NewTLSConfig(TLSConfigOptions{RootCAs: validCertPEM, NoSSLVerify: true})
 	require.NoError(t, err)
 	require.True(t, config.InsecureSkipVerify)
-	require.Equal(t, config.RootCAs.Subjects(), pool.Subjects())
+	require.Nil(t, config.RootCAs)
 	require.Nil(t, config.Certificates)
 }
 
 func TestNewTLSConfigInvalidCert(t *testing.T) {
-	_, err := NewTLSConfig(TLSConfigOptions{ServerCAs: invalidCertPEM})
+	_, err := NewTLSConfig(TLSConfigOptions{RootCAs: invalidCertPEM})
 
 	var parseCertKeyError ParseCertKeyError
 

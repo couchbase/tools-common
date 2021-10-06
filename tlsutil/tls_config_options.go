@@ -14,7 +14,7 @@ type TLSConfigOptions struct {
 	ClientAuthType tls.ClientAuthType
 	ClientCAs      []byte
 
-	ServerCAs   []byte
+	RootCAs     []byte
 	NoSSLVerify bool
 
 	CipherSuites             []uint16

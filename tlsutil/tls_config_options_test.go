@@ -20,7 +20,7 @@ func TestTLSConfigOptionsValidate(t *testing.T) {
 		},
 		{
 			name:   "ServerCAs",
-			config: TLSConfigOptions{ServerCAs: []byte("certdata")},
+			config: TLSConfigOptions{RootCAs: []byte("certdata")},
 			valid:  true,
 		},
 		{

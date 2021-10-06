@@ -27,20 +27,12 @@ func NewTLSConfig(options TLSConfigOptions) (*tls.Config, error) {
 		return nil, err
 	}
 
-	// NOTE: The system cert pool isn't available on Windows, if we get an error continue with a new cert pool
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		pool = x509.NewCertPool()
-	}
-
 	config := &tls.Config{
 		CipherSuites:             options.CipherSuites,
 		ClientAuth:               options.ClientAuthType,
-		ClientCAs:                x509.NewCertPool(),
 		InsecureSkipVerify:       options.NoSSLVerify,
 		MinVersion:               options.MinVersion,
 		PreferServerCipherSuites: options.PreferServerCipherSuites,
-		RootCAs:                  pool,
 	}
 
 	err = populateClientCert(config, options)
@@ -262,6 +254,8 @@ func populateClientCAs(config *tls.Config, options TLSConfigOptions) error {
 		return nil
 	}
 
+	config.ClientCAs = x509.NewCertPool()
+
 	ok := config.ClientCAs.AppendCertsFromPEM(options.ClientCAs)
 	if !ok {
 		return ParseCertKeyError{what: "certificates"}
@@ -273,11 +267,19 @@ func populateClientCAs(config *tls.Config, options TLSConfigOptions) error {
 // populateRootCAs reads the certificates from the given path and populates the required attributes of the given TLS
 // configuration.
 func populateRootCAs(config *tls.Config, options TLSConfigOptions) error {
-	if options.ServerCAs == nil || options.NoSSLVerify {
+	if options.RootCAs == nil || options.NoSSLVerify {
 		return nil
 	}
 
-	ok := config.RootCAs.AppendCertsFromPEM(options.ServerCAs)
+	var err error
+
+	// NOTE: The system cert pool isn't available on Windows, if we get an error continue with a new cert pool
+	config.RootCAs, err = x509.SystemCertPool()
+	if err != nil {
+		config.RootCAs = x509.NewCertPool()
+	}
+
+	ok := config.RootCAs.AppendCertsFromPEM(options.RootCAs)
 	if !ok {
 		return ParseCertKeyError{what: "certificates"}
 	}
