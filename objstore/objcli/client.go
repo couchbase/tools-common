@@ -8,17 +8,9 @@ import (
 	"github.com/couchbase/tools-common/objstore/objval"
 )
 
-// PutObjectOptions encapsulates the extra options which may be supplied when uploading an object to the cloud.
-type PutObjectOptions struct {
-	Metadata map[string]string
-}
-
 // IterateFunc is the function used when iterating over objects, this function will be called once for each object whose
 // key matches the provided filtering.
 type IterateFunc func(attrs *objval.ObjectAttrs) error
-
-// MultipartUploadOptions encapsulates the extra options which may be supplied when starting a new multipart upload.
-type MultipartUploadOptions PutObjectOptions
 
 // Client is a unified interface for accessing/managing objects stored in the cloud.
 type Client interface {
@@ -34,7 +26,7 @@ type Client interface {
 	// PutObject creates an object in the cloud with the given key/options.
 	//
 	// NOTE: The body is required to be a 'ReadSeeker' to support checksum calculation/validation.
-	PutObject(bucket, key string, body io.ReadSeeker, options PutObjectOptions) error
+	PutObject(bucket, key string, body io.ReadSeeker) error
 
 	// AppendToObject appends the provided data to the object with the given key, this is a binary concatenation.
 	//
@@ -55,7 +47,7 @@ type Client interface {
 	//
 	// NOTE: Not all clients directly support multipart uploads, the interface exposed should be used as if they do. The
 	// underlying client will handle any nuances.
-	CreateMultipartUpload(bucket, key string, options MultipartUploadOptions) (string, error)
+	CreateMultipartUpload(bucket, key string) (string, error)
 
 	// UploadPart creates/uploads a new part for the multipart upload with the given id.
 	//

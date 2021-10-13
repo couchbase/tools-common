@@ -19,9 +19,8 @@ import (
 // TestClient implementation of the 'Client' interface which stores state in memory, and can be used to avoid having to
 // manually mock a client during unit testing.
 type TestClient struct {
-	t       *testing.T
-	lock    sync.Mutex
-	uploads map[string]MultipartUploadOptions
+	t    *testing.T
+	lock sync.Mutex
 
 	// Buckets is the in memory state maintained by the client. Internally, access is guarded by a mutex, however, it's
 	// not safe/recommended to access this attribute whilst a test is running; it should only be used to inspect state
@@ -35,7 +34,6 @@ var _ Client = (*TestClient)(nil)
 func NewTestClient(t *testing.T) *TestClient {
 	return &TestClient{
 		t:       t,
-		uploads: make(map[string]MultipartUploadOptions),
 		Buckets: make(objval.TestBuckets),
 	}
 }
@@ -67,11 +65,11 @@ func (t *TestClient) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, er
 	return &object.ObjectAttrs, nil
 }
 
-func (t *TestClient) PutObject(bucket, key string, body io.ReadSeeker, options PutObjectOptions) error {
+func (t *TestClient) PutObject(bucket, key string, body io.ReadSeeker) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	_ = t.putObjectLocked(bucket, key, body, options)
+	_ = t.putObjectLocked(bucket, key, body)
 
 	return nil
 }
@@ -122,15 +120,11 @@ func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*r
 	return nil
 }
 
-func (t *TestClient) CreateMultipartUpload(bucket, key string, options MultipartUploadOptions) (string, error) {
+func (t *TestClient) CreateMultipartUpload(bucket, key string) (string, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	id := uuid.NewString()
-
-	t.uploads[id] = options
-
-	return id, nil
+	return uuid.NewString(), nil
 }
 
 func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
@@ -138,7 +132,7 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 	defer t.lock.Unlock()
 
 	part := objval.Part{
-		ID:     t.putObjectLocked(bucket, fmt.Sprintf("%s-%s-%d", id, key, number), body, PutObjectOptions{}),
+		ID:     t.putObjectLocked(bucket, fmt.Sprintf("%s-%s-%d", id, key, number), body),
 		Number: number,
 	}
 
@@ -148,11 +142,6 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	options, ok := t.uploads[id]
-	if !ok {
-		return &objerr.NotFoundError{Type: "multipart upload", Name: id}
-	}
 
 	buffer := &bytes.Buffer{}
 
@@ -165,10 +154,7 @@ func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...ob
 		buffer.Write(object.Body)
 	}
 
-	_ = t.putObjectLocked(bucket, key, bytes.NewReader(buffer.Bytes()), PutObjectOptions(options))
-
-	// Cleanup the (now unused) upload metadata/parts
-	delete(t.uploads, id)
+	_ = t.putObjectLocked(bucket, key, bytes.NewReader(buffer.Bytes()))
 
 	return t.abortMultipartUploadLocked(bucket, id, key, parts...)
 }
@@ -198,7 +184,7 @@ func (t *TestClient) getObjectLocked(bucket, key string) (*objval.TestObject, er
 	return o, nil
 }
 
-func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker, options PutObjectOptions) string {
+func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) string {
 	var (
 		now  = time.Now()
 		data = testutil.ReadAll(t.t, body)
@@ -209,7 +195,6 @@ func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker, opt
 		ETag:         strings.ReplaceAll(uuid.NewString(), "-", ""),
 		Size:         int64(len(data)),
 		LastModified: &now,
-		Metadata:     options.Metadata,
 	}
 
 	_, ok := t.Buckets[bucket]

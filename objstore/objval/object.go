@@ -9,14 +9,11 @@ import (
 type ObjectAttrs struct {
 	// Object identity attributes
 	Key  string
-	ETag string
+	ETag string // NOTE: Not populated during object iteration.
 
 	// Attributes about the object itself
 	Size         int64
 	LastModified *time.Time
-
-	// Supplimentary attributes
-	Metadata map[string]string // NOTE: Not populated during object iteration.
 }
 
 // Object represents an object stored in the cloud, simply the attributes and it's body.
