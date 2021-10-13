@@ -61,7 +61,7 @@ func (e Event) MarshalJSON() ([]byte, error) {
 		ExtraAttributes interface{} `json:"extra_attributes,omitempty"`
 		SubComponent    string      `json:"sub_component,omitempty"`
 	}{
-		Timestamp:       time.Now().UTC().Format(time.RFC3339),
+		Timestamp:       time.Now().UTC().Format("2006-01-02T15:04:05.999Z"),
 		Component:       string(e.Component),
 		Severity:        string(e.Severity),
 		EventID:         uint(e.EventID),
