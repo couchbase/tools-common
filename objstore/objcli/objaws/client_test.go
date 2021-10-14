@@ -12,7 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/couchbase/tools-common/objstore/objcli/objaws/mocks"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/testutil"
 
@@ -30,7 +29,7 @@ func (m *mockError) Message() string { return m.inner }
 func (m *mockError) OrigErr() error  { return nil }
 
 func TestClientGetObject(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.GetObjectInput) bool {
 		var (
@@ -72,7 +71,7 @@ func TestClientGetObject(t *testing.T) {
 }
 
 func TestClientGetObjectWithByteRange(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.GetObjectInput) bool {
 		return input.Range != nil && *input.Range == "64-128"
@@ -106,7 +105,7 @@ func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 }
 
 func TestClientGetObjectAttrs(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.HeadObjectInput) bool {
 		var (
@@ -144,7 +143,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 }
 
 func TestClientPutObject(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.PutObjectInput) bool {
 		var (
@@ -167,7 +166,7 @@ func TestClientPutObject(t *testing.T) {
 }
 
 func TestClientAppendToObjectNotFound(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.HeadObjectInput) bool {
 		var (
@@ -203,7 +202,7 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 }
 
 func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.HeadObjectInput) bool {
 		var (
@@ -264,7 +263,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 }
 
 func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.HeadObjectInput) bool {
 		var (
@@ -365,7 +364,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 }
 
 func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.HeadObjectInput) bool {
 		var (
@@ -439,7 +438,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 }
 
 func TestClientDeleteObjectsSinglePage(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.DeleteObjectsInput) bool {
 		var (
@@ -466,7 +465,7 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 }
 
 func TestClientDeleteObjectsMultiplePages(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.DeleteObjectsInput) bool {
 		var (
@@ -507,7 +506,7 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 }
 
 func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	output := &s3.DeleteObjectsOutput{
 		Errors: []*s3.Error{{Code: aws.String(s3.ErrCodeNoSuchKey), Message: aws.String("")}},
@@ -524,7 +523,7 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 }
 
 func TestClientIterateObjects(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.ListObjectsV2Input) bool {
 		var (
@@ -546,7 +545,7 @@ func TestClientIterateObjects(t *testing.T) {
 }
 
 func TestClientIterateObjectsPropagateUserError(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.ListObjectsV2Input) bool {
 		var (
@@ -690,7 +689,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			api := &mocks.ServiceAPI{}
+			api := &mockServiceAPI{}
 
 			fn1 := func(input *s3.ListObjectsV2Input) bool {
 				var (
@@ -743,7 +742,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 }
 
 func TestClientCreateMultipartUpload(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.CreateMultipartUploadInput) bool {
 		var (
@@ -771,7 +770,7 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 }
 
 func TestClientUploadPart(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.UploadPartInput) bool {
 		var (
@@ -802,7 +801,7 @@ func TestClientUploadPart(t *testing.T) {
 }
 
 func TestClientUploadPartCopy(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.UploadPartCopyInput) bool {
 		var (
@@ -844,7 +843,7 @@ func TestClientUploadPartCopyInvalidByteRange(t *testing.T) {
 }
 
 func TestClientCompleteMultipartUpload(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.CompleteMultipartUploadInput) bool {
 		var (
@@ -877,7 +876,7 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 }
 
 func TestClientAbortMultipartUpload(t *testing.T) {
-	api := &mocks.ServiceAPI{}
+	api := &mockServiceAPI{}
 
 	fn := func(input *s3.AbortMultipartUploadInput) bool {
 		var (
