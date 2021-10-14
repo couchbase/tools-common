@@ -21,6 +21,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mockError struct{ inner string }
+
+func (m *mockError) Error() string   { return m.inner }
+func (m *mockError) String() string  { return m.inner }
+func (m *mockError) Code() string    { return m.inner }
+func (m *mockError) Message() string { return m.inner }
+func (m *mockError) OrigErr() error  { return nil }
+
 func TestClientGetObject(t *testing.T) {
 	api := &mocks.ServiceAPI{}
 
@@ -155,6 +163,42 @@ func TestClientPutObject(t *testing.T) {
 	require.NoError(t, client.PutObject("bucket", "key", strings.NewReader("value")))
 
 	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
+}
+
+func TestClientAppendToObjectNotFound(t *testing.T) {
+	api := &mocks.ServiceAPI{}
+
+	fn1 := func(input *s3.HeadObjectInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return bucket && key
+	}
+
+	api.On("HeadObject", mock.MatchedBy(fn1)).Return(nil, &mockError{s3.ErrCodeNoSuchKey})
+
+	fn2 := func(input *s3.PutObjectInput) bool {
+		var (
+			body   = input.Body != nil && bytes.Equal(testutil.ReadAll(t, input.Body), []byte("appended"))
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return body && bucket && key
+	}
+
+	api.On("PutObject", mock.MatchedBy(fn2)).Return(&s3.PutObjectOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.AppendToObject("bucket", "key", strings.NewReader("appended"))
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
 	api.AssertNumberOfCalls(t, "PutObject", 1)
 }
 

@@ -30,8 +30,7 @@ type Client interface {
 
 	// AppendToObject appends the provided data to the object with the given key, this is a binary concatenation.
 	//
-	// NOTE: The behavior of this function is undefined if the given object does not already exist; in theory the SDK
-	// from the underlying client should return a satisfactory error.
+	// NOTE: If the given object does not already exist, it will be created.
 	AppendToObject(bucket, key string, data io.ReadSeeker) error
 
 	// DeleteObjects deletes all the objects with the given keys ignoring any errors for keys which are not found.

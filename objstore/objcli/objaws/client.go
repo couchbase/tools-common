@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -98,6 +99,12 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 
 func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 	attrs, err := c.GetObjectAttrs(bucket, key)
+
+	// As defined by the 'Client' interface, if the given object does not exist, we create it
+	if objerr.IsNotFoundError(err) {
+		return c.PutObject(bucket, key, data)
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to get object attributes: %w", err)
 	}

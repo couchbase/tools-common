@@ -78,12 +78,12 @@ func (t *TestClient) AppendToObject(bucket, key string, data io.ReadSeeker) erro
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, err := t.getObjectLocked(bucket, key)
-	if err != nil {
-		return err
+	object, ok := t.getBucketLocked(bucket)[key]
+	if ok {
+		object.Body = append(object.Body, testutil.ReadAll(t.t, data)...)
+	} else {
+		t.putObjectLocked(bucket, key, data)
 	}
-
-	object.Body = append(object.Body, testutil.ReadAll(t.t, data)...)
 
 	return nil
 }
