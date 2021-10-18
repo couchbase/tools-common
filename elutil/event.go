@@ -61,7 +61,7 @@ func (e Event) MarshalJSON() ([]byte, error) {
 		ExtraAttributes interface{} `json:"extra_attributes,omitempty"`
 		SubComponent    string      `json:"sub_component,omitempty"`
 	}{
-		Timestamp:       time.Now().UTC().Format("2006-01-02T15:04:05.999Z"),
+		Timestamp:       timestamp(),
 		Component:       string(e.Component),
 		Severity:        string(e.Severity),
 		EventID:         uint(e.EventID),
@@ -70,4 +70,14 @@ func (e Event) MarshalJSON() ([]byte, error) {
 		ExtraAttributes: e.ExtraAttributes,
 		SubComponent:    e.SubComponent,
 	})
+}
+
+// timestamp returns the current UTC time formatted in a stable version of ISO 8601.
+func timestamp() string {
+	return stableISO8601(time.Now().UTC())
+}
+
+// stableISO8601 formats the given time using a stable version of ISO 8601.
+func stableISO8601(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05.000Z")
 }
