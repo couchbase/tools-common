@@ -15,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in AWS S3.
@@ -25,9 +24,9 @@ type Client struct {
 
 var _ objcli.Client = (*Client)(nil)
 
-// NewAWSClient returns a new client which uses the given 'serviceAPI', in general this should be one created using the
+// NewClient returns a new client which uses the given 'serviceAPI', in general this should be the one created using the
 // 's3.New' function exposed by the SDK.
-func NewAWSClient(serviceAPI s3iface.S3API) *Client {
+func NewClient(serviceAPI serviceAPI) *Client {
 	return &Client{serviceAPI: serviceAPI}
 }
 

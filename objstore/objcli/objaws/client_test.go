@@ -10,11 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/testutil"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,6 +28,12 @@ func (m *mockError) String() string  { return m.inner }
 func (m *mockError) Code() string    { return m.inner }
 func (m *mockError) Message() string { return m.inner }
 func (m *mockError) OrigErr() error  { return nil }
+
+func TestNewClient(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	require.Equal(t, &Client{serviceAPI: api}, NewClient(api))
+}
 
 func TestClientGetObject(t *testing.T) {
 	api := &mockServiceAPI{}
@@ -118,7 +125,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	output := &s3.HeadObjectOutput{
 		ETag:          aws.String("etag"),
-		ContentLength: aws.Int64(int64(len("value"))),
+		ContentLength: aws.Int64(5),
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
@@ -132,7 +139,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:          "key",
 		ETag:         "etag",
-		Size:         int64(len("value")),
+		Size:         5,
 		LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
@@ -542,6 +549,13 @@ func TestClientIterateObjects(t *testing.T) {
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
+}
+
+func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
+	client := &Client{}
+
+	err := client.IterateObjects("bucket", "prefix", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
+	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
 func TestClientIterateObjectsPropagateUserError(t *testing.T) {
