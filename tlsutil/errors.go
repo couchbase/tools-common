@@ -16,7 +16,8 @@ var (
 
 	// ErrPasswordProvidedButUnused is returned if the user has provided a password, but we've got to a point where it
 	// would no longer be used.
-	ErrPasswordProvidedButUnused = errors.New("a cert/key password has been provided, but isn't used")
+	ErrPasswordProvidedButUnused = errors.New("a cert/key password was provided but hasn't been used, either the " +
+		"cert/key is unencrypted, or is an unsupported format")
 )
 
 // ParseCertKeyError is a more useful variation of 'ErrInvalidPasswordInputDataOrKey' which contains hints as to the

@@ -20,11 +20,17 @@ var (
 	//go:embed testdata/valid_key.pem
 	validKeyPEM []byte
 
-	//go:embed testdata/valid_key.p8
-	validKeyPKCS8 []byte
+	//go:embed testdata/valid_key_p8.pem
+	validKeyPKCS8PEM []byte
 
-	//go:embed testdata/invalid_key.p8
-	invalidKeyPKCS8 []byte
+	//go:embed testdata/valid_key_p8.der
+	validKeyPKCS8DER []byte
+
+	//go:embed testdata/invalid_key_p8.pem
+	invalidKeyPKCS8PEM []byte
+
+	//go:embed testdata/invalid_key_p8.der
+	invalidKeyPKCS8DER []byte
 
 	//go:embed testdata/valid_cert_and_key.p12
 	validCertAndKeyPKCS12 []byte
@@ -53,8 +59,11 @@ var (
 	//go:embed testdata/valid_ed448_key.pem
 	validED488KeyPEM []byte
 
-	//go:embed testdata/valid_ed448_key.p8
-	validED488KeyPKCS8 []byte
+	//go:embed testdata/valid_ed448_key_p8.pem
+	validED488KeyPKCS8PEM []byte
+
+	//go:embed testdata/valid_ed448_key_p8.der
+	validED488KeyPKCS8DER []byte
 
 	//go:embed testdata/valid_cert_and_ed448_key.p12
 	validCertAndED488KeyPKCS12 []byte
@@ -259,50 +268,130 @@ func TestNewTLSConfigInvalidEncryptedPKCS12(t *testing.T) {
 }
 
 func TestNewTLSConfigValidEncryptedPKCS8(t *testing.T) {
-	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     validCertPEM,
-		ClientKey:      validKeyPKCS8,
-		Password:       []byte("asdasd"),
-		ClientAuthType: tls.VerifyClientCertIfGiven,
-	})
-	require.NoError(t, err)
-	require.Len(t, config.Certificates, 1)
-	require.NotNil(t, config.Certificates[0].Leaf)
-	require.IsType(t, config.Certificates[0].PrivateKey, &rsa.PrivateKey{})
+	type test struct {
+		name string
+		data []byte
+	}
+
+	tests := []*test{
+		{
+			name: "PEM",
+			data: validKeyPKCS8PEM,
+		},
+		{
+			name: "DER",
+			data: validKeyPKCS8DER,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config, err := NewTLSConfig(TLSConfigOptions{
+				ClientCert:     validCertPEM,
+				ClientKey:      test.data,
+				Password:       []byte("asdasd"),
+				ClientAuthType: tls.VerifyClientCertIfGiven,
+			})
+			require.NoError(t, err)
+			require.Len(t, config.Certificates, 1)
+			require.NotNil(t, config.Certificates[0].Leaf)
+			require.IsType(t, config.Certificates[0].PrivateKey, &rsa.PrivateKey{})
+		})
+	}
 }
 
 func TestNewTLSConfigValidEncryptedPKCS8WrongPassword(t *testing.T) {
-	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     validCertPEM,
-		ClientKey:      validKeyPKCS8,
-		Password:       []byte("not-the-password"),
-		ClientAuthType: tls.VerifyClientCertIfGiven,
-	})
-	require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
+	type test struct {
+		name string
+		data []byte
+	}
+
+	tests := []*test{
+		{
+			name: "PEM",
+			data: validKeyPKCS8PEM,
+		},
+		{
+			name: "DER",
+			data: validKeyPKCS8DER,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewTLSConfig(TLSConfigOptions{
+				ClientCert:     validCertPEM,
+				ClientKey:      test.data,
+				Password:       []byte("not-the-password"),
+				ClientAuthType: tls.VerifyClientCertIfGiven,
+			})
+			require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
+		})
+	}
 }
 
 func TestNewTLSConfigValidEncryptedPKCS8WithoutPassword(t *testing.T) {
-	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     validCertPEM,
-		ClientKey:      validKeyPKCS8,
-		ClientAuthType: tls.VerifyClientCertIfGiven,
-	})
+	type test struct {
+		name string
+		data []byte
+	}
 
-	var parseCertKeyError ParseCertKeyError
+	tests := []*test{
+		{
+			name: "PEM",
+			data: validKeyPKCS8PEM,
+		},
+		{
+			name: "DER",
+			data: validKeyPKCS8DER,
+		},
+	}
 
-	require.ErrorAs(t, err, &parseCertKeyError)
-	require.Equal(t, "private key", parseCertKeyError.what)
-	require.False(t, parseCertKeyError.password)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewTLSConfig(TLSConfigOptions{
+				ClientCert:     validCertPEM,
+				ClientKey:      test.data,
+				ClientAuthType: tls.VerifyClientCertIfGiven,
+			})
+
+			var parseCertKeyError ParseCertKeyError
+
+			require.ErrorAs(t, err, &parseCertKeyError)
+			require.Equal(t, "private key", parseCertKeyError.what)
+			require.False(t, parseCertKeyError.password)
+		})
+	}
 }
 
 func TestNewTLSConfigInvalidEncryptedPKCS8(t *testing.T) {
-	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     validCertPEM,
-		ClientKey:      invalidKeyPKCS8,
-		Password:       []byte("asdasd"),
-		ClientAuthType: tls.VerifyClientCertIfGiven,
-	})
-	require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
+	type test struct {
+		name string
+		data []byte
+	}
+
+	tests := []*test{
+		{
+			name: "PEM",
+			data: invalidKeyPKCS8PEM,
+		},
+		{
+			name: "DER",
+			data: invalidKeyPKCS8DER,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewTLSConfig(TLSConfigOptions{
+				ClientCert:     validCertPEM,
+				ClientKey:      test.data,
+				Password:       []byte("asdasd"),
+				ClientAuthType: tls.VerifyClientCertIfGiven,
+			})
+			require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
+		})
+	}
 }
 
 func TestNewTLSConfigMultipleCertsPEM(t *testing.T) {
@@ -381,11 +470,31 @@ func TestNewTLSConfigUnsupportedPublicPrivateKeyPKCS12(t *testing.T) {
 }
 
 func TestNewTLSConfigUnsupportedPublicPrivateKeyPKCS8(t *testing.T) {
-	_, err := NewTLSConfig(TLSConfigOptions{
-		ClientCert:     validCertPEM,
-		ClientKey:      validED488KeyPKCS8,
-		Password:       []byte("asdasd"),
-		ClientAuthType: tls.VerifyClientCertIfGiven,
-	})
-	require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
+	type test struct {
+		name string
+		data []byte
+	}
+
+	tests := []*test{
+		{
+			name: "PEM",
+			data: validED488KeyPKCS8PEM,
+		},
+		{
+			name: "DER",
+			data: validED488KeyPKCS8DER,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewTLSConfig(TLSConfigOptions{
+				ClientCert:     validCertPEM,
+				ClientKey:      test.data,
+				Password:       []byte("asdasd"),
+				ClientAuthType: tls.VerifyClientCertIfGiven,
+			})
+			require.ErrorIs(t, err, ErrInvalidPasswordInputDataOrKey)
+		})
+	}
 }

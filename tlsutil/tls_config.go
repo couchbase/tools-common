@@ -183,7 +183,7 @@ func parseKey(options TLSConfigOptions) (interface{}, error) {
 	}
 
 	block, _ := pem.Decode(data)
-	if block != nil && strings.Contains(block.Type, "PRIVATE KEY") {
+	if block != nil && (!strings.Contains(block.Type, "ENCRYPTED") && strings.Contains(block.Type, "PRIVATE KEY")) {
 		return parseUnencryptedPrivateKey(block.Bytes), nil
 	}
 
@@ -193,6 +193,12 @@ func parseKey(options TLSConfigOptions) (interface{}, error) {
 // parseEncryptedKey attempts to decrypt, parse and return private key which should be used for mTLS, the key is
 // expected to be in either PKCS#8 or PKCS#12 format.
 func parseEncryptedKey(data []byte, options TLSConfigOptions) (interface{}, error) {
+	// We've not been provided a password, so we assume this isn't an encrypted private key, and try to parse it as
+	// unencrypted.
+	if len(options.Password) == 0 {
+		return nil, nil
+	}
+
 	if options.ClientKey != nil {
 		return parseEncryptedPKCS8Key(data, options.Password)
 	}
@@ -216,9 +222,20 @@ func parseEncryptedKey(data []byte, options TLSConfigOptions) (interface{}, erro
 // parseEncryptedPKCS8Key attempts to decrypt, parse and return the private key which should be used for mTLS, the key
 // is expected to be in PKCS#8 format.
 func parseEncryptedPKCS8Key(data, password []byte) (interface{}, error) {
+	block, _ := pem.Decode(data)
+	if block != nil {
+		data = block.Bytes
+	}
+
 	key, err := pkcs8.ParsePKCS8PrivateKey(data, password)
 	if err == nil {
 		return key, nil
+	}
+
+	// We've failed to parse the key with the given password, and it's not valid PEM encoded data, either the password
+	// or data itself is wrong.
+	if block == nil {
+		return nil, ErrInvalidPasswordInputDataOrKey
 	}
 
 	return nil, handleKnownPublicPrivateKeyErrors(err)
