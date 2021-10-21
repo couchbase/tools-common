@@ -7,9 +7,10 @@ import (
 
 // TLSConfigOptions encapsulates the available options for creating a new TLS config.
 type TLSConfigOptions struct {
-	ClientCert []byte
-	ClientKey  []byte
-	Password   []byte
+	ClientCert           []byte
+	ClientKey            []byte
+	Password             []byte
+	IgnoreUnusedPassword bool
 
 	ClientAuthType tls.ClientAuthType
 	ClientCAs      []byte

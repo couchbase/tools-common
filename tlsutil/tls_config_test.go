@@ -224,6 +224,17 @@ func TestNewTLSConfigUnencryptedWithPassword(t *testing.T) {
 	require.ErrorIs(t, err, ErrPasswordProvidedButUnused)
 }
 
+func TestNewTLSConfigUnencryptedWithPasswordIgnoreUnused(t *testing.T) {
+	_, err := NewTLSConfig(TLSConfigOptions{
+		ClientCert:           validCertPEM,
+		ClientKey:            validKeyPEM,
+		Password:             []byte("asdasd"),
+		IgnoreUnusedPassword: true,
+		ClientAuthType:       tls.VerifyClientCertIfGiven,
+	})
+	require.Nil(t, err)
+}
+
 func TestNewTLSConfigValidEncryptedPKCS12(t *testing.T) {
 	config, err := NewTLSConfig(TLSConfigOptions{
 		ClientCert:     validCertAndKeyPKCS12,

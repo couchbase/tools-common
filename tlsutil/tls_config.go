@@ -178,7 +178,7 @@ func parseKey(options TLSConfigOptions) (interface{}, error) {
 		return key, nil
 	}
 
-	if len(options.Password) != 0 {
+	if len(options.Password) != 0 && !options.IgnoreUnusedPassword {
 		return nil, ErrPasswordProvidedButUnused
 	}
 
