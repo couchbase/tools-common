@@ -3,6 +3,8 @@ package cbrest
 import (
 	"net/url"
 	"time"
+
+	"github.com/couchbase/tools-common/netutil"
 )
 
 // Method is a readability wrapper around the method for a given REST request; only the methods defined in the 'http'
@@ -51,14 +53,28 @@ type Request struct {
 	// ExpectedStatusCode indicates that when this REST request is successful, we will get this specific status code.
 	ExpectedStatusCode int
 
+	// Timeout overrides the default client timeout. If not set the client timeout will be used instead.
+	Timeout time.Duration
+
+	// Idempotent indicates whether this request is idempotent and can be retried.
+	//
+	// The following attributes (RetryOnStatusCodes and NoRetryOnStatusCodes) may be used to configure retry
+	// behavior for the request.
+	//
+	// NOTE: This only needs to be set for certain methods, as by default some should be idempotent as defined in
+	// https://developer.mozilla.org/en-US/docs/Glossary/Idempotent.
+	Idempotent bool
+
 	// RetryOnStatusCodes is a list of status codes which will be used to indicate that we should retry the request.
 	RetryOnStatusCodes []int
 
 	// NoRetryOnStatusCodes is a list of status codes which will explicitly not be retried.
 	NoRetryOnStatusCodes []int
+}
 
-	// Timeout overrides the default client timeout. If not set the client timeout will be used instead.
-	Timeout time.Duration
+// IsIdempotent returns a boolean indicating whether this request is idempotent and may be retried.
+func (r *Request) IsIdempotent() bool {
+	return r.Idempotent || netutil.IsMethodIdempotent(string(r.Method))
 }
 
 // Response represents a REST response from the Couchbase Cluster.

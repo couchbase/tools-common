@@ -12,9 +12,39 @@ import (
 	"time"
 
 	"github.com/couchbase/tools-common/errutil"
+	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 )
+
+// enhanceError returns a more informative error using information from the given request/response.
+func enhanceError(err error, request *Request, resp *http.Response) error {
+	if err != nil || resp == nil {
+		return err
+	}
+
+	// Attempt to read the response body, this will help improve the returned error message
+	defer resp.Body.Close()
+	body, _ := readBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
+
+	return handleResponseError(request.Method, request.Endpoint, resp.StatusCode, body)
+}
+
+// cleanupResp drains the response body and ensures it's closed.
+func cleanupResp(resp *http.Response) {
+	if resp == nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	_, err := io.Copy(io.Discard, resp.Body)
+	if err == nil || errors.Is(err, http.ErrBodyReadAfterClose) {
+		return
+	}
+
+	log.Warnf("(REST) Failed to drain response body due to unexpected error: %s", err)
+}
 
 // readBody returns the entire response body returning an informative error in the case where the response body is less
 // than the expected length.
@@ -133,12 +163,7 @@ func handleResponseError(method Method, endpoint Endpoint, statusCode int, body 
 		return &EndpointNotFoundError{method: method, endpoint: endpoint}
 	}
 
-	return &UnexpectedStatusCodeError{
-		Status:   statusCode,
-		method:   method,
-		endpoint: endpoint,
-		body:     body,
-	}
+	return &UnexpectedStatusCodeError{Status: statusCode, method: method, endpoint: endpoint, body: body}
 }
 
 // shouldRetry returns a boolean indicating whether the request which returned the given error should be retried.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -585,7 +586,6 @@ func TestClientExecuteWithDefaultRetries(t *testing.T) {
 				Endpoint:           "/test",
 				ExpectedStatusCode: http.StatusOK,
 				Method:             http.MethodGet,
-				RetryOnStatusCodes: []int{http.StatusTooEarly},
 				Service:            ServiceManagement,
 			}
 
@@ -752,6 +752,39 @@ func TestClientExecuteStandardError(t *testing.T) {
 
 	var unexpectedStatus *UnexpectedStatusCodeError
 
+	require.ErrorAs(t, err, &unexpectedStatus)
+}
+
+func TestClientExecuteWithNonIdepotentRequest(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodPost, "/test", NewTestHandler(t, http.StatusTooEarly, make([]byte, 0)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodPost,
+		RetryOnStatusCodes: []int{http.StatusTooEarly},
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	_, err = client.Execute(request)
+	require.Error(t, err)
+
+	var (
+		retriesExhausted *RetriesExhaustedError
+		unexpectedStatus *UnexpectedStatusCodeError
+	)
+
+	require.False(t, errors.As(err, &retriesExhausted)) // testify doesn't appear to have a 'NotErrorAs' function...
 	require.ErrorAs(t, err, &unexpectedStatus)
 }
 
