@@ -46,9 +46,9 @@ type ClientOptions struct {
 	// client functions to return stale data/attempt to address missing nodes.
 	DisableCCP bool
 
-	// ThisNodeOnly is only meant to be used if you only want to exclusively communicate with the given host. It should
-	// only be used for short lived clients, ideally doing a couple of requests at most.
-	ThisNodeOnly bool
+	// ConnectionMode is the connection mode to use when connecting to the cluster, this may be used to limit how/where
+	// REST requests are dispatched.
+	ConnectionMode ConnectionMode
 
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
 	ReqResLogLevel log.Level
@@ -60,7 +60,7 @@ type Client struct {
 	authProvider *AuthProvider
 	clusterInfo  *cbvalue.ClusterInfo
 
-	thisNodeOnly bool
+	connectionMode ConnectionMode
 
 	pollTimeout    time.Duration
 	requestRetries int
@@ -104,13 +104,17 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 
-	if options.ThisNodeOnly && len(parsed.Addresses) > 1 {
+	if options.ConnectionMode.ThisNodeOnly() && len(parsed.Addresses) > 1 {
 		return nil, ErrThisNodeOnlyExpectsASingleAddress
 	}
 
 	resolved, err := parsed.Resolve()
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve connection string: %w", err)
+	}
+
+	if !options.ConnectionMode.AllowTLS() && resolved.UseSSL {
+		return nil, ErrConnectionModeRequiresNonTLS
 	}
 
 	authProvider := NewAuthProvider(resolved, options.Provider)
@@ -132,7 +136,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 			},
 		},
 		authProvider:   authProvider,
-		thisNodeOnly:   options.ThisNodeOnly,
+		connectionMode: options.ConnectionMode,
 		pollTimeout:    pollTimeout,
 		requestRetries: requestRetries,
 		reqResLogLevel: options.ReqResLogLevel,
@@ -153,7 +157,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 
 	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
 	// having the cluster uuid to determine whether it's safe to use a given cluster config.
-	if !(options.ThisNodeOnly || options.DisableCCP) {
+	if !(options.ConnectionMode.ThisNodeOnly() || options.DisableCCP) {
 		client.beginCCP()
 	}
 
@@ -308,7 +312,7 @@ func (c *Client) updateCCFromHost(host string) error {
 		return fmt.Errorf("failed to unmarshal cluster config: %w", err)
 	}
 
-	if c.thisNodeOnly {
+	if c.connectionMode.ThisNodeOnly() {
 		config.FilterOtherNodes()
 	}
 
@@ -638,7 +642,7 @@ func (c *Client) waitUntilUpdated(ctx context.Context) {
 	// We don't update the cluster config when we're only communicating with the bootstrap node since it's unlikely that
 	// a refresh will resolve any issues. For example, we normally refresh to detect when a node has been added/removed
 	// from the cluster.
-	if c.thisNodeOnly {
+	if c.connectionMode.ThisNodeOnly() {
 		return
 	}
 
@@ -709,6 +713,26 @@ func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, 
 	return req, nil
 }
 
+// serviceHost returns the service host that this request should be dispatched too.
+func (c *Client) serviceHost(service Service) (string, error) {
+	host, err := c.authProvider.GetServiceHost(service)
+	if err != nil {
+		return "", fmt.Errorf("failed to get host for service '%s': %w", service, err)
+	}
+
+	if c.connectionMode != ConnectionModeLoopback {
+		return host, nil
+	}
+
+	// This shouldn't really fail since we should be constructing valid hosts in the auth provider
+	parsed, err := url.Parse(host)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse host '%s': %w", host, err)
+	}
+
+	return "http://127.0.0.1:" + parsed.Port(), nil
+}
+
 // perform synchronously executes the provided request returning the response and any error that occurred during the
 // process.
 func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
@@ -739,12 +763,21 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 
 // GetServiceHost retrieves the address for a single node in the cluster which is running the provided service.
 func (c *Client) GetServiceHost(service Service) (string, error) {
-	return c.authProvider.GetServiceHost(service)
+	return c.serviceHost(service)
 }
 
 // GetAllServiceHosts retrieves a list of all the nodes in the cluster that are running the provided service.
 func (c *Client) GetAllServiceHosts(service Service) ([]string, error) {
-	return c.authProvider.GetAllServiceHosts(service)
+	if !c.connectionMode.ThisNodeOnly() {
+		return c.authProvider.GetAllServiceHosts(service)
+	}
+
+	host, err := c.GetServiceHost(service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service host for single node: %w", err)
+	}
+
+	return []string{host}, nil
 }
 
 // GetClusterInfo gets commonly used information about the cluster; this includes the uuid and version.

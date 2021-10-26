@@ -72,10 +72,10 @@ func TestNewClientWithThisNodeOnly(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		ThisNodeOnly:     true,
+		ConnectionMode:   ConnectionModeThisNodeOnly,
 	})
 	require.NoError(t, err)
-	require.True(t, client.thisNodeOnly)
+	require.Equal(t, ConnectionModeThisNodeOnly, client.connectionMode)
 }
 
 func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
@@ -85,9 +85,18 @@ func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
 	_, err := NewClient(ClientOptions{
 		ConnectionString: fmt.Sprintf("%s,secondhostname:8091", cluster.URL()),
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		ThisNodeOnly:     true,
+		ConnectionMode:   ConnectionModeThisNodeOnly,
 	})
 	require.ErrorIs(t, err, ErrThisNodeOnlyExpectsASingleAddress)
+}
+
+func TestNewClientWithLoopbackWithTLS(t *testing.T) {
+	_, err := NewClient(ClientOptions{
+		ConnectionString: "https://127.0.0.1:8091",
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		ConnectionMode:   ConnectionModeLoopback,
+	})
+	require.ErrorIs(t, err, ErrConnectionModeRequiresNonTLS)
 }
 
 func TestNewClient(t *testing.T) {
@@ -132,7 +141,7 @@ func TestNewClientThisNodeOnly(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		ThisNodeOnly:     true,
+		ConnectionMode:   ConnectionModeThisNodeOnly,
 	})
 	require.NoError(t, err)
 	require.Len(t, client.authProvider.manager.config.Nodes, 1)
@@ -1016,6 +1025,23 @@ func TestGetServiceHost(t *testing.T) {
 	require.Equal(t, cluster.URL(), host)
 }
 
+func TestGetServiceHostServiceConnectionMode(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		DisableCCP:       true,
+		ConnectionMode:   ConnectionModeLoopback,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	})
+	require.NoError(t, err)
+
+	host, err := client.GetServiceHost(ServiceManagement)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("http://127.0.0.1:%d", cluster.Port()), host)
+}
+
 func TestGetServiceHostTLS(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{
 		Nodes:     TestNodes{{SSL: true}},
@@ -1460,7 +1486,7 @@ func TestClientUpdateCCFromNodeThisNodeOnly(t *testing.T) {
 
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
-		ThisNodeOnly:     true,
+		ConnectionMode:   ConnectionModeThisNodeOnly,
 		DisableCCP:       true,
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
@@ -1493,7 +1519,7 @@ func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
 
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
-		ThisNodeOnly:     true,
+		ConnectionMode:   ConnectionModeThisNodeOnly,
 		DisableCCP:       true,
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 	})
@@ -1651,15 +1677,15 @@ func TestClientDoRequestWithCustomTimeout(t *testing.T) {
 }
 
 func TestClientWaitUntilUpdated(t *testing.T) {
-	for _, thisNodeOnly := range []bool{false, true} {
-		t.Run(fmt.Sprintf(`{"this_node_only":%s}`, strconv.FormatBool(thisNodeOnly)), func(t *testing.T) {
+	for _, connectionMode := range SupportedConnectionModes {
+		t.Run(fmt.Sprintf(`{"connection_mode":%d}`, connectionMode), func(t *testing.T) {
 			cluster := NewTestCluster(t, TestClusterOptions{})
 			defer cluster.Close()
 
 			client, err := NewClient(ClientOptions{
 				ConnectionString: cluster.URL(),
 				Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-				ThisNodeOnly:     thisNodeOnly,
+				ConnectionMode:   connectionMode,
 				DisableCCP:       true,
 			})
 			require.NoError(t, err)
@@ -1668,7 +1694,7 @@ func TestClientWaitUntilUpdated(t *testing.T) {
 
 			client.waitUntilUpdated(context.Background())
 
-			if thisNodeOnly {
+			if connectionMode == ConnectionModeThisNodeOnly || connectionMode == ConnectionModeLoopback {
 				require.Equal(t, rev, client.authProvider.manager.config.Revision)
 			} else {
 				require.NotEqual(t, rev, client.authProvider.manager.config.Revision)

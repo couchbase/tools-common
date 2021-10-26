@@ -24,6 +24,10 @@ var (
 	// more than one node in the connection string.
 	ErrThisNodeOnlyExpectsASingleAddress = errors.New("when using 'ThisNodeOnly', a connection string with a single " +
 		"address should be supplied")
+
+	// ErrConnectionModeRequiresNonTLS is returned if the user attempts to connect using TLS when the connection mode
+	// requires non-TLS communication.
+	ErrConnectionModeRequiresNonTLS = errors.New("connection mode requires non-TLS communication")
 )
 
 // BootstrapFailureError is returned to the user if we've failed to bootstrap the REST client.

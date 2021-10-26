@@ -24,8 +24,7 @@ func NewClient(options ServiceOptions) (*Client, error) {
 		Provider:         options.Provider,
 		TLSConfig:        options.TLSConfig,
 		ReqResLogLevel:   options.ReqResLogLevel,
-		DisableCCP:       true,
-		ThisNodeOnly:     true,
+		ConnectionMode:   cbrest.ConnectionModeLoopback,
 	})
 
 	return &Client{client}, err
