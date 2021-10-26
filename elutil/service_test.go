@@ -16,8 +16,8 @@ func TestNewService(t *testing.T) {
 	defer cluster.Close()
 
 	service, err := NewService(ServiceOptions{
-		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{},
+		ManagementPort: cluster.Port(),
+		Provider:       &aprov.Static{},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, service)
@@ -38,8 +38,8 @@ func TestServiceReport(t *testing.T) {
 	defer cluster.Close()
 
 	service, err := NewService(ServiceOptions{
-		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{},
+		ManagementPort: cluster.Port(),
+		Provider:       &aprov.Static{},
 	})
 	require.NoError(t, err)
 
@@ -64,8 +64,8 @@ func TestServiceReportTooBig(t *testing.T) {
 	defer cluster.Close()
 
 	service, err := NewService(ServiceOptions{
-		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{},
+		ManagementPort: cluster.Port(),
+		Provider:       &aprov.Static{},
 	})
 	require.NoError(t, err)
 
@@ -95,8 +95,8 @@ func TestServiceReportIsAsync(t *testing.T) {
 	defer cluster.Close()
 
 	service, err := NewService(ServiceOptions{
-		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{},
+		ManagementPort: cluster.Port(),
+		Provider:       &aprov.Static{},
 	})
 	require.NoError(t, err)
 

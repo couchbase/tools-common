@@ -15,8 +15,8 @@ func TestNewClient(t *testing.T) {
 	defer cluster.Close()
 
 	client, err := NewClient(ServiceOptions{
-		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{},
+		ManagementPort: cluster.Port(),
+		Provider:       &aprov.Static{},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, client)
@@ -35,8 +35,8 @@ func TestClientPostEvent(t *testing.T) {
 	defer cluster.Close()
 
 	client, err := NewClient(ServiceOptions{
-		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{},
+		ManagementPort: cluster.Port(),
+		Provider:       &aprov.Static{},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, client)

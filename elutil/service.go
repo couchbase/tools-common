@@ -24,9 +24,9 @@ const (
 
 // ServiceOptions encapsulates the options available when creating a new event log service.
 type ServiceOptions struct {
-	ConnectionString string
-	Provider         aprov.Provider
-	TLSConfig        *tls.Config
+	ManagementPort uint16
+	Provider       aprov.Provider
+	TLSConfig      *tls.Config
 
 	// ReqResLogLevel is the level at which HTTP requests/responses will be logged; this directly maps to the 'cbrest'
 	// client value.
