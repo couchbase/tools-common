@@ -43,6 +43,11 @@ func (r Retryer) DoWithContext(ctx context.Context, fn RetryableFunc) (interface
 		if done {
 			return payload, err
 		}
+
+		// Log all but the last failure, the caller may use this to log that a retry is about to take place
+		if r.options.Log != nil && wrapped.attempt != r.options.MaxRetries {
+			r.options.Log(wrapped, payload, err)
+		}
 	}
 
 	return payload, &RetriesExhaustedError{attempts: r.options.MaxRetries, err: err}

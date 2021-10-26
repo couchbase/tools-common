@@ -36,6 +36,23 @@ func TestRetryerDo(t *testing.T) {
 	require.Equal(t, 1, called)
 }
 
+func TestRetryerDoWithLogFuncAllButLast(t *testing.T) {
+	var (
+		called  int
+		options = RetryerOptions{
+			Log: func(ctx *Context, _ interface{}, err error) {
+				require.NotNil(t, ctx)
+				require.Equal(t, called+1, ctx.Attempt())
+				called++
+			},
+		}
+	)
+
+	_, err := NewRetryer(options).Do(func(ctx *Context) (interface{}, error) { return nil, assert.AnError })
+	require.Error(t, err)
+	require.Equal(t, 2, called)
+}
+
 func TestRetryerDoCleanupAllButLast(t *testing.T) {
 	var (
 		cleanupCalled int
