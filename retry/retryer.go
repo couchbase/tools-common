@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/couchbase/tools-common/maths"
@@ -105,7 +106,7 @@ func (r Retryer) duration(attempt int) time.Duration {
 	case AlgoritmnExponential:
 		n = 1 << attempt
 	case AlgoritmnFibonacci:
-		n = time.Duration(fibN(attempt))
+		n = time.Duration(math.Round(math.Pow(math.Phi, float64(attempt)) / sqrt5))
 	}
 
 	duration := n * r.options.MinDelay
