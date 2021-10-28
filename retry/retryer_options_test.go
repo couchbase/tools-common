@@ -12,7 +12,7 @@ func TestRetryerOptionsDefaults(t *testing.T) {
 	options.defaults()
 
 	expected := RetryerOptions{
-		Algoritmn:  AlgoritmnFibonacci,
+		Algorithm:  AlgorithmFibonacci,
 		MaxRetries: 3,
 		MinDelay:   50 * time.Millisecond,
 		MaxDelay:   2*time.Second + 500*time.Millisecond,
@@ -26,7 +26,7 @@ func TestRetryerOptionsLimitRetries(t *testing.T) {
 	options.defaults()
 
 	expected := RetryerOptions{
-		Algoritmn:  AlgoritmnFibonacci,
+		Algorithm:  AlgorithmFibonacci,
 		MaxRetries: 50,
 		MinDelay:   50 * time.Millisecond,
 		MaxDelay:   2*time.Second + 500*time.Millisecond,

@@ -105,12 +105,12 @@ func (r Retryer) sleep(ctx *Context) error {
 func (r Retryer) duration(attempt int) time.Duration {
 	var n time.Duration
 
-	switch r.options.Algoritmn {
-	case AlgoritmnLinear:
+	switch r.options.Algorithm {
+	case AlgorithmLinear:
 		n = time.Duration(attempt)
-	case AlgoritmnExponential:
+	case AlgorithmExponential:
 		n = 1 << attempt
-	case AlgoritmnFibonacci:
+	case AlgorithmFibonacci:
 		n = time.Duration(math.Round(math.Pow(math.Phi, float64(attempt)) / sqrt5))
 	}
 

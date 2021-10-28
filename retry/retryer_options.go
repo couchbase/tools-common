@@ -6,18 +6,18 @@ import (
 	"github.com/couchbase/tools-common/maths"
 )
 
-// Algoritmn represents a retry algoritmn used to determine backoff before retrying function execution.
-type Algoritmn int
+// Algorithm represents a retry algorithm used to determine backoff before retrying function execution.
+type Algorithm int
 
 const (
-	// AlgoritmnFibonacci backs off using the fibonacci sequence e.g. 50ms, 50ms, 100ms ... 128h9m33s
-	AlgoritmnFibonacci Algoritmn = iota
+	// AlgorithmFibonacci backs off using the fibonacci sequence e.g. 50ms, 50ms, 100ms ... 128h9m33s
+	AlgorithmFibonacci Algorithm = iota
 
-	// AlgoritmnExponential backs off exponentially e.g. 100ms, 200ms, 400ms ... 477218h35m18s
-	AlgoritmnExponential
+	// AlgorithmExponential backs off exponentially e.g. 100ms, 200ms, 400ms ... 477218h35m18s
+	AlgorithmExponential
 
-	// AlgoritmnLinear backs off linearly e.g. 50ms, 100ms, 150ms ... 1.75s
-	AlgoritmnLinear
+	// AlgorithmLinear backs off linearly e.g. 50ms, 100ms, 150ms ... 1.75s
+	AlgorithmLinear
 )
 
 // LogFunc is a function which is run before each retry attempt after failing to run the given 'RetryableFunc'.
@@ -36,8 +36,8 @@ type CleanupFunc func(payload interface{})
 
 // RetryerOptions encapsulates the options available when creating a retryer.
 type RetryerOptions struct {
-	// Algoritmn is the algorithm to use when calculating backoff.
-	Algoritmn Algoritmn
+	// Algorithm is the algorithm to use when calculating backoff.
+	Algorithm Algorithm
 
 	// MaxRetries is the maximum number of times to retry the function.
 	MaxRetries int

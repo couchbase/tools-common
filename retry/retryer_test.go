@@ -13,7 +13,7 @@ func TestNewRetryer(t *testing.T) {
 	retryer := NewRetryer(RetryerOptions{})
 
 	options := RetryerOptions{
-		Algoritmn:  AlgoritmnFibonacci,
+		Algorithm:  AlgorithmFibonacci,
 		MaxRetries: 3,
 		MinDelay:   50 * time.Millisecond,
 		MaxDelay:   2*time.Second + 500*time.Millisecond,
@@ -177,24 +177,24 @@ func TestRetryerInternalDoContextCancelled(t *testing.T) {
 func TestRetryerDuration(t *testing.T) {
 	type test struct {
 		name      string
-		algorithm Algoritmn
+		algorithm Algorithm
 		expected  []time.Duration
 	}
 
 	tests := []*test{
 		{
 			name:      "Fibonacci",
-			algorithm: AlgoritmnFibonacci,
+			algorithm: AlgorithmFibonacci,
 			expected:  []time.Duration{50 * time.Millisecond, 50 * time.Millisecond, 100 * time.Millisecond},
 		},
 		{
 			name:      "Exponential",
-			algorithm: AlgoritmnExponential,
+			algorithm: AlgorithmExponential,
 			expected:  []time.Duration{100 * time.Millisecond, 200 * time.Millisecond, 400 * time.Millisecond},
 		},
 		{
 			name:      "Linear",
-			algorithm: AlgoritmnLinear,
+			algorithm: AlgorithmLinear,
 			expected:  []time.Duration{50 * time.Millisecond, 100 * time.Millisecond, 150 * time.Millisecond},
 		},
 	}
@@ -205,7 +205,7 @@ func TestRetryerDuration(t *testing.T) {
 				require.Equal(
 					t,
 					test.expected[i],
-					NewRetryer(RetryerOptions{Algoritmn: test.algorithm}).duration(i+1),
+					NewRetryer(RetryerOptions{Algorithm: test.algorithm}).duration(i+1),
 				)
 			}
 		})
@@ -216,6 +216,6 @@ func TestRetryerDurationWithOverflow(t *testing.T) {
 	require.Equal(
 		t,
 		2*time.Second+500*time.Millisecond,
-		NewRetryer(RetryerOptions{Algoritmn: AlgoritmnExponential}).duration(42),
+		NewRetryer(RetryerOptions{Algorithm: AlgorithmExponential}).duration(42),
 	)
 }
