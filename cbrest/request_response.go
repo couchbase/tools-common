@@ -82,3 +82,12 @@ type Response struct {
 	StatusCode int
 	Body       []byte
 }
+
+// StreamingResponse encapsulates a single streaming response payload/error.
+type StreamingResponse struct {
+	// Payload is the raw payload received from a streaming endpoint.
+	Payload []byte
+
+	// Error is an error received during streaming, after the first error, the stream will be terminated.
+	Error error
+}

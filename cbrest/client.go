@@ -1,12 +1,14 @@
 package cbrest
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -365,11 +367,11 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 
 	setAuthHeaders(host, c.authProvider, req)
 
-	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0)
+	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0) //nolint:bodyclose
 	if err != nil {
 		return nil, handleRequestError(req, err) // Purposefully not wrapped
 	}
-	defer resp.Body.Close()
+	defer cleanupResp(resp) //nolint:wsl
 
 	body, err := readBody(http.MethodGet, endpoint, resp.Body, resp.ContentLength)
 	if err != nil {
@@ -495,15 +497,19 @@ func (c *Client) AltAddr() bool {
 // Execute the given request to completion reading the entire response body whilst honoring request level
 // retries/timeout.
 func (c *Client) Execute(request *Request) (*Response, error) {
-	resp, err := c.Do(context.Background(), request)
+	return c.ExecuteWithContext(context.Background(), request)
+}
+
+// ExecuteWithContext the given request to completion, using the provided context, reading the entire response body
+// whilst honoring request level retries/timeout.
+func (c *Client) ExecuteWithContext(ctx context.Context, request *Request) (*Response, error) {
+	resp, err := c.Do(ctx, request) //nolint:bodyclose
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanupResp(resp) //nolint:wsl
 
-	response := &Response{
-		StatusCode: resp.StatusCode,
-	}
+	response := &Response{StatusCode: resp.StatusCode}
 
 	response.Body, err = readBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
 	if err != nil {
@@ -515,6 +521,104 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 	}
 
 	return response, handleResponseError(request.Method, request.Endpoint, response.StatusCode, response.Body)
+}
+
+// ExecuteStream executes the given request, returning a read only channel which can be used to read updates from a
+// streaming endpoint.
+//
+// NOTE: The returned channel will be close when the remote connection closes the socket, in this case no error will be
+// returned.
+func (c *Client) ExecuteStream(request *Request) (<-chan StreamingResponse, error) {
+	return c.ExecuteStreamWithContext(context.Background(), request)
+}
+
+// ExecuteStreamWithContext executes the given request using the provided context, returning a read only channel which
+// can be used to read updates from a streaming endpoint.
+//
+// The returned channel will be close when either:
+// 1) The remote connection closes the socket, in this case no error will be returned
+// 2) The given context is cancelled, again no error will be returned
+func (c *Client) ExecuteStreamWithContext(ctx context.Context, request *Request) (<-chan StreamingResponse, error) {
+	ctx = retry.NewContext(ctx)
+
+	resp, err := c.Do(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	if resp.StatusCode == request.ExpectedStatusCode {
+		return c.beginStream(ctx.(*retry.Context), request, resp), nil
+	}
+
+	// Received a valid response, but with the wrong status code, ensure we drain and close the response body
+	defer cleanupResp(resp)
+
+	body, err := readBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return nil, handleResponseError(request.Method, request.Endpoint, resp.StatusCode, body)
+}
+
+// beginStream constructs a stream, and kicks off a goroutine to wait for, and process mutations.
+func (c *Client) beginStream(ctx *retry.Context, request *Request, resp *http.Response) <-chan StreamingResponse {
+	log.Logf(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Beginning stream for endpoint '%s'",
+		ctx.Attempt(), request.Method, request.Endpoint)
+
+	stream := make(chan StreamingResponse, 1)
+
+	go c.stream(ctx, request, resp, stream)
+
+	return stream
+}
+
+// stream processes payloads from a streaming endpoint, dispatching them to the provided channel.
+func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Response, stream chan<- StreamingResponse) {
+	// Ensure the response is always drained, and closed and that the response stream is always closed
+	defer func() { cleanupResp(resp); close(stream) }()
+
+	var (
+		reader = bufio.NewReader(resp.Body)
+		err    error
+	)
+
+	for {
+		payload, err := reader.ReadBytes('\n')
+		if err != nil {
+			break
+		}
+
+		//nolint:lll
+		// The payloads sent by 'ns_server' are quadruple newline delimited, if we have successfully read a payload
+		// which is empty when trimmed of whitespace, we can safely ignore it.
+		//
+		// See https://github.com/couchbase/ns_server/blob/d5d1e828e570737aedae95de56b5e3fb178f4059/src/menelaus_util.erl#L620-L628
+		// for more information.
+		payload = bytes.TrimSpace(payload)
+		if len(payload) == 0 {
+			continue
+		}
+
+		select {
+		case stream <- StreamingResponse{Payload: payload}:
+		case <-ctx.Done():
+			return
+		}
+	}
+
+	// If the remote end close the connection, cleanup and return successfully
+	if err == nil || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		log.Logf(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Closing stream for endpoint '%s'"+
+			" which completed successfully", ctx.Attempt(), request.Method, request.Endpoint)
+
+		return
+	}
+
+	log.Logf(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Closing stream for endpoint '%s'"+
+		" which failed due to error: %s", ctx.Attempt(), request.Method, request.Endpoint, err)
+
+	stream <- StreamingResponse{Error: err}
 }
 
 // Do converts and executes the provided request returning the raw HTTP response. In general users should prefer to use
@@ -535,7 +639,7 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 			request.Endpoint)
 
 		if err != nil {
-			msg = fmt.Sprintf("%s: which failed due to error: %v", msg, err)
+			msg = fmt.Sprintf("%s: which failed due to error: %s", msg, err)
 		} else {
 			msg = fmt.Sprintf("%s: which failed with status code %d", msg, payload.(*http.Response).StatusCode)
 		}

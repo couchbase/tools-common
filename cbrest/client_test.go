@@ -1013,6 +1013,214 @@ func TestClientExecuteUnknownAuthority(t *testing.T) {
 	require.ErrorAs(t, err, &unknownAuthority)
 }
 
+func TestClientExecuteStream(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithStream(t, 5, []byte(`"payload"`)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	stream, err := client.ExecuteStream(request)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	var responses int
+
+	for response := range stream {
+		require.NoError(t, response.Error)
+		require.Equal(t, []byte(`"payload"`), response.Payload)
+
+		responses++
+	}
+
+	require.Equal(t, 5, responses)
+}
+
+func TestClientExecuteStreamCloseOnContextCancel(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithStream(t, 5, []byte(`"payload"`)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream, err := client.ExecuteStreamWithContext(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	var responses int
+
+	for response := range stream {
+		require.NoError(t, response.Error)
+		require.Equal(t, []byte(`"payload"`), response.Payload)
+
+		cancel()
+		responses++
+	}
+
+	// NOTE: We expect to see two responses here, and not one because we use a buffered response channel
+	require.Equal(t, 2, responses)
+}
+
+func TestClientExecuteStreamWithHijack(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithStreamHijack(t))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream, err := client.ExecuteStreamWithContext(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	var responses int
+
+	for range stream {
+		responses++
+	}
+
+	require.Zero(t, responses)
+}
+
+func TestClientExecuteStreamWithBinaryPayload(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithStream(t, 1, []byte(`payload`)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream, err := client.ExecuteStreamWithContext(ctx, request)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	var responses int
+
+	for response := range stream {
+		require.NoError(t, response.Error)
+		responses++
+	}
+
+	require.Equal(t, 1, responses)
+}
+
+func TestClientExecuteStreamWithError(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusUnauthorized, make([]byte, 0)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	stream, err := client.ExecuteStream(request)
+	require.Error(t, err)
+	require.Nil(t, stream)
+
+	var unauthorized *AuthenticationError
+
+	require.ErrorAs(t, err, &unauthorized)
+}
+
+func TestClientExecuteStreamWithUnexpectedStatusCode(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusTeapot, make([]byte, 0)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	stream, err := client.ExecuteStream(request)
+	require.Error(t, err)
+	require.Nil(t, stream)
+
+	var unexpectedStatus *UnexpectedStatusCodeError
+
+	require.ErrorAs(t, err, &unexpectedStatus)
+}
+
 func TestGetServiceHost(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()

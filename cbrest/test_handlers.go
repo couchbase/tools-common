@@ -42,6 +42,42 @@ func NewTestHandler(t *testing.T, status int, body []byte) http.HandlerFunc {
 	}
 }
 
+// NewTestHandlerWithStream creates a handler which will respond with a streaming response writing the provided body a
+// given number of times.
+func NewTestHandlerWithStream(t *testing.T, responses int, body []byte) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Transfer-Encoding", "chunked")
+		writer.WriteHeader(http.StatusOK)
+
+		for i := 0; i < responses; i++ {
+			_, err := writer.Write(body)
+			require.NoError(t, err)
+
+			//nolint:lll
+			// We're mimicking the behavior of 'ns_server' here by writing quadruple newlines, see
+			// https://github.com/couchbase/ns_server/blob/d5d1e828e570737aedae95de56b5e3fb178f4059/src/menelaus_util.erl#L620-L628.
+			_, err = writer.Write([]byte("\n\n\n\n"))
+			require.NoError(t, err)
+		}
+	}
+}
+
+// NewTestHandlerWithStreamHijack creates a handler which will respond with a streaming response which will be
+// immediately closed.
+func NewTestHandlerWithStreamHijack(t *testing.T) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Transfer-Encoding", "chunked")
+		writer.WriteHeader(http.StatusOK)
+
+		hijacker, ok := writer.(http.Hijacker)
+		require.True(t, ok)
+
+		conn, _, err := hijacker.Hijack()
+		require.NoError(t, err)
+		require.NoError(t, conn.Close())
+	}
+}
+
 // NewTestHandlerWithRetries builds upon the basic handler by simulating a flaky/busy endpoint which forces retries a
 // configurable number of times before providing a valid response.
 func NewTestHandlerWithRetries(t *testing.T, numRetries, retryStatus, successStatus int,
