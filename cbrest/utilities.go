@@ -39,7 +39,9 @@ func cleanupResp(resp *http.Response) {
 	defer resp.Body.Close()
 
 	_, err := io.Copy(io.Discard, resp.Body)
-	if err == nil || errors.Is(err, http.ErrBodyReadAfterClose) {
+	if err == nil ||
+		errors.Is(err, http.ErrBodyReadAfterClose) ||
+		errutil.Contains(err, "http: read on closed response body") {
 		return
 	}
 
