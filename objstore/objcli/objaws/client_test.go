@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -526,6 +527,69 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 	require.NoError(t, client.DeleteObjects("bucket", "key"))
 
 	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
+}
+
+func TestClientDeleteDirectory(t *testing.T) {
+	var (
+		api = &mockServiceAPI{}
+		wg  sync.WaitGroup
+	)
+
+	fn1 := func(input *s3.ListObjectsV2Input) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix = input.Prefix != nil && *input.Prefix == "prefix"
+		)
+
+		return bucket && prefix
+	}
+
+	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
+		contents := []*s3.Object{
+			{
+				Key:          aws.String("/path/to/key1"),
+				Size:         aws.Int64(64),
+				LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			},
+			{
+				Key:          aws.String("/path/to/key2"),
+				Size:         aws.Int64(128),
+				LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+			},
+		}
+
+		wg.Add(1)
+
+		go func() { defer wg.Done(); fn(&s3.ListObjectsV2Output{Contents: contents}, true) }()
+
+		return true
+	}
+
+	api.On("ListObjectsV2Pages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+
+	fn := func(input *s3.DeleteObjectsInput) bool {
+		var (
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
+			objects = input.Delete != nil && reflect.DeepEqual(input.Delete.Objects, []*s3.ObjectIdentifier{
+				{Key: aws.String("/path/to/key1")},
+				{Key: aws.String("/path/to/key2")},
+			})
+		)
+
+		return bucket && quiet && objects
+	}
+
+	api.On("DeleteObjects", mock.MatchedBy(fn)).Return(&s3.DeleteObjectsOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+	require.NoError(t, client.DeleteDirectory("bucket", "prefix"))
+
+	wg.Wait()
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
 	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
 }
 

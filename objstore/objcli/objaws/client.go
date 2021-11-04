@@ -192,6 +192,34 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	return nil
 }
 
+func (c *Client) DeleteDirectory(bucket, prefix string) error {
+	var err error
+
+	callback := func(page *s3.ListObjectsV2Output, _ bool) bool {
+		keys := make([]string, 0, len(page.Contents))
+
+		for _, object := range page.Contents {
+			keys = append(keys, *object.Key)
+		}
+
+		err = c.deleteObjects(bucket, keys...)
+
+		return err == nil
+	}
+
+	input := &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
+	}
+
+	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
+	if err := c.serviceAPI.ListObjectsV2Pages(input, callback); err != nil {
+		return handleError(input.Bucket, nil, err)
+	}
+
+	return nil
+}
+
 // deleteObjects performs a batched delete operation for a single page (<=1000) of keys.
 func (c *Client) deleteObjects(bucket string, keys ...string) error {
 	input := &s3.DeleteObjectsInput{

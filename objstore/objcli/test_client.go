@@ -101,6 +101,23 @@ func (t *TestClient) DeleteObjects(bucket string, keys ...string) error {
 	return nil
 }
 
+func (t *TestClient) DeleteDirectory(bucket, prefix string) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	b := t.getBucketLocked(bucket)
+
+	for key := range b {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+
+		delete(b, key)
+	}
+
+	return nil
+}
+
 func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn IterateFunc) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()

@@ -148,6 +148,14 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	return nil
 }
 
+func (c *Client) DeleteDirectory(bucket, prefix string) error {
+	fn := func(attrs *objval.ObjectAttrs) error {
+		return c.DeleteObjects(bucket, attrs.Key)
+	}
+
+	return c.IterateObjects(bucket, prefix, nil, nil, fn)
+}
+
 func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive

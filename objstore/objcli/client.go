@@ -38,6 +38,11 @@ type Client interface {
 	// NOTE: Depending on the underlying client and support from its SDK, this function may batch operations into pages.
 	DeleteObjects(bucket string, keys ...string) error
 
+	// DeleteDirectory deletes all the objects which have the given prefix.
+	//
+	// NOTE: Depending on the underlying client and support from its SDK, this function may batch operations into pages.
+	DeleteDirectory(bucket, prefix string) error
+
 	// IterateObjects iterates through the objects a bucket running the provided iteration function for each object
 	// which matches the given filtering parameters.
 	IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn IterateFunc) error

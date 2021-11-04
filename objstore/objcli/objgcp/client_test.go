@@ -404,6 +404,60 @@ func TestClientDeleteObjects(t *testing.T) {
 	moAPI.AssertNumberOfCalls(t, "Delete", 3)
 }
 
+func TestClientDeleteDirectory(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.Anything).Return(moAPI)
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(
+		func(query *storage.Query) bool { return query.Prefix == "prefix" },
+	)).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "/path/to/key1",
+		Size:    64,
+		Updated: (time.Time{}).Add(24 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	call = miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "/path/to/key2",
+		Size:    128,
+		Updated: (time.Time{}).Add(48 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	moAPI.On("Delete", mock.Anything).Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	require.NoError(t, client.DeleteDirectory("bucket", "prefix"))
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 3)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 2)
+	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
+
+	miAPI.AssertExpectations(t)
+	miAPI.AssertNumberOfCalls(t, "Next", 3)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Delete", 2)
+}
+
 func TestClientIterateObjects(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}
