@@ -35,7 +35,7 @@ func handleError(bucket, key string, err error) error {
 		return &objerr.NotFoundError{Type: "key", Name: key}
 	}
 
-	return err
+	return objerr.HandleError(err)
 }
 
 // generateKey returns a key which should be used for an in-progress multipart upload. This function should be used to

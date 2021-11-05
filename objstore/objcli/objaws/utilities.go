@@ -14,7 +14,7 @@ import (
 func handleError(bucket, key *string, err error) error {
 	var awsErr awserr.Error
 	if err == nil || !errors.As(err, &awsErr) {
-		return err
+		return objerr.HandleError(err)
 	}
 
 	switch awsErr.Code() {
@@ -34,6 +34,13 @@ func handleError(bucket, key *string, err error) error {
 		}
 
 		return &objerr.NotFoundError{Type: "bucket", Name: *bucket}
+	case aws.ErrMissingEndpoint.Code():
+		return objerr.ErrEndpointResolutionFailed
+	}
+
+	// The AWS error type doesn't implement Unwrap, se we must manually unwrap and check it here
+	if err := objerr.TryHandleError(awsErr.OrigErr()); err != nil {
+		return err
 	}
 
 	// This isn't a status code we plan to handle manually, return the complete error

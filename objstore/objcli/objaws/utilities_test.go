@@ -1,6 +1,7 @@
 package objaws
 
 import (
+	"net"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -49,6 +50,12 @@ func TestHandleError(t *testing.T) {
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "bucket", notFound.Type)
 	require.Equal(t, "<empty bucket name>", notFound.Name)
+
+	err = handleError(nil, nil, &net.DNSError{IsNotFound: true})
+	require.ErrorIs(t, err, objerr.ErrEndpointResolutionFailed)
+
+	err = handleError(nil, nil, &mockError{inner: aws.ErrMissingEndpoint.Code()})
+	require.ErrorIs(t, err, objerr.ErrEndpointResolutionFailed)
 }
 
 func TestIsKeyNotFound(t *testing.T) {

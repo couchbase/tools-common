@@ -1,6 +1,7 @@
 package objgcp
 
 import (
+	"net"
 	"strings"
 	"testing"
 
@@ -31,6 +32,8 @@ func TestHandleError(t *testing.T) {
 	require.ErrorAs(t, handleError("", "key1", storage.ErrObjectNotExist), &notFound)
 	require.Equal(t, "key", notFound.Type)
 	require.Equal(t, "key1", notFound.Name)
+
+	require.ErrorIs(t, handleError("", "", &net.DNSError{IsNotFound: true}), objerr.ErrEndpointResolutionFailed)
 }
 
 func TestGenerateKey(t *testing.T) {
