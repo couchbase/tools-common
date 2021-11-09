@@ -574,6 +574,42 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 	require.Equal(t, 1, attempts)
 }
 
+func TestClientExecuteWithModeLoopback(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandler(t, http.StatusOK, nil))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:          ContentTypeURLEncoded,
+		Endpoint:             "/test",
+		ExpectedStatusCode:   http.StatusOK,
+		Method:               http.MethodGet,
+		NoRetryOnStatusCodes: []int{http.StatusGatewayTimeout},
+		Service:              ServiceManagement,
+	}
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		DisableCCP:       true,
+		ConnectionMode:   ConnectionModeLoopback,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	})
+	require.NoError(t, err)
+
+	// Any requests should timeout if they attempt to use the hostname from the payload, however, we're using loopback
+	// mode so they should be ignored.
+	for _, node := range client.authProvider.manager.config.Nodes {
+		node.Hostname = "not-a-hostname"
+	}
+
+	_, err = client.Execute(request)
+	require.NoError(t, err)
+}
+
 func TestClientExecuteWithDefaultRetries(t *testing.T) {
 	for status := range netutil.TemporaryFailureStatusCodes {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {

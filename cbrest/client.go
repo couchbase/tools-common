@@ -786,7 +786,7 @@ func (c *Client) do(ctx *retry.Context, request *Request) (*http.Response, error
 // meaning the request timeout is not reset by retries.
 func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, error) {
 	// Get the fully qualified address to the node that we are sending this request to
-	host, err := c.authProvider.GetServiceHost(request.Service)
+	host, err := c.serviceHost(request.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host for service '%s': %w", request.Service, err)
 	}
