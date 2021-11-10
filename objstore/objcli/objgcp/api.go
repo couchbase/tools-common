@@ -7,7 +7,7 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-// storageAPI top level interface which allows interactions with Google cloud storage.
+// storageAPI is a top level interface which allows interactions with Google cloud storage.
 type serviceAPI interface {
 	Bucket(name string) bucketAPI
 }
@@ -21,7 +21,7 @@ func (g serviceClient) Bucket(name string) bucketAPI {
 	return bucketHandle{h: g.c.Bucket(name)}
 }
 
-// bucketAPI bucket level interface which allows interactions with a Google Storage bucket.
+// bucketAPI is a bucket level interface which allows interactions with a Google Storage bucket.
 type bucketAPI interface {
 	Object(key string) objectAPI
 	Objects(ctx context.Context, query *storage.Query) objectIteratorAPI
@@ -41,7 +41,7 @@ func (g bucketHandle) Objects(ctx context.Context, query *storage.Query) objectI
 	return g.h.Objects(ctx, query)
 }
 
-// objectAPI object level API which allows interactions with an object stored in a Google cloud bucket.
+// objectAPI is an object level API which allows interactions with an object stored in a Google cloud bucket.
 type objectAPI interface {
 	Attrs(ctx context.Context) (*storage.ObjectAttrs, error)
 	Delete(ctx context.Context) error
@@ -138,7 +138,7 @@ func (g writer) SendCRC(crc uint32) {
 	g.w.ObjectAttrs.CRC32C = crc
 }
 
-// objectIteratorAPI object level iterator API which can be used to list objects in Google Storage.
+// objectIteratorAPI is an object level iterator API which can be used to list objects in Google Storage.
 type objectIteratorAPI interface {
 	Next() (*storage.ObjectAttrs, error)
 }

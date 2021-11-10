@@ -2,9 +2,13 @@ package objval
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 )
+
+// ErrByteRangeRequired is returned when a function which requires a byte range hasn't been provided with one.
+var ErrByteRangeRequired = errors.New("a byte range is required but hasn't been provided")
 
 // InvalidByteRangeError is returned if a byte range is invalid for some reason.
 type InvalidByteRangeError struct {
@@ -23,9 +27,13 @@ type ByteRange struct {
 	End   int64
 }
 
-// Valid returns an 'InvalidByteRangeError' error if the byte range is invalid, <nil> otherwise.
+// Valid returns an error if the byte range is invalid, <nil> otherwise.
 func (b *ByteRange) Valid(required bool) error {
-	if (b == nil && !required) || (b != nil && b.End >= b.Start) {
+	if b == nil && required {
+		return ErrByteRangeRequired
+	}
+
+	if b == nil || b != nil && b.End >= b.Start {
 		return nil
 	}
 

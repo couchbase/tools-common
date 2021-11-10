@@ -704,7 +704,7 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 func TestClientUploadPartWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPart("bucket", "key", "id", 42, nil)
+	_, err := client.UploadPart("bucket", "id", "key", 42, nil)
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -773,7 +773,7 @@ func TestClientUploadPart(t *testing.T) {
 func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.CompleteMultipartUpload("bucket", "key", "id", objval.Part{})
+	err := client.CompleteMultipartUpload("bucket", "id", "key", objval.Part{})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -822,7 +822,7 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 func TestClientAbortMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.AbortMultipartUpload("bucket", "key", "id", objval.Part{})
+	err := client.AbortMultipartUpload("bucket", "id", "key", objval.Part{})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
