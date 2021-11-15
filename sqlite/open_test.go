@@ -22,6 +22,7 @@ func TestOpen(t *testing.T) {
 
 	res, err := db.Query("pragma user_version;")
 	require.Nil(t, err)
+	require.NoError(t, res.Err())
 
 	defer res.Close()
 
