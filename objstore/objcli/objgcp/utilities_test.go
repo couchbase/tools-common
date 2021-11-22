@@ -2,13 +2,16 @@ package objgcp
 
 import (
 	"net"
+	"net/http"
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/storage"
 	"github.com/couchbase/tools-common/objstore/objerr"
+
+	"cloud.google.com/go/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 )
 
 func TestHandleError(t *testing.T) {
@@ -16,6 +19,12 @@ func TestHandleError(t *testing.T) {
 
 	require.Nil(t, handleError("", "", nil))
 	require.ErrorIs(t, handleError("", "", assert.AnError), assert.AnError)
+
+	require.ErrorIs(t,
+		handleError("bucket", "key", &googleapi.Error{Code: http.StatusUnauthorized}), objerr.ErrUnauthenticated)
+
+	require.ErrorIs(t,
+		handleError("bucket", "key", &googleapi.Error{Code: http.StatusForbidden}), objerr.ErrUnauthorized)
 
 	require.ErrorAs(t, handleError("", "", storage.ErrBucketNotExist), &notFound)
 	require.Equal(t, "bucket", notFound.Type)
