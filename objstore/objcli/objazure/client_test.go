@@ -48,12 +48,15 @@ func assignToUnexportedField(field reflect.Value, value interface{}) {
 	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }
 
-type mockError struct{ inner azblob.ServiceCodeType }
+type mockError struct {
+	resp  *http.Response
+	inner azblob.ServiceCodeType
+}
 
 func (e *mockError) Error() string                       { return "" }
 func (e *mockError) Timeout() bool                       { return false }
 func (e *mockError) Temporary() bool                     { return false }
-func (e *mockError) Response() *http.Response            { return nil }
+func (e *mockError) Response() *http.Response            { return e.resp }
 func (e *mockError) ServiceCode() azblob.ServiceCodeType { return e.inner }
 
 func TestNewClient(t *testing.T) {
