@@ -38,7 +38,7 @@ type RetriesAbortedError struct {
 }
 
 func (r *RetriesAbortedError) Error() string {
-	msg := fmt.Sprintf("retries aborted after %d attempts", r.attempts)
+	msg := fmt.Sprintf("retries aborted after %d attempt(s)", r.attempts)
 	if r.err != nil {
 		msg += fmt.Sprintf(": %s", r.err)
 	}
