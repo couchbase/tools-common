@@ -11,11 +11,12 @@ import (
 	"github.com/couchbase/tools-common/hofp"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/objstore/objval"
 )
 
 // MaxUploadParts is the hard limit on the number of parts that can be uploaded by a 'MPUploader'.
-const MaxUploadParts = 10_000
+const MaxUploadParts = objaws.MaxUploadParts
 
 var (
 	// ErrMPUploaderExceededMaxPartCount is returned if the user attempts to upload more than 'MaxUploadParts' parts.

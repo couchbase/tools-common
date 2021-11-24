@@ -74,7 +74,12 @@ func (g objectHandle) NewRangeReader(ctx context.Context, offset, length int64) 
 }
 
 func (g objectHandle) NewWriter(ctx context.Context) writerAPI {
-	return &writer{w: g.h.NewWriter(ctx)}
+	writer := &writer{w: g.h.NewWriter(ctx)}
+
+	// Disable SDK upload chunking
+	writer.w.ChunkSize = 0
+
+	return writer
 }
 
 func (g objectHandle) ComposerFrom(srcs ...objectAPI) composeAPI {

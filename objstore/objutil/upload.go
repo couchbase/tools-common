@@ -8,13 +8,14 @@ import (
 
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objcli/objaws"
 
 	"github.com/aws/aws-sdk-go/aws"
 )
 
 const (
 	// MinPartSize is the minimum size allowed for 'PartSize', and is a hard limit enforced by AWS.
-	MinPartSize = 5*1024*1024 + 1
+	MinPartSize = objaws.MinUploadSize
 
 	// MPUThreshold is the threshold at which point we break the upload up into multiple requests which are executed
 	// concurrently.
