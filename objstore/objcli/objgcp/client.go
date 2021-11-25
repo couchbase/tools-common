@@ -41,7 +41,7 @@ func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Ob
 
 	var offset, length int64 = 0, -1
 	if br != nil {
-		offset, length = br.Start, br.End-offset+1
+		offset, length = br.ToOffsetLength(length)
 	}
 
 	reader, err := c.serviceAPI.Bucket(bucket).Object(key).NewRangeReader(context.Background(), offset, length)

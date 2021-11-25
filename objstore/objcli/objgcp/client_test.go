@@ -95,7 +95,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 		"NewRangeReader",
 		mock.Anything,
 		mock.MatchedBy(func(offset int64) bool { return offset == 64 }),
-		mock.MatchedBy(func(length int64) bool { return length == 129 }),
+		mock.MatchedBy(func(length int64) bool { return length == 65 }),
 	).Return(mrAPI, nil)
 
 	output := storage.ReaderObjectAttrs{

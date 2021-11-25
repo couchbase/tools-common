@@ -41,7 +41,7 @@ func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Ob
 	}
 
 	if br != nil {
-		input.Range = aws.String(br.String())
+		input.Range = aws.String(br.ToRangeHeader())
 	}
 
 	resp, err := c.serviceAPI.GetObject(input)
@@ -337,7 +337,7 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 	input := &s3.UploadPartCopyInput{
 		Bucket:          aws.String(bucket),
 		CopySource:      aws.String(src),
-		CopySourceRange: aws.String(br.String()),
+		CopySourceRange: aws.String(br.ToRangeHeader()),
 		Key:             aws.String(dst),
 		PartNumber:      aws.Int64(int64(number)),
 		UploadId:        aws.String(id),

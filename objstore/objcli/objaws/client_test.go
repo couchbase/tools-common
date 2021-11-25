@@ -82,7 +82,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 	api := &mockServiceAPI{}
 
 	fn := func(input *s3.GetObjectInput) bool {
-		return input.Range != nil && *input.Range == "64-128"
+		return input.Range != nil && *input.Range == "bytes=64-128"
 	}
 
 	output := &s3.GetObjectOutput{
@@ -309,7 +309,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
 			src    = input.CopySource != nil && *input.CopySource == "key"
-			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == fmt.Sprintf("0-%d", MinUploadSize-1)
+			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == fmt.Sprintf("bytes=0-%d", MinUploadSize-1)
 			key    = input.Key != nil && *input.Key == "key"
 			number = input.PartNumber != nil && *input.PartNumber == 1
 			id     = input.UploadId != nil && *input.UploadId == "id"
@@ -410,7 +410,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
 			src    = input.CopySource != nil && *input.CopySource == "key"
-			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == fmt.Sprintf("0-%d", MinUploadSize-1)
+			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == fmt.Sprintf("bytes=0-%d", MinUploadSize-1)
 			key    = input.Key != nil && *input.Key == "key"
 			number = input.PartNumber != nil && *input.PartNumber == 1
 			id     = input.UploadId != nil && *input.UploadId == "id"
@@ -885,7 +885,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
 			src    = input.CopySource != nil && *input.CopySource == "key2"
-			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == "64-128"
+			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == "bytes=64-128"
 			key    = input.Key != nil && *input.Key == "key1"
 			number = input.PartNumber != nil && *input.PartNumber == 1
 			id     = input.UploadId != nil && *input.UploadId == "id"

@@ -40,9 +40,23 @@ func (b *ByteRange) Valid(required bool) error {
 	return &InvalidByteRangeError{ByteRange: b}
 }
 
-// String implements the 'Stringer' interface, the format will be the HTTP range header format.
-func (b *ByteRange) String() string {
-	buffer := bytes.NewBufferString(strconv.FormatInt(b.Start, 10) + "-")
+// ToOffsetLength returns the offset/length representation of this byte range.
+func (b *ByteRange) ToOffsetLength(length int64) (int64, int64) {
+	offset := b.Start
+
+	if b.End != 0 {
+		length = b.End - offset + 1
+	}
+
+	return offset, length
+}
+
+// ToRangeHeader returns the HTTP range header representation of this byte range.
+func (b *ByteRange) ToRangeHeader() string {
+	buffer := &bytes.Buffer{}
+
+	buffer.WriteString("bytes=")
+	buffer.WriteString(strconv.FormatInt(b.Start, 10) + "-")
 
 	if b.End != 0 {
 		buffer.WriteString(strconv.FormatInt(b.End, 10))

@@ -94,8 +94,8 @@ func TestClientGetObject(t *testing.T) {
 	mbAPI.On(
 		"Download",
 		mock.Anything,
-		mock.MatchedBy(func(offset int64) bool { return offset == 64 }),
-		mock.MatchedBy(func(length int64) bool { return length == 129 }),
+		mock.MatchedBy(func(offset int64) bool { return offset == 0 }),
+		mock.MatchedBy(func(length int64) bool { return length == 0 }),
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -103,7 +103,7 @@ func TestClientGetObject(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	object, err := client.GetObject("container", "blob", &objval.ByteRange{Start: 64, End: 128})
+	object, err := client.GetObject("container", "blob", nil)
 	require.NoError(t, err)
 
 	expected := &objval.Object{
@@ -158,8 +158,8 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 	mbAPI.On(
 		"Download",
 		mock.Anything,
-		mock.MatchedBy(func(offset int64) bool { return offset == 0 }),
-		mock.MatchedBy(func(length int64) bool { return length == 0 }),
+		mock.MatchedBy(func(offset int64) bool { return offset == 64 }),
+		mock.MatchedBy(func(length int64) bool { return length == 65 }),
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -167,7 +167,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	object, err := client.GetObject("container", "blob", nil)
+	object, err := client.GetObject("container", "blob", &objval.ByteRange{Start: 64, End: 128})
 	require.NoError(t, err)
 
 	expected := &objval.Object{
