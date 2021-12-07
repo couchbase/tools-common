@@ -919,17 +919,17 @@ func (c *Client) GetClusterMetaData() (bool, string, error) {
 	var decoded *overlay
 
 	err = json.Unmarshal(response.Body, &decoded)
-	if err != nil {
-		// We will fail to unmarshal the response from the node if it's uninitialized, this is because the "uuid" field
-		// will be an empty array, instead of a string; if this is the case, return a clearer error message.
-		if bytes.Contains(response.Body, []byte(`"uuid":[]`)) {
-			return false, "", ErrNodeUninitialized
-		}
-
-		return false, "", fmt.Errorf("failed to unmarshal response: %w", err)
+	if err == nil {
+		return decoded.Enterprise, decoded.UUID, nil
 	}
 
-	return decoded.Enterprise, decoded.UUID, nil
+	// We will fail to unmarshal the response from the node if it's uninitialized, this is because the "uuid" field will
+	// be an empty array, instead of a string; if this is the case, return a clearer error message.
+	if bytes.Contains(response.Body, []byte(`"uuid":[]`)) {
+		return false, "", ErrNodeUninitialized
+	}
+
+	return false, "", fmt.Errorf("failed to unmarshal response: %w", err)
 }
 
 // GetClusterVersion extracts version information from the cluster nodes.
