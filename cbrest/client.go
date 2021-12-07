@@ -263,7 +263,7 @@ func (c *Client) updateCC() error {
 func (c *Client) updateCCFromNode(node *Node) error {
 	host, _ := node.GetQualifiedHostname(ServiceManagement, c.authProvider.resolved.UseSSL, c.authProvider.useAltAddr)
 	if host == "" {
-		return fmt.Errorf("node is not running the management service")
+		return &ServiceNotAvailableError{service: ServiceManagement}
 	}
 
 	valid, err := c.validHost(host)
