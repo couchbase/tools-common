@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -122,21 +121,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 	authProvider := NewAuthProvider(resolved, options.Provider)
 
 	client := &Client{
-		client: &http.Client{
-			Timeout: clientTimeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).DialContext,
-				ForceAttemptHTTP2:   true,
-				IdleConnTimeout:     90 * time.Second,
-				MaxIdleConns:        100,
-				Proxy:               http.ProxyFromEnvironment,
-				TLSClientConfig:     options.TLSConfig,
-				TLSHandshakeTimeout: 10 * time.Second,
-			},
-		},
+		client:         newHTTPClient(clientTimeout, newHTTPTransport(options.TLSConfig)),
 		authProvider:   authProvider,
 		connectionMode: options.ConnectionMode,
 		pollTimeout:    pollTimeout,
@@ -848,7 +833,7 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 	// We only use the custom timeout if it is bigger than the client one. This is so that it can be overridden via
 	// environmental variables.
 	if timeout > 0 && timeout > client.Timeout {
-		client = &http.Client{Timeout: timeout, Transport: client.Transport}
+		client = newHTTPClient(timeout, client.Transport)
 	}
 
 	resp, err := client.Do(req)
