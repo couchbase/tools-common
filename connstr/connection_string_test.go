@@ -3,8 +3,10 @@ package connstr
 import (
 	"fmt"
 	"math"
+	"net"
 	"testing"
 
+	mockdns "github.com/foxcpp/go-mockdns"
 	"github.com/stretchr/testify/require"
 )
 
@@ -164,6 +166,7 @@ func TestConnectionStringResolve(t *testing.T) {
 		input         string
 		expected      *ResolvedConnectionString
 		expectedError error
+		zones         map[string]mockdns.Zone
 	}
 
 	tests := []*test{
@@ -311,10 +314,71 @@ func TestConnectionStringResolve(t *testing.T) {
 				Addresses: []Address{{Host: "[2001:4860:4860::8888]", Port: 12345}},
 			},
 		},
+		{
+			name:  "ValidSRVNoTLS",
+			input: "couchbase://example.com",
+			expected: &ResolvedConnectionString{
+				Addresses: []Address{{Host: "example.org", Port: DefaultHTTPPort}},
+			},
+			zones: map[string]mockdns.Zone{
+				"_couchbase._tcp.example.com.": {SRV: []net.SRV{{Target: "example.org.", Port: 11210}}},
+			},
+		},
+		{
+			name:  "ValidSRVTLS",
+			input: "couchbases://example.com",
+			expected: &ResolvedConnectionString{
+				UseSSL:    true,
+				Addresses: []Address{{Host: "example.org", Port: DefaultHTTPSPort}},
+			},
+			zones: map[string]mockdns.Zone{
+				"_couchbases._tcp.example.com.": {SRV: []net.SRV{{Target: "example.org.", Port: 11207}}},
+			},
+		},
+		{
+			name:  "ValidSRVMultipleHostsNoTLS",
+			input: "couchbase://example.com",
+			expected: &ResolvedConnectionString{
+				Addresses: []Address{
+					{Host: "example1.org", Port: DefaultHTTPPort},
+					{Host: "example2.org", Port: DefaultHTTPPort},
+				},
+			},
+			zones: map[string]mockdns.Zone{
+				"_couchbase._tcp.example.com.": {SRV: []net.SRV{
+					{Target: "example1.org.", Port: 11210},
+					{Target: "example2.org.", Port: 11210},
+				}},
+			},
+		},
+		{
+			name:  "ValidSRVMultipleHostsTLS",
+			input: "couchbases://example.com",
+			expected: &ResolvedConnectionString{
+				UseSSL: true,
+				Addresses: []Address{
+					{Host: "example1.org", Port: DefaultHTTPSPort},
+					{Host: "example2.org", Port: DefaultHTTPSPort},
+				},
+			},
+			zones: map[string]mockdns.Zone{
+				"_couchbases._tcp.example.com.": {SRV: []net.SRV{
+					{Target: "example1.org.", Port: 11210},
+					{Target: "example2.org.", Port: 11210},
+				}},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			server, err := mockdns.NewServer(test.zones, false)
+			require.NoError(t, err)
+			defer server.Close()
+
+			server.PatchNet(net.DefaultResolver)
+			defer mockdns.UnpatchNet(net.DefaultResolver)
+
 			parsed, err := Parse(test.input)
 			require.Nil(t, err)
 

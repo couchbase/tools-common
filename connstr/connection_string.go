@@ -187,7 +187,10 @@ func (c *ConnectionString) resolveSRV() *ResolvedConnectionString {
 		return nil
 	}
 
-	resolved := &ResolvedConnectionString{}
+	resolved := &ResolvedConnectionString{
+		UseSSL: c.Scheme == "couchbases",
+	}
+
 	for _, server := range servers {
 		resolved.Addresses = append(resolved.Addresses, Address{
 			Host: strings.TrimSuffix(server.Target, "."),

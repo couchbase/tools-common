@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/storage v1.18.2
 	github.com/Azure/azure-storage-blob-go v0.14.0
 	github.com/aws/aws-sdk-go v1.42.26
+	github.com/foxcpp/go-mockdns v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/json-iterator/go v1.1.12
 	github.com/mattn/go-sqlite3 v1.14.10
@@ -33,6 +34,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
+	github.com/miekg/dns v1.1.25 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
