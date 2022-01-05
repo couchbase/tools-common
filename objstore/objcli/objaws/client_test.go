@@ -36,6 +36,10 @@ func TestNewClient(t *testing.T) {
 	require.Equal(t, &Client{serviceAPI: api}, NewClient(api))
 }
 
+func TestClientProvider(t *testing.T) {
+	require.Equal(t, objval.ProviderAWS, (&Client{}).Provider())
+}
+
 func TestClientGetObject(t *testing.T) {
 	api := &mockServiceAPI{}
 

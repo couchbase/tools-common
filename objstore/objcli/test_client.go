@@ -19,8 +19,9 @@ import (
 // TestClient implementation of the 'Client' interface which stores state in memory, and can be used to avoid having to
 // manually mock a client during unit testing.
 type TestClient struct {
-	t    *testing.T
-	lock sync.Mutex
+	t        *testing.T
+	lock     sync.Mutex
+	provider objval.Provider
 
 	// Buckets is the in memory state maintained by the client. Internally, access is guarded by a mutex, however, it's
 	// not safe/recommended to access this attribute whilst a test is running; it should only be used to inspect state
@@ -31,11 +32,16 @@ type TestClient struct {
 var _ Client = (*TestClient)(nil)
 
 // NewTestClient returns a new test client, which has no buckets/objects.
-func NewTestClient(t *testing.T) *TestClient {
+func NewTestClient(t *testing.T, provider objval.Provider) *TestClient {
 	return &TestClient{
-		t:       t,
-		Buckets: make(objval.TestBuckets),
+		t:        t,
+		provider: provider,
+		Buckets:  make(objval.TestBuckets),
 	}
+}
+
+func (t *TestClient) Provider() objval.Provider {
+	return t.provider
 }
 
 func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Object, error) {

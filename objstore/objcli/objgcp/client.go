@@ -34,6 +34,10 @@ func NewClient(client *storage.Client) *Client {
 	return &Client{serviceAPI: &serviceClient{client}}
 }
 
+func (c *Client) Provider() objval.Provider {
+	return objval.ProviderGCP
+}
+
 func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
 	if err := br.Valid(false); err != nil {
 		return nil, err // Purposefully not wrapped

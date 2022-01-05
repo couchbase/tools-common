@@ -33,6 +33,10 @@ func NewClient(url azblob.ServiceURL) *Client {
 	return &Client{storageAPI: serviceURL{url: url}}
 }
 
+func (c *Client) Provider() objval.Provider {
+	return objval.ProviderAzure
+}
+
 func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
 	if err := br.Valid(false); err != nil {
 		return nil, err // Purposefully not wrapped

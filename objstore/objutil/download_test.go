@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/tools-common/fsutil"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objval"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +60,7 @@ func TestDownload(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				testDir = t.TempDir()
-				client  = objcli.NewTestClient(t)
+				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
 			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))
@@ -86,7 +87,7 @@ func TestDownload(t *testing.T) {
 
 func TestDownloadTrackExpectedWrites(t *testing.T) {
 	var (
-		client = objcli.NewTestClient(t)
+		client = objcli.NewTestClient(t, objval.ProviderAWS)
 		writer = &tracker{}
 	)
 
@@ -116,7 +117,7 @@ func TestDownloadTrackExpectedWrites(t *testing.T) {
 func TestDownloadWithByteRange(t *testing.T) {
 	var (
 		testDir = t.TempDir()
-		client  = objcli.NewTestClient(t)
+		client  = objcli.NewTestClient(t, objval.ProviderAWS)
 	)
 
 	require.NoError(t, client.PutObject("bucket", "key", strings.NewReader("value")))

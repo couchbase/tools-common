@@ -23,7 +23,7 @@ func TestMPUploadOptionsDefaults(t *testing.T) {
 
 func TestNewMPUploader(t *testing.T) {
 	options := MPUploaderOptions{
-		Client: objcli.NewTestClient(t),
+		Client: objcli.NewTestClient(t, objval.ProviderAWS),
 		Bucket: "bucket",
 		Key:    "key",
 	}
@@ -44,7 +44,7 @@ func TestNewMPUploader(t *testing.T) {
 
 func TestNewMPUploaderExistingUpload(t *testing.T) {
 	options := MPUploaderOptions{
-		Client: objcli.NewTestClient(t),
+		Client: objcli.NewTestClient(t, objval.ProviderAWS),
 		Bucket: "bucket",
 		ID:     "id",
 		Key:    "key",
@@ -66,7 +66,7 @@ func TestNewMPUploaderExistingUpload(t *testing.T) {
 }
 
 func TestMPUploaderUpload(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := MPUploaderOptions{
 		Client: client,
@@ -91,7 +91,7 @@ func TestMPUploaderUpload(t *testing.T) {
 
 func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 	var (
-		client   = objcli.NewTestClient(t)
+		client   = objcli.NewTestClient(t, objval.ProviderAWS)
 		metadata interface{}
 		part     objval.Part
 	)
@@ -127,7 +127,7 @@ func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 }
 
 func TestMPUploaderUploadWithOnPartCompletePropagateUserError(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := MPUploaderOptions{
 		Client:         client,
@@ -147,7 +147,7 @@ func TestMPUploaderUploadWithOnPartCompletePropagateUserError(t *testing.T) {
 
 func TestMPUploaderUploadAlmostGreaterThanMaxCount(t *testing.T) {
 	options := MPUploaderOptions{
-		Client: objcli.NewTestClient(t),
+		Client: objcli.NewTestClient(t, objval.ProviderAWS),
 		Bucket: "bucket",
 		ID:     "id",
 		Key:    "key",
@@ -164,7 +164,7 @@ func TestMPUploaderUploadAlmostGreaterThanMaxCount(t *testing.T) {
 
 func TestMPUploaderUploadGreaterThanMaxCount(t *testing.T) {
 	options := MPUploaderOptions{
-		Client: objcli.NewTestClient(t),
+		Client: objcli.NewTestClient(t, objval.ProviderAWS),
 		Bucket: "bucket",
 		ID:     "id",
 		Key:    "key",
@@ -181,7 +181,7 @@ func TestMPUploaderUploadGreaterThanMaxCount(t *testing.T) {
 
 func TestMPUploaderUploadGreaterThanMaxCountButOnlyOnePart(t *testing.T) {
 	options := MPUploaderOptions{
-		Client: objcli.NewTestClient(t),
+		Client: objcli.NewTestClient(t, objval.ProviderAWS),
 		Bucket: "bucket",
 		ID:     "id",
 		Key:    "key",
@@ -197,7 +197,7 @@ func TestMPUploaderUploadGreaterThanMaxCountButOnlyOnePart(t *testing.T) {
 }
 
 func TestMPUploaderStop(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := MPUploaderOptions{
 		Client: client,
@@ -230,7 +230,7 @@ func TestMPUploaderStop(t *testing.T) {
 }
 
 func TestMPUploaderAbort(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := MPUploaderOptions{
 		Client: client,
@@ -255,7 +255,7 @@ func TestMPUploaderAbort(t *testing.T) {
 }
 
 func TestMPUploaderCommit(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := MPUploaderOptions{
 		Client: client,

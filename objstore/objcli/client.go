@@ -14,6 +14,11 @@ type IterateFunc func(attrs *objval.ObjectAttrs) error
 
 // Client is a unified interface for accessing/managing objects stored in the cloud.
 type Client interface {
+	// Provider returns the cloud provider this client is interfacing with.
+	//
+	// NOTE: This may be used to change high level behavior which may be cloud provider specific.
+	Provider() objval.Provider
+
 	// GetObject retrieves an object form the cloud, an optional byte range argument may be supplied which causes only
 	// the requested byte range to be returned.
 	//

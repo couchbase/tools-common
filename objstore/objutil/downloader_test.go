@@ -28,7 +28,7 @@ func TestNewMPDownloader(t *testing.T) {
 	defer file.Close()
 
 	options := MPDownloaderOptions{
-		Client:    objcli.NewTestClient(t),
+		Client:    objcli.NewTestClient(t, objval.ProviderAWS),
 		Bucket:    "bucket",
 		Key:       "key",
 		ByteRange: &objval.ByteRange{Start: 64, End: 128},
@@ -80,7 +80,7 @@ func TestMPDownloaderDownload(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				testDir = t.TempDir()
-				client  = objcli.NewTestClient(t)
+				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
 			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))
@@ -107,7 +107,7 @@ func TestMPDownloaderDownload(t *testing.T) {
 }
 
 func TestMPDownloaderByteRangeUseRemote(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	require.NoError(t, client.PutObject("bucket", "key", strings.NewReader("value")))
 
@@ -174,7 +174,7 @@ func TestMPDownloaderInternalDownload(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				testDir = t.TempDir()
-				client  = objcli.NewTestClient(t)
+				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
 			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))
@@ -242,7 +242,7 @@ func TestMPDownloaderDownloadChunk(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				testDir = t.TempDir()
-				client  = objcli.NewTestClient(t)
+				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
 			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))

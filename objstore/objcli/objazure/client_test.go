@@ -63,6 +63,10 @@ func TestNewClient(t *testing.T) {
 	require.Equal(t, &Client{storageAPI: serviceURL{url: azblob.ServiceURL{}}}, NewClient(azblob.ServiceURL{}))
 }
 
+func TestClientProvider(t *testing.T) {
+	require.Equal(t, objval.ProviderAzure, (&Client{}).Provider())
+}
+
 func TestClientGetObject(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}

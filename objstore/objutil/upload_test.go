@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objval"
 
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ func TestUploadOptionsDefaults(t *testing.T) {
 }
 
 func TestUploadObjectLessThanThreshold(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := UploadOptions{
 		Client: client,
@@ -35,7 +36,7 @@ func TestUploadObjectLessThanThreshold(t *testing.T) {
 }
 
 func TestUploadObjectGreaterThanThreshold(t *testing.T) {
-	client := objcli.NewTestClient(t)
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	options := UploadOptions{
 		Client: client,
