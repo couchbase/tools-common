@@ -17,8 +17,8 @@ type serviceClient struct {
 	c *storage.Client
 }
 
-func (g serviceClient) Bucket(name string) bucketAPI {
-	return bucketHandle{h: g.c.Bucket(name)}
+func (s serviceClient) Bucket(name string) bucketAPI {
+	return bucketHandle{h: s.c.Bucket(name)}
 }
 
 // bucketAPI is a bucket level interface which allows interactions with a Google Storage bucket.
@@ -33,12 +33,12 @@ type bucketHandle struct {
 	h *storage.BucketHandle
 }
 
-func (g bucketHandle) Object(key string) objectAPI {
-	return &objectHandle{h: g.h.Object(key)}
+func (b bucketHandle) Object(key string) objectAPI {
+	return &objectHandle{h: b.h.Object(key)}
 }
 
-func (g bucketHandle) Objects(ctx context.Context, query *storage.Query) objectIteratorAPI {
-	return g.h.Objects(ctx, query)
+func (b bucketHandle) Objects(ctx context.Context, query *storage.Query) objectIteratorAPI {
+	return b.h.Objects(ctx, query)
 }
 
 // objectAPI is an object level API which allows interactions with an object stored in a Google cloud bucket.
@@ -56,16 +56,16 @@ type objectHandle struct {
 	h *storage.ObjectHandle
 }
 
-func (g objectHandle) Attrs(ctx context.Context) (*storage.ObjectAttrs, error) {
-	return g.h.Attrs(ctx)
+func (o objectHandle) Attrs(ctx context.Context) (*storage.ObjectAttrs, error) {
+	return o.h.Attrs(ctx)
 }
 
-func (g objectHandle) Delete(ctx context.Context) error {
-	return g.h.Delete(ctx)
+func (o objectHandle) Delete(ctx context.Context) error {
+	return o.h.Delete(ctx)
 }
 
-func (g objectHandle) NewRangeReader(ctx context.Context, offset, length int64) (readerAPI, error) {
-	r, err := g.h.NewRangeReader(ctx, offset, length)
+func (o objectHandle) NewRangeReader(ctx context.Context, offset, length int64) (readerAPI, error) {
+	r, err := o.h.NewRangeReader(ctx, offset, length)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +73,8 @@ func (g objectHandle) NewRangeReader(ctx context.Context, offset, length int64) 
 	return &reader{r: r}, nil
 }
 
-func (g objectHandle) NewWriter(ctx context.Context) writerAPI {
-	writer := &writer{w: g.h.NewWriter(ctx)}
+func (o objectHandle) NewWriter(ctx context.Context) writerAPI {
+	writer := &writer{w: o.h.NewWriter(ctx)}
 
 	// Disable SDK upload chunking
 	writer.w.ChunkSize = 0
@@ -82,13 +82,13 @@ func (g objectHandle) NewWriter(ctx context.Context) writerAPI {
 	return writer
 }
 
-func (g objectHandle) ComposerFrom(srcs ...objectAPI) composeAPI {
+func (o objectHandle) ComposerFrom(srcs ...objectAPI) composeAPI {
 	converted := make([]*storage.ObjectHandle, 0, len(srcs))
 	for _, src := range srcs {
 		converted = append(converted, src.(*objectHandle).h)
 	}
 
-	return &composer{c: g.h.ComposerFrom(converted...)}
+	return &composer{c: o.h.ComposerFrom(converted...)}
 }
 
 // readerAPI is a range aware reader API which is used to stream object data from Google Storage.
@@ -102,16 +102,16 @@ type reader struct {
 	r *storage.Reader
 }
 
-func (g reader) Read(p []byte) (int, error) {
-	return g.r.Read(p)
+func (r reader) Read(p []byte) (int, error) {
+	return r.r.Read(p)
 }
 
-func (g reader) Close() error {
-	return g.r.Close()
+func (r reader) Close() error {
+	return r.r.Close()
 }
 
-func (g reader) Attrs() storage.ReaderObjectAttrs {
-	return g.r.Attrs
+func (r reader) Attrs() storage.ReaderObjectAttrs {
+	return r.r.Attrs
 }
 
 // writerAPI is a checksum aware writer API which is used to upload data to Google Storage.
@@ -126,21 +126,21 @@ type writer struct {
 	w *storage.Writer
 }
 
-func (g writer) Write(p []byte) (int, error) {
-	return g.w.Write(p)
+func (w writer) Write(p []byte) (int, error) {
+	return w.w.Write(p)
 }
 
-func (g writer) Close() error {
-	return g.w.Close()
+func (w writer) Close() error {
+	return w.w.Close()
 }
 
-func (g writer) SendMD5(md5 []byte) {
-	g.w.ObjectAttrs.MD5 = md5
+func (w writer) SendMD5(md5 []byte) {
+	w.w.ObjectAttrs.MD5 = md5
 }
 
-func (g writer) SendCRC(crc uint32) {
-	g.w.SendCRC32C = true
-	g.w.ObjectAttrs.CRC32C = crc
+func (w writer) SendCRC(crc uint32) {
+	w.w.SendCRC32C = true
+	w.w.ObjectAttrs.CRC32C = crc
 }
 
 // objectIteratorAPI is an object level iterator API which can be used to list objects in Google Storage.
@@ -163,6 +163,6 @@ type composer struct {
 	c *storage.Composer
 }
 
-func (g composer) Run(ctx context.Context) (*storage.ObjectAttrs, error) {
-	return g.c.Run(ctx)
+func (c composer) Run(ctx context.Context) (*storage.ObjectAttrs, error) {
+	return c.c.Run(ctx)
 }
