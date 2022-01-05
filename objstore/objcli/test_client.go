@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/testutil"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 // TestClient implementation of the 'Client' interface which stores state in memory, and can be used to avoid having to
@@ -93,7 +96,7 @@ func (t *TestClient) AppendToObject(bucket, key string, data io.ReadSeeker) erro
 	if ok {
 		object.Body = append(object.Body, testutil.ReadAll(t.t, data)...)
 	} else {
-		t.putObjectLocked(bucket, key, data)
+		_ = t.putObjectLocked(bucket, key, data)
 	}
 
 	return nil
@@ -159,9 +162,13 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	size, err := aws.SeekerLen(body)
+	require.NoError(t.t, err)
+
 	part := objval.Part{
-		ID:     t.putObjectLocked(bucket, fmt.Sprintf("%s-%s-%d", id, key, number), body),
+		ID:     t.putObjectLocked(bucket, partKey(id, key), body),
 		Number: number,
+		Size:   size,
 	}
 
 	return part, nil
@@ -174,7 +181,7 @@ func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...ob
 	buffer := &bytes.Buffer{}
 
 	for _, part := range parts {
-		object, err := t.getObjectLocked(bucket, fmt.Sprintf("%s-%s-%d", id, key, part.Number))
+		object, err := t.getObjectLocked(bucket, part.ID)
 		if err != nil {
 			return err
 		}
@@ -184,14 +191,14 @@ func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...ob
 
 	_ = t.putObjectLocked(bucket, key, bytes.NewReader(buffer.Bytes()))
 
-	return t.abortMultipartUploadLocked(bucket, id, key, parts...)
+	return t.deleteKeysMatchingPrefix(bucket, partPrefix(id, key), nil, nil)
 }
 
-func (t *TestClient) AbortMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
+func (t *TestClient) AbortMultipartUpload(bucket, id, key string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.abortMultipartUploadLocked(bucket, id, key, parts...)
+	return t.deleteKeysMatchingPrefix(bucket, partPrefix(id, key), nil, nil)
 }
 
 func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {
@@ -235,15 +242,28 @@ func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) str
 		Body:        data,
 	}
 
-	return attrs.ETag
+	return attrs.Key
 }
 
-func (t *TestClient) abortMultipartUploadLocked(bucket, id, key string, parts ...objval.Part) error {
+func (t *TestClient) deleteKeysMatchingPrefix(bucket, prefix string, include, exclude []*regexp.Regexp) error {
 	b := t.getBucketLocked(bucket)
 
-	for _, part := range parts {
-		delete(b, fmt.Sprintf("%s-%s-%d", id, key, part.Number))
+	for key := range b {
+		if strings.HasPrefix(key, prefix) && !ShouldIgnore(key, include, exclude) {
+			delete(b, key)
+		}
 	}
 
 	return nil
+}
+
+// partKey returns a key which should be used for an in-progress multipart upload. This function should be used to
+// generate key names since they'll be prefixed with 'basename(key)-mpu-' allowing efficient listing upon completion.
+func partKey(id, key string) string {
+	return path.Join(path.Dir(key), fmt.Sprintf("%s-mpu-%s-%s", path.Base(key), id, uuid.New()))
+}
+
+// partPrefix returns the prefix which will be used for all parts in the given upload for the provided key.
+func partPrefix(id, key string) string {
+	return fmt.Sprintf("%s-mpu-%s", key, id)
 }

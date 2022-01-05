@@ -68,7 +68,5 @@ type Client interface {
 	CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error
 
 	// AbortMultipartUpload aborts the multipart upload with the given id whilst cleaning up any abandoned parts.
-	//
-	// NOTE: Providing the list of completed parts is not necessary for all cloud providers, however, is recommend.
-	AbortMultipartUpload(bucket, id, key string, parts ...objval.Part) error
+	AbortMultipartUpload(bucket, id, key string) error
 }

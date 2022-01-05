@@ -1089,12 +1089,12 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 func TestClientAbortMultipartUpload(t *testing.T) {
 	client := &Client{}
 
-	require.NoError(t, client.AbortMultipartUpload("container", objcli.NoUploadID, "blob", objval.Part{}))
+	require.NoError(t, client.AbortMultipartUpload("container", objcli.NoUploadID, "blob"))
 }
 
 func TestClientAbortMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.AbortMultipartUpload("container", "id", "blob", objval.Part{})
+	err := client.AbortMultipartUpload("container", "id", "blob")
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }

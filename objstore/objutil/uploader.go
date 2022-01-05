@@ -201,7 +201,7 @@ func (m *MPUploader) Abort() error {
 		return fmt.Errorf("failed to stop worker pool: %w", err)
 	}
 
-	return m.opts.Client.AbortMultipartUpload(m.opts.Bucket, m.opts.ID, m.opts.Key, m.opts.Parts...)
+	return m.opts.Client.AbortMultipartUpload(m.opts.Bucket, m.opts.ID, m.opts.Key)
 }
 
 // Commit the multipart upload and stop the worker pool.

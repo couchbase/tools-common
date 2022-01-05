@@ -374,7 +374,7 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 	return err
 }
 
-func (c *Client) AbortMultipartUpload(bucket, id, key string, _ ...objval.Part) error {
+func (c *Client) AbortMultipartUpload(bucket, id, key string) error {
 	input := &s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(bucket),
 		Key:      aws.String(key),
@@ -382,6 +382,9 @@ func (c *Client) AbortMultipartUpload(bucket, id, key string, _ ...objval.Part) 
 	}
 
 	_, err := c.serviceAPI.AbortMultipartUpload(input)
+	if err != nil && !isNoSuchUpload(err) {
+		return handleError(input.Bucket, input.Key, err)
+	}
 
-	return err
+	return nil
 }

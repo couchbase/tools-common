@@ -54,3 +54,11 @@ func isKeyNotFound(err error) bool {
 	return errors.As(err, &awsErr) &&
 		(awsErr.Code() == sns.ErrCodeNotFoundException || awsErr.Code() == s3.ErrCodeNoSuchKey)
 }
+
+// isNoSuchUpload returns a boolean indicating whether the given error is an 'NoSuchUpload' error. We also ignore the
+// 'sns' not found exception because localstack returns the wrong error string ('NotFound').
+func isNoSuchUpload(err error) bool {
+	var awsErr awserr.Error
+	return errors.As(err, &awsErr) && (awsErr.Code() == sns.ErrCodeNotFoundException ||
+		awsErr.Code() == s3.ErrCodeNoSuchUpload)
+}

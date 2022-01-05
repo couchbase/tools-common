@@ -63,3 +63,9 @@ func TestIsKeyNotFound(t *testing.T) {
 	require.True(t, isKeyNotFound(&mockError{inner: sns.ErrCodeNotFoundException}))
 	require.True(t, isKeyNotFound(&mockError{inner: s3.ErrCodeNoSuchKey}))
 }
+
+func TestIsNoSuchUpload(t *testing.T) {
+	require.False(t, isNoSuchUpload(assert.AnError))
+	require.True(t, isNoSuchUpload(&mockError{inner: sns.ErrCodeNotFoundException}))
+	require.True(t, isNoSuchUpload(&mockError{inner: s3.ErrCodeNoSuchUpload}))
+}

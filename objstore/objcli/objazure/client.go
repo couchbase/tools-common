@@ -334,7 +334,7 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 	return handleError(bucket, key, err)
 }
 
-func (c *Client) AbortMultipartUpload(_, id, _ string, _ ...objval.Part) error {
+func (c *Client) AbortMultipartUpload(_, id, _ string) error {
 	if id != objcli.NoUploadID {
 		return objcli.ErrExpectedNoUploadID
 	}
