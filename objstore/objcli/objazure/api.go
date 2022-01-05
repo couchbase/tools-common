@@ -87,6 +87,8 @@ type blockBlobAPI interface {
 	CommitBlockList(ctx context.Context, base64BlockIDs []string, h azblob.BlobHTTPHeaders, metadata azblob.Metadata,
 		ac azblob.BlobAccessConditions, tier azblob.AccessTierType, blobTagsMap azblob.BlobTagsMap,
 		cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobCommitBlockListResponse, error)
+	GetBlockList(ctx context.Context, listType azblob.BlockListType,
+		ac azblob.LeaseAccessConditions) (*azblob.BlockList, error)
 	StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker, ac azblob.LeaseAccessConditions,
 		transactionalMD5 []byte, cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobStageBlockResponse, error)
 	StageBlockFromURL(ctx context.Context, base64BlockID string, sourceURL url.URL, offset, count int64,
@@ -110,6 +112,11 @@ func (b blockBlobURL) CommitBlockList(
 	cpk azblob.ClientProvidedKeyOptions,
 ) (*azblob.BlockBlobCommitBlockListResponse, error) {
 	return b.url.CommitBlockList(ctx, base64BlockIDs, h, metadata, ac, tier, blobTagsMap, cpk)
+}
+
+func (b blockBlobURL) GetBlockList(ctx context.Context, listType azblob.BlockListType,
+	ac azblob.LeaseAccessConditions) (*azblob.BlockList, error) {
+	return b.url.GetBlockList(ctx, listType, ac)
 }
 
 func (b blockBlobURL) StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker,

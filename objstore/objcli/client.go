@@ -58,6 +58,11 @@ type Client interface {
 	// underlying client will handle any nuances.
 	CreateMultipartUpload(bucket, key string) (string, error)
 
+	// ListParts returns the list of parts staged or uploaded for the given upload id/key pair.
+	//
+	// NOTE: The returned parts will not have their part number populated as this is not stored by all cloud providers.
+	ListParts(bucket, id, key string) ([]objval.Part, error)
+
 	// UploadPart creates/uploads a new part for the multipart upload with the given id.
 	//
 	// NOTE: The part 'number' should be between 1-10,000 and is used for the ordering of parts upon completion.

@@ -158,6 +158,28 @@ func (t *TestClient) CreateMultipartUpload(bucket, key string) (string, error) {
 	return uuid.NewString(), nil
 }
 
+func (t *TestClient) ListParts(bucket, id, key string) ([]objval.Part, error) {
+	var (
+		prefix = partPrefix(id, key)
+		parts  = make([]objval.Part, 0)
+	)
+
+	fn := func(attrs *objval.ObjectAttrs) error {
+		if strings.HasPrefix(attrs.Key, prefix) {
+			parts = append(parts, objval.Part{ID: attrs.Key, Size: attrs.Size})
+		}
+
+		return nil
+	}
+
+	err := t.IterateObjects(bucket, prefix, nil, nil, fn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate objects: %w", err)
+	}
+
+	return parts, nil
+}
+
 func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()

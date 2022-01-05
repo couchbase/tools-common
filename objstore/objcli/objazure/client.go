@@ -235,6 +235,31 @@ func (c *Client) CreateMultipartUpload(bucket, key string) (string, error) {
 	return objcli.NoUploadID, nil
 }
 
+func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
+	if id != objcli.NoUploadID {
+		return nil, objcli.ErrExpectedNoUploadID
+	}
+
+	blockURL := c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key).ToBlockBlobAPI()
+
+	resp, err := blockURL.GetBlockList(
+		context.Background(),
+		azblob.BlockListUncommitted,
+		azblob.LeaseAccessConditions{},
+	)
+	if err != nil {
+		return nil, handleError(bucket, key, err)
+	}
+
+	parts := make([]objval.Part, 0, len(resp.UncommittedBlocks))
+
+	for _, block := range resp.UncommittedBlocks {
+		parts = append(parts, objval.Part{ID: block.Name, Size: int64(block.Size)})
+	}
+
+	return parts, nil
+}
+
 func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
 	if id != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID

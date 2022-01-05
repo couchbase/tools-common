@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/testutil"
 
@@ -849,6 +850,74 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
+}
+
+func TestClientListParts(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.ListPartsInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			id     = input.UploadId != nil && *input.UploadId == "id"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return bucket && id && key
+	}
+
+	fn2 := func(fn func(page *s3.ListPartsOutput, _ bool) bool) bool {
+		parts := []*s3.Part{
+			{
+				ETag: aws.String("etag1"),
+				Size: aws.Int64(64),
+			},
+			{
+				ETag: aws.String("etag2"),
+				Size: aws.Int64(128),
+			},
+		}
+
+		fn(&s3.ListPartsOutput{Parts: parts}, false)
+
+		return true
+	}
+
+	api.On("ListPartsPages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+
+	client := &Client{serviceAPI: api}
+
+	parts, err := client.ListParts("bucket", "id", "key")
+	require.NoError(t, err)
+
+	expected := []objval.Part{{ID: "etag1", Size: 64}, {ID: "etag2", Size: 128}}
+	require.Equal(t, expected, parts)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListPartsPages", 1)
+}
+
+func TestClientListPartsUploadNotFound(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.ListPartsInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			id     = input.UploadId != nil && *input.UploadId == "id"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return bucket && id && key
+	}
+
+	api.On("ListPartsPages", mock.MatchedBy(fn1), mock.Anything).Return(&mockError{inner: s3.ErrCodeNoSuchUpload})
+
+	client := &Client{serviceAPI: api}
+
+	_, err := client.ListParts("bucket", "id", "key")
+	require.True(t, objerr.IsNotFoundError(err))
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListPartsPages", 1)
 }
 
 func TestClientUploadPart(t *testing.T) {

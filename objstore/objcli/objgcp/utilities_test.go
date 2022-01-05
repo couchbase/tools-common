@@ -45,7 +45,11 @@ func TestHandleError(t *testing.T) {
 	require.ErrorIs(t, handleError("", "", &net.DNSError{IsNotFound: true}), objerr.ErrEndpointResolutionFailed)
 }
 
-func TestGenerateKey(t *testing.T) {
-	require.True(t, strings.HasPrefix(generateKey("key"), "key-"))
-	require.NotEqual(t, generateKey("key"), generateKey("key"))
+func TestPartKey(t *testing.T) {
+	require.True(t, strings.HasPrefix(partKey("id", "key"), "key-"))
+	require.NotEqual(t, partKey("id", "key"), partKey("id", "key"))
+}
+
+func TestPartPrefix(t *testing.T) {
+	require.Equal(t, "/path/to/key-mpu-id", partPrefix("id", "/path/to/key"))
 }

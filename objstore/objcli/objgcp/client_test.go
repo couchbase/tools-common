@@ -702,14 +702,53 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 
 	id, err := client.CreateMultipartUpload("bucket", "key")
 	require.NoError(t, err)
-	require.Equal(t, objcli.NoUploadID, id)
+	require.NotEmpty(t, id)
 }
 
-func TestClientUploadPartWithUploadID(t *testing.T) {
-	client := &Client{}
+func TestClientListParts(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+	)
 
-	_, err := client.UploadPart("bucket", "id", "key", 42, nil)
-	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(
+		func(query *storage.Query) bool { return query.Prefix == "key-mpu-id" },
+	)).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "key-mpu-id-uuid1",
+		Size:    64,
+		Updated: (time.Time{}).Add(24 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	call = miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "key-mpu-id-uuid2",
+		Size:    128,
+		Updated: (time.Time{}).Add(48 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	client := &Client{serviceAPI: msAPI}
+
+	parts, err := client.ListParts("bucket", "id", "key")
+	require.NoError(t, err)
+
+	expected := []objval.Part{{ID: "key-mpu-id-uuid1", Size: 64}, {ID: "key-mpu-id-uuid2", Size: 128}}
+	require.Equal(t, expected, parts)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
 }
 
 func TestClientUploadPart(t *testing.T) {
@@ -753,7 +792,7 @@ func TestClientUploadPart(t *testing.T) {
 
 	client := &Client{serviceAPI: msAPI}
 
-	part, err := client.UploadPart("bucket", objcli.NoUploadID, "key", 42, strings.NewReader("value"))
+	part, err := client.UploadPart("bucket", "id", "key", 42, strings.NewReader("value"))
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(part.ID, "key-"))
 	require.Equal(t, 42, part.Number)
@@ -772,13 +811,6 @@ func TestClientUploadPart(t *testing.T) {
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
-}
-
-func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
-	client := &Client{}
-
-	err := client.CompleteMultipartUpload("bucket", "id", "key", objval.Part{})
-	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
 func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
@@ -815,10 +847,52 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		parts = append(parts, objval.Part{ID: fmt.Sprintf("key-%d", i), Number: i})
 	}
 
-	require.NoError(t, client.CompleteMultipartUpload("bucket", objcli.NoUploadID, "key", parts...))
+	require.NoError(t, client.CompleteMultipartUpload("bucket", "id", "key", parts...))
 
 	msAPI.AssertExpectations(t)
 	mbAPI.AssertExpectations(t)
 	moAPI.AssertExpectations(t)
 	mcAPI.AssertExpectations(t)
+}
+
+func TestClientAbortMultipartUpload(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(
+		func(query *storage.Query) bool { return query.Prefix == "key-mpu-id" },
+	)).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "/path/to/key-mpu-id-f2be662e-458f-4e26-b2d7-74e7cf78edc7",
+		Size:    64,
+		Updated: (time.Time{}).Add(24 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	mbAPI.On("Object", mock.Anything).Return(moAPI)
+
+	moAPI.On("Delete", mock.Anything).Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	require.NoError(t, client.AbortMultipartUpload("bucket", "id", "key"))
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 2)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Delete", 1)
 }

@@ -56,8 +56,13 @@ func handleError(bucket, key string, err error) error {
 	return objerr.HandleError(err)
 }
 
-// generateKey returns a key which should be used for an in-progress multipart upload. This function should be used to
-// generate key names since they'll be prefixed with '<key>-' allowing efficient listing upon completion.
-func generateKey(key string) string {
-	return path.Join(path.Dir(key), fmt.Sprintf("%s-%s", path.Base(key), uuid.New()))
+// partKey returns a key which should be used for an in-progress multipart upload. This function should be used to
+// generate key names since they'll be prefixed with 'basename(key)-mpu-' allowing efficient listing upon completion.
+func partKey(id, key string) string {
+	return path.Join(path.Dir(key), fmt.Sprintf("%s-mpu-%s-%s", path.Base(key), id, uuid.New()))
+}
+
+// partPrefix returns the prefix which will be used for all parts in the given upload for the provided key.
+func partPrefix(id, key string) string {
+	return fmt.Sprintf("%s-mpu-%s", key, id)
 }

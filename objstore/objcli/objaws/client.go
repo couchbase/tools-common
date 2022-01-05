@@ -311,6 +311,34 @@ func (c *Client) CreateMultipartUpload(bucket, key string) (string, error) {
 	return *resp.UploadId, nil
 }
 
+func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
+	parts := make([]objval.Part, 0)
+
+	input := &s3.ListPartsInput{
+		Bucket:   aws.String(bucket),
+		UploadId: aws.String(id),
+		Key:      aws.String(key),
+	}
+
+	err := c.serviceAPI.ListPartsPages(input, func(page *s3.ListPartsOutput, _ bool) bool {
+		for _, part := range page.Parts {
+			parts = append(parts, objval.Part{ID: *part.ETag, Size: *part.Size})
+		}
+
+		return true
+	})
+	if err == nil {
+		return parts, nil
+	}
+
+	// Must be handled here localstack may return a clashing "NotFound" error
+	if isNoSuchUpload(err) {
+		return nil, &objerr.NotFoundError{Type: "upload", Name: id}
+	}
+
+	return nil, handleError(input.Bucket, input.Key, err)
+}
+
 func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
 	input := &s3.UploadPartInput{
 		Body:       body,

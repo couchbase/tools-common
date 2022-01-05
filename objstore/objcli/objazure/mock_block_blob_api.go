@@ -42,6 +42,29 @@ func (_m *mockBlockBlobAPI) CommitBlockList(ctx context.Context, base64BlockIDs 
 	return r0, r1
 }
 
+// GetBlockList provides a mock function with given fields: ctx, listType, ac
+func (_m *mockBlockBlobAPI) GetBlockList(ctx context.Context, listType azblob.BlockListType, ac azblob.LeaseAccessConditions) (*azblob.BlockList, error) {
+	ret := _m.Called(ctx, listType, ac)
+
+	var r0 *azblob.BlockList
+	if rf, ok := ret.Get(0).(func(context.Context, azblob.BlockListType, azblob.LeaseAccessConditions) *azblob.BlockList); ok {
+		r0 = rf(ctx, listType, ac)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*azblob.BlockList)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, azblob.BlockListType, azblob.LeaseAccessConditions) error); ok {
+		r1 = rf(ctx, listType, ac)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // StageBlock provides a mock function with given fields: ctx, base64BlockID, body, ac, transactionalMD5, cpk
 func (_m *mockBlockBlobAPI) StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker, ac azblob.LeaseAccessConditions, transactionalMD5 []byte, cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobStageBlockResponse, error) {
 	ret := _m.Called(ctx, base64BlockID, body, ac, transactionalMD5, cpk)

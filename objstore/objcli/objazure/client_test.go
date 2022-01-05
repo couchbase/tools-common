@@ -198,7 +198,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.GetObject("bucket", "key", &objval.ByteRange{Start: 128, End: 64})
+	_, err := client.GetObject("bucket", "blob", &objval.ByteRange{Start: 128, End: 64})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -846,7 +846,57 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 func TestClientUploadPartWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPart("container", "blob", "id", 42, nil)
+	_, err := client.UploadPart("container", "id", "blob", 42, nil)
+	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
+}
+
+func TestClientListParts(t *testing.T) {
+	var (
+		msAPI     = &mockBlobStorageAPI{}
+		mcAPI     = &mockContainerAPI{}
+		mBlobAPI  = &mockBlobAPI{}
+		mBlockAPI = &mockBlockBlobAPI{}
+	)
+
+	msAPI.On("ToContainerAPI", mock.MatchedBy(
+		func(container string) bool { return container == "container" })).Return(mcAPI)
+
+	mcAPI.On("ToBlobAPI", mock.Anything).Return(mBlobAPI)
+
+	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
+
+	output := &azblob.BlockList{
+		CommittedBlocks:   []azblob.Block{{Name: "block1", Size: 64}, {Name: "block2", Size: 128}},
+		UncommittedBlocks: []azblob.Block{{Name: "block3", Size: 256}, {Name: "block4", Size: 512}},
+	}
+
+	mBlockAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(output, nil)
+
+	client := &Client{storageAPI: msAPI}
+
+	parts, err := client.ListParts("container", objcli.NoUploadID, "blob")
+	require.NoError(t, err)
+
+	expected := []objval.Part{{ID: "block3", Size: 256}, {ID: "block4", Size: 512}}
+	require.Equal(t, expected, parts)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+
+	mcAPI.AssertExpectations(t)
+	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
+
+	mBlobAPI.AssertExpectations(t)
+	mBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
+
+	mBlockAPI.AssertExpectations(t)
+	mBlockAPI.AssertNumberOfCalls(t, "GetBlockList", 1)
+}
+
+func TestClientListPartsWithUploadID(t *testing.T) {
+	client := &Client{}
+
+	_, err := client.ListParts("container", "id", "blob")
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -1028,7 +1078,7 @@ func TestClientUploadPartCopyWithUploadID(t *testing.T) {
 func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.CompleteMultipartUpload("bucket", "id", "key", objval.Part{})
+	err := client.CompleteMultipartUpload("bucket", "id", "blob", objval.Part{})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 

@@ -164,6 +164,20 @@ func (_m *mockServiceAPI) ListObjectsV2Pages(_a0 *s3.ListObjectsV2Input, _a1 fun
 	return r0
 }
 
+// ListPartsPages provides a mock function with given fields: _a0, _a1
+func (_m *mockServiceAPI) ListPartsPages(_a0 *s3.ListPartsInput, _a1 func(*s3.ListPartsOutput, bool) bool) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*s3.ListPartsInput, func(*s3.ListPartsOutput, bool) bool) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // PutObject provides a mock function with given fields: _a0
 func (_m *mockServiceAPI) PutObject(_a0 *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
 	ret := _m.Called(_a0)
