@@ -6,11 +6,13 @@ import (
 	"io"
 	"regexp"
 
+	"github.com/couchbase/tools-common/hofp"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
+	"github.com/couchbase/tools-common/system"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -186,14 +188,26 @@ func (c *Client) copyAndAppend(bucket, id string, attrs *objval.ObjectAttrs, dat
 }
 
 func (c *Client) DeleteObjects(bucket string, keys ...string) error {
+	pool := hofp.NewPool(hofp.Options{
+		Size:      system.NumWorkers(len(keys)),
+		LogPrefix: "(objaws)",
+	})
+
+	del := func(start, end int) error {
+		return c.deleteObjects(bucket, keys[start:maths.Min(end, len(keys))]...)
+	}
+
+	queue := func(start, end int) error {
+		return pool.Queue(func() error { return del(start, end) })
+	}
+
 	for start, end := 0, PageSize; start < len(keys); start, end = start+PageSize, end+PageSize {
-		err := c.deleteObjects(bucket, keys[start:maths.Min(end, len(keys))]...)
-		if err != nil {
-			return err // Purposefully not wrapped
+		if queue(start, end) != nil {
+			break
 		}
 	}
 
-	return nil
+	return pool.Stop()
 }
 
 func (c *Client) DeleteDirectory(bucket, prefix string) error {

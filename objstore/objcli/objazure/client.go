@@ -9,9 +9,11 @@ import (
 	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/couchbase/tools-common/hofp"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
+	"github.com/couchbase/tools-common/system"
 	"github.com/google/uuid"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -153,9 +155,15 @@ func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 }
 
 func (c *Client) DeleteObjects(bucket string, keys ...string) error {
-	containerURL := c.storageAPI.ToContainerAPI(bucket)
+	var (
+		containerURL = c.storageAPI.ToContainerAPI(bucket)
+		pool         = hofp.NewPool(hofp.Options{
+			Size:      system.NumWorkers(len(keys)),
+			LogPrefix: "(objazure)",
+		})
+	)
 
-	for _, key := range keys {
+	del := func(key string) error {
 		blobURL := containerURL.ToBlobAPI(key)
 
 		_, err := blobURL.Delete(
@@ -166,9 +174,21 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 		if err != nil && !isKeyNotFound(err) {
 			return handleError(bucket, key, err)
 		}
+
+		return nil
 	}
 
-	return nil
+	queue := func(key string) error {
+		return pool.Queue(func() error { return del(key) })
+	}
+
+	for _, key := range keys {
+		if queue(key) != nil {
+			break
+		}
+	}
+
+	return pool.Stop()
 }
 
 func (c *Client) DeleteDirectory(bucket, prefix string) error {

@@ -10,11 +10,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/couchbase/tools-common/hofp"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/slice"
+	"github.com/couchbase/tools-common/system"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 
@@ -143,14 +145,31 @@ func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 }
 
 func (c *Client) DeleteObjects(bucket string, keys ...string) error {
-	for _, key := range keys {
+	pool := hofp.NewPool(hofp.Options{
+		Size:      system.NumWorkers(len(keys)),
+		LogPrefix: "(objgcp)",
+	})
+
+	del := func(key string) error {
 		err := c.serviceAPI.Bucket(bucket).Object(key).Delete(context.Background())
 		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
 			return handleError(bucket, key, err)
 		}
+
+		return nil
 	}
 
-	return nil
+	queue := func(key string) error {
+		return pool.Queue(func() error { return del(key) })
+	}
+
+	for _, key := range keys {
+		if queue(key) != nil {
+			break
+		}
+	}
+
+	return pool.Stop()
 }
 
 func (c *Client) DeleteDirectory(bucket, prefix string) error {
