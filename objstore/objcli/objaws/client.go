@@ -354,6 +354,11 @@ func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
 }
 
 func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
+	size, err := aws.SeekerLen(body)
+	if err != nil {
+		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
+	}
+
 	input := &s3.UploadPartInput{
 		Body:       body,
 		Bucket:     aws.String(bucket),
@@ -367,7 +372,7 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 		return objval.Part{}, handleError(input.Bucket, input.Key, err)
 	}
 
-	return objval.Part{ID: *output.ETag, Number: number}, nil
+	return objval.Part{ID: *output.ETag, Number: number, Size: size}, nil
 }
 
 // UploadPartCopy copies the provided byte range from the given 'src' object into a multipart upload for the given 'dst'
@@ -394,7 +399,7 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 		return objval.Part{}, handleError(input.Bucket, input.Key, err)
 	}
 
-	return objval.Part{ID: *output.CopyPartResult.ETag, Number: number}, nil
+	return objval.Part{ID: *output.CopyPartResult.ETag, Number: number, Size: br.End - br.Start + 1}, nil
 }
 
 func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
@@ -413,7 +418,7 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 
 	_, err := c.serviceAPI.CompleteMultipartUpload(input)
 
-	return err
+	return handleError(input.Bucket, input.Key, err)
 }
 
 func (c *Client) AbortMultipartUpload(bucket, id, key string) error {

@@ -136,7 +136,7 @@ func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(bucket, id, key, objval.Part{ID: key, Number: 1}, intermediate)
+	err = c.CompleteMultipartUpload(bucket, id, key, objval.Part{ID: key, Number: 1, Size: attrs.Size}, intermediate)
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}

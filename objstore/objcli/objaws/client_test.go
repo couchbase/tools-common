@@ -945,7 +945,7 @@ func TestClientUploadPart(t *testing.T) {
 
 	part, err := client.UploadPart("bucket", "id", "key", 1, strings.NewReader("value"))
 	require.NoError(t, err)
-	require.Equal(t, objval.Part{ID: "etag", Number: 1}, part)
+	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 5}, part)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "UploadPart", 1)
@@ -977,7 +977,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 	part, err := client.UploadPartCopy("bucket", "id", "key1", "key2", 1, &objval.ByteRange{Start: 64, End: 128})
 	require.NoError(t, err)
-	require.Equal(t, objval.Part{ID: "etag", Number: 1}, part)
+	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 65}, part)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)

@@ -940,6 +940,14 @@ func TestClientUploadPart(t *testing.T) {
 	_, err = base64.StdEncoding.DecodeString(part.ID)
 	require.NoError(t, err)
 
+	expected := objval.Part{
+		ID:     part.ID,
+		Number: 42,
+		Size:   5,
+	}
+
+	require.Equal(t, expected, part)
+
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 

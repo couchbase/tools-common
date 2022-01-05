@@ -146,7 +146,7 @@ func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(bucket, id, key, objval.Part{ID: key}, intermediate)
+	err = c.CompleteMultipartUpload(bucket, id, key, objval.Part{ID: key, Number: 1, Size: attrs.Size}, intermediate)
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -285,13 +285,18 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
 	}
 
+	size, err := aws.SeekerLen(body)
+	if err != nil {
+		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
+	}
+
 	var (
 		md5sum   = md5.New()
 		blockID  = base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 		blockURL = c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key).ToBlockBlobAPI()
 	)
 
-	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum), body)
+	_, err = aws.CopySeekableBody(md5sum, body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
@@ -305,7 +310,7 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 		azblob.ClientProvidedKeyOptions{},
 	)
 
-	return objval.Part{ID: blockID, Number: number}, handleError(bucket, key, err)
+	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
 }
 
 // UploadPartCopy copies the provided byte range from the given 'src' blob and "stages" it for the multipart upload for
@@ -348,7 +353,7 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 		return objval.Part{}, handleError(bucket, dst, err)
 	}
 
-	return objval.Part{ID: blockID, Number: number}, nil
+	return objval.Part{ID: blockID, Number: number, Size: length}, nil
 }
 
 func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
