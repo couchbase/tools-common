@@ -1048,3 +1048,26 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
 }
+
+func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.AbortMultipartUploadInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+			id     = input.UploadId != nil && *input.UploadId == "id"
+		)
+
+		return bucket && key && id
+	}
+
+	api.On("AbortMultipartUpload", mock.MatchedBy(fn)).Return(nil, &mockError{inner: s3.ErrCodeNoSuchUpload})
+
+	client := &Client{serviceAPI: api}
+
+	require.NoError(t, client.AbortMultipartUpload("bucket", "id", "key"))
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
+}
