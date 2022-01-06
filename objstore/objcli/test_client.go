@@ -133,6 +133,10 @@ func (t *TestClient) DeleteDirectory(bucket, prefix string) error {
 }
 
 func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn IterateFunc) error {
+	if include != nil && exclude != nil {
+		return ErrIncludeAndExcludeAreMutuallyExclusive
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
