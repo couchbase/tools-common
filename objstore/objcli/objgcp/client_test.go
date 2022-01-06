@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -811,6 +812,85 @@ func TestClientUploadPart(t *testing.T) {
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
+}
+
+func TestClientUploadPartCopy(t *testing.T) {
+	type test struct {
+		name    string
+		br      *objval.ByteRange
+		invalid bool
+	}
+
+	tests := []*test{
+		{
+			name: "NoByteRange",
+		},
+		{
+			name: "ValidByteRange",
+			br:   &objval.ByteRange{End: 4},
+		},
+		{
+			name:    "InvalidByteRange",
+			br:      &objval.ByteRange{End: 5},
+			invalid: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				msAPI  = &mockServiceAPI{}
+				mbAPI  = &mockBucketAPI{}
+				msoAPI = &mockObjectAPI{}
+				mdoAPI = &mockObjectAPI{}
+				mcAPI  = &mockCopierAPI{}
+			)
+
+			msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+			mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "src" })).Return(msoAPI)
+
+			mbAPI.On("Object", mock.MatchedBy(func(key string) bool {
+				return strings.HasPrefix(key, "dst-mpu-")
+			})).Return(mdoAPI)
+
+			mdoAPI.On("CopierFrom", mock.Anything).Return(mcAPI)
+
+			mcAPI.On("Run", mock.Anything).Return(nil, nil)
+
+			output := &storage.ObjectAttrs{
+				Name:    "key",
+				Etag:    "etag",
+				Size:    5,
+				Updated: (time.Time{}).Add(24 * time.Hour),
+			}
+
+			msoAPI.On("Attrs", mock.Anything).Return(output, nil)
+
+			client := &Client{serviceAPI: msAPI}
+
+			_, err := client.UploadPartCopy("bucket", "id", "dst", "src", 1, test.br)
+			if test.invalid {
+				require.ErrorIs(t, err, objerr.ErrUnsupportedOperation)
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			msAPI.AssertExpectations(t)
+			msAPI.AssertNumberOfCalls(t, "Bucket", 3)
+
+			mbAPI.AssertExpectations(t)
+			mbAPI.AssertNumberOfCalls(t, "Object", 3)
+
+			msoAPI.AssertExpectations(t)
+			msoAPI.AssertNumberOfCalls(t, "Attrs", 1)
+
+			msoAPI.AssertExpectations(t)
+			mdoAPI.AssertNumberOfCalls(t, "CopierFrom", 1)
+		})
+	}
 }
 
 func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {

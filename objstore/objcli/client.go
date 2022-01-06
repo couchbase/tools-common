@@ -68,6 +68,12 @@ type Client interface {
 	// NOTE: The part 'number' should be between 1-10,000 and is used for the ordering of parts upon completion.
 	UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error)
 
+	// UploadPartCopy creates a new part for the multipart upload using an existing object (or part of an existing
+	// object).
+	//
+	// NOTE: Not all cloud providers support providing a byte range.
+	UploadPartCopy(bucket, id, dst, src string, number int, br *objval.ByteRange) (objval.Part, error)
+
 	// CompleteMultipartUpload completes the multipart upload with the given id, the given parts should be provided in
 	// the order that they should be constructed.
 	CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error

@@ -48,6 +48,7 @@ type objectAPI interface {
 	NewRangeReader(ctx context.Context, offset, length int64) (readerAPI, error)
 	NewWriter(ctx context.Context) writerAPI
 	ComposerFrom(srcs ...objectAPI) composeAPI
+	CopierFrom(src objectAPI) copierAPI
 }
 
 // objectHandle implements the 'objectAPI' interface and encapsulates the Google Storage SDK into a unit testable
@@ -89,6 +90,10 @@ func (o objectHandle) ComposerFrom(srcs ...objectAPI) composeAPI {
 	}
 
 	return &composer{c: o.h.ComposerFrom(converted...)}
+}
+
+func (o objectHandle) CopierFrom(src objectAPI) copierAPI {
+	return &copier{c: o.h.CopierFrom(src.(*objectHandle).h)}
 }
 
 // readerAPI is a range aware reader API which is used to stream object data from Google Storage.
@@ -164,5 +169,17 @@ type composer struct {
 }
 
 func (c composer) Run(ctx context.Context) (*storage.ObjectAttrs, error) {
+	return c.c.Run(ctx)
+}
+
+type copierAPI interface {
+	Run(ctx context.Context) (*storage.ObjectAttrs, error)
+}
+
+type copier struct {
+	c *storage.Copier
+}
+
+func (c copier) Run(ctx context.Context) (*storage.ObjectAttrs, error) {
 	return c.c.Run(ctx)
 }

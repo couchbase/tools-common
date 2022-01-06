@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 
 	"github.com/couchbase/tools-common/hofp"
@@ -375,11 +376,6 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	return objval.Part{ID: *output.ETag, Number: number, Size: size}, nil
 }
 
-// UploadPartCopy copies the provided byte range from the given 'src' object into a multipart upload for the given 'dst'
-// object; this operation is specific to AWS and is required for implementing 'AppendToObject'
-//
-// NOTE: This function is not exposed by the 'objcli.Client' interface because it's not supported/required by all cloud
-// providers.
 func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *objval.ByteRange) (objval.Part, error) {
 	if err := br.Valid(true); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
@@ -387,7 +383,7 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 
 	input := &s3.UploadPartCopyInput{
 		Bucket:          aws.String(bucket),
-		CopySource:      aws.String(src),
+		CopySource:      aws.String(path.Join(bucket, src)),
 		CopySourceRange: aws.String(br.ToRangeHeader()),
 		Key:             aws.String(dst),
 		PartNumber:      aws.Int64(int64(number)),

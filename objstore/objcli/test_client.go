@@ -200,6 +200,25 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 	return part, nil
 }
 
+func (t *TestClient) UploadPartCopy(bucket, id, dst, src string, number int,
+	br *objval.ByteRange) (objval.Part, error) {
+	object, err := t.getObjectLocked(bucket, src)
+	if err != nil {
+		return objval.Part{}, err
+	}
+
+	body := make([]byte, br.End-br.Start+1)
+	copy(body, object.Body)
+
+	part := objval.Part{
+		ID:     t.putObjectLocked(bucket, partKey(id, dst), bytes.NewReader(body)),
+		Number: number,
+		Size:   int64(len(body)),
+	}
+
+	return part, nil
+}
+
 func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()

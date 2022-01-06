@@ -313,11 +313,6 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
 }
 
-// UploadPartCopy copies the provided byte range from the given 'src' blob and "stages" it for the multipart upload for
-// the given 'dst' object; this operation is specific to Azure and is required for implementing 'AppendToObject'
-//
-// NOTE: This function is not exposed by the 'objcli.Client' interface because it's not supported/required by all cloud
-// providers.
 func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *objval.ByteRange) (objval.Part, error) {
 	if id != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID

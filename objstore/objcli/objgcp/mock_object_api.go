@@ -59,6 +59,22 @@ func (_m *mockObjectAPI) ComposerFrom(srcs ...objectAPI) composeAPI {
 	return r0
 }
 
+// CopierFrom provides a mock function with given fields: src
+func (_m *mockObjectAPI) CopierFrom(src objectAPI) copierAPI {
+	ret := _m.Called(src)
+
+	var r0 copierAPI
+	if rf, ok := ret.Get(0).(func(objectAPI) copierAPI); ok {
+		r0 = rf(src)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(copierAPI)
+		}
+	}
+
+	return r0
+}
+
 // Delete provides a mock function with given fields: ctx
 func (_m *mockObjectAPI) Delete(ctx context.Context) error {
 	ret := _m.Called(ctx)

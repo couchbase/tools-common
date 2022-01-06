@@ -261,6 +261,36 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	return objval.Part{ID: intermediate, Number: number, Size: size}, nil
 }
 
+// NOTE: Google storage does not support byte range copying, therefore, only the entire object may be copied; this may
+// be done by either not providing a byte range, or providing a byte range for the entire object.
+func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *objval.ByteRange) (objval.Part, error) {
+	if err := br.Valid(false); err != nil {
+		return objval.Part{}, err // Purposefully not wrapped
+	}
+
+	attrs, err := c.GetObjectAttrs(bucket, src)
+	if err != nil {
+		return objval.Part{}, fmt.Errorf("failed to get object attributes: %w", err)
+	}
+
+	// If the user has provided a byte range, ensure that it's for the entire object
+	if br != nil && !(br.Start == 0 && br.End == attrs.Size-1) {
+		return objval.Part{}, objerr.ErrUnsupportedOperation
+	}
+
+	var (
+		intermediate = partKey(id, dst)
+		handle       = c.serviceAPI.Bucket(bucket).Object(src)
+	)
+
+	_, err = c.serviceAPI.Bucket(bucket).Object(intermediate).CopierFrom(handle).Run(context.Background())
+	if err != nil {
+		return objval.Part{}, handleError(bucket, intermediate, err)
+	}
+
+	return objval.Part{ID: intermediate, Size: attrs.Size}, nil
+}
+
 func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
 	converted := make([]string, 0, len(parts))
 

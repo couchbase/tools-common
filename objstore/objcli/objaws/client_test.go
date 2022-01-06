@@ -313,7 +313,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	fn3 := func(input *s3.UploadPartCopyInput) bool {
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			src    = input.CopySource != nil && *input.CopySource == "key"
+			src    = input.CopySource != nil && *input.CopySource == "bucket/key"
 			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == fmt.Sprintf("bytes=0-%d", MinUploadSize-1)
 			key    = input.Key != nil && *input.Key == "key"
 			number = input.PartNumber != nil && *input.PartNumber == 1
@@ -414,7 +414,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 	fn3 := func(input *s3.UploadPartCopyInput) bool {
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			src    = input.CopySource != nil && *input.CopySource == "key"
+			src    = input.CopySource != nil && *input.CopySource == "bucket/key"
 			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == fmt.Sprintf("bytes=0-%d", MinUploadSize-1)
 			key    = input.Key != nil && *input.Key == "key"
 			number = input.PartNumber != nil && *input.PartNumber == 1
@@ -957,7 +957,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 	fn := func(input *s3.UploadPartCopyInput) bool {
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			src    = input.CopySource != nil && *input.CopySource == "key2"
+			src    = input.CopySource != nil && *input.CopySource == "bucket/key2"
 			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == "bytes=64-128"
 			key    = input.Key != nil && *input.Key == "key1"
 			number = input.PartNumber != nil && *input.PartNumber == 1
