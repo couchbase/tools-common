@@ -23,7 +23,7 @@ import (
 // manually mock a client during unit testing.
 type TestClient struct {
 	t        *testing.T
-	lock     sync.Mutex
+	lock     sync.RWMutex
 	provider objval.Provider
 
 	// Buckets is the in memory state maintained by the client. Internally, access is guarded by a mutex, however, it's
@@ -48,8 +48,8 @@ func (t *TestClient) Provider() objval.Provider {
 }
 
 func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
 	object, err := t.getObjectLocked(bucket, key)
 	if err != nil {
@@ -68,8 +68,8 @@ func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objva
 }
 
 func (t *TestClient) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
 	object, err := t.getObjectLocked(bucket, key)
 	if err != nil {
@@ -137,8 +137,8 @@ func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*r
 		return ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
 	b := t.getBucketLocked(bucket)
 
@@ -156,9 +156,6 @@ func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*r
 }
 
 func (t *TestClient) CreateMultipartUpload(bucket, key string) (string, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	return uuid.NewString(), nil
 }
 
@@ -202,6 +199,9 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 
 func (t *TestClient) UploadPartCopy(bucket, id, dst, src string, number int,
 	br *objval.ByteRange) (objval.Part, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	object, err := t.getObjectLocked(bucket, src)
 	if err != nil {
 		return objval.Part{}, err
@@ -236,14 +236,14 @@ func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...ob
 
 	_ = t.putObjectLocked(bucket, key, bytes.NewReader(buffer.Bytes()))
 
-	return t.deleteKeysMatchingPrefix(bucket, partPrefix(id, key), nil, nil)
+	return t.deleteKeysLocked(bucket, partPrefix(id, key), nil, nil)
 }
 
 func (t *TestClient) AbortMultipartUpload(bucket, id, key string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.deleteKeysMatchingPrefix(bucket, partPrefix(id, key), nil, nil)
+	return t.deleteKeysLocked(bucket, partPrefix(id, key), nil, nil)
 }
 
 func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {
@@ -290,7 +290,7 @@ func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) str
 	return attrs.Key
 }
 
-func (t *TestClient) deleteKeysMatchingPrefix(bucket, prefix string, include, exclude []*regexp.Regexp) error {
+func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []*regexp.Regexp) error {
 	b := t.getBucketLocked(bucket)
 
 	for key := range b {
