@@ -51,7 +51,7 @@ func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objva
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	object, err := t.getObjectLocked(bucket, key)
+	object, err := t.getObjectRLocked(bucket, key)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (t *TestClient) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, er
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	object, err := t.getObjectLocked(bucket, key)
+	object, err := t.getObjectRLocked(bucket, key)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,10 @@ func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*r
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	b := t.getBucketLocked(bucket)
+	b, ok := t.Buckets[bucket]
+	if !ok {
+		return nil
+	}
 
 	for key, object := range b {
 		if !strings.HasPrefix(key, prefix) || ShouldIgnore(key, include, exclude) {
@@ -202,7 +205,7 @@ func (t *TestClient) UploadPartCopy(bucket, id, dst, src string, number int,
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, err := t.getObjectLocked(bucket, src)
+	object, err := t.getObjectRLocked(bucket, src)
 	if err != nil {
 		return objval.Part{}, err
 	}
@@ -226,7 +229,7 @@ func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...ob
 	buffer := &bytes.Buffer{}
 
 	for _, part := range parts {
-		object, err := t.getObjectLocked(bucket, part.ID)
+		object, err := t.getObjectRLocked(bucket, part.ID)
 		if err != nil {
 			return err
 		}
@@ -255,8 +258,15 @@ func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {
 	return t.Buckets[bucket]
 }
 
-func (t *TestClient) getObjectLocked(bucket, key string) (*objval.TestObject, error) {
-	o, ok := t.getBucketLocked(bucket)[key]
+// NOTE: Buckets are automatically created by the test client when they're required, so this error returns an object not
+// found error if either the bucket/object don't exist.
+func (t *TestClient) getObjectRLocked(bucket, key string) (*objval.TestObject, error) {
+	b, ok := t.Buckets[bucket]
+	if !ok {
+		return nil, &objerr.NotFoundError{Type: "object", Name: key}
+	}
+
+	o, ok := b[key]
 	if !ok {
 		return nil, &objerr.NotFoundError{Type: "object", Name: key}
 	}
