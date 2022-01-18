@@ -12,13 +12,14 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/couchbase/tools-common/objstore/objcli"
-	"github.com/couchbase/tools-common/objstore/objerr"
-	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/iterator"
+
+	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objerr"
+	"github.com/couchbase/tools-common/objstore/objval"
 )
 
 func TestNewClient(t *testing.T) {

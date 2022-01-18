@@ -10,6 +10,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
+	"google.golang.org/api/iterator"
+
 	"github.com/couchbase/tools-common/hofp"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/objstore/objcli"
@@ -17,8 +20,6 @@ import (
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/slice"
 	"github.com/couchbase/tools-common/system"
-	"github.com/google/uuid"
-	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go/aws"

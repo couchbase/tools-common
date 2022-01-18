@@ -5,8 +5,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/couchbase/tools-common/system"
 	"github.com/stretchr/testify/require"
+
+	"github.com/couchbase/tools-common/system"
 )
 
 func TestNewPool(t *testing.T) {

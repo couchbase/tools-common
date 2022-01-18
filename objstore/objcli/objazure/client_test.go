@@ -17,12 +17,13 @@ import (
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/couchbase/tools-common/objstore/objcli"
-	"github.com/couchbase/tools-common/objstore/objval"
-	"github.com/couchbase/tools-common/slice"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/couchbase/tools-common/objstore/objcli"
+	"github.com/couchbase/tools-common/objstore/objval"
+	"github.com/couchbase/tools-common/slice"
 )
 
 // responseField is the unexported field used by the Azure SDK to store the HTTP response. We access/set/modify this

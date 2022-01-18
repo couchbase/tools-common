@@ -9,12 +9,13 @@ import (
 	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/google/uuid"
+
 	"github.com/couchbase/tools-common/hofp"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/system"
-	"github.com/google/uuid"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
+
 	"github.com/couchbase/tools-common/objstore/objerr"
 )
 

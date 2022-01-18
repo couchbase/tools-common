@@ -29,9 +29,9 @@ gofmt -s -w ${staged_go_files}
 gofumpt -s -w --extra ${staged_go_files}
 
 # run goimports to ensure that imports are sorted correctly
-env GOOS="darwin" goimports -w ${staged_go_files}
-env GOOS="linux" goimports -w ${staged_go_files}
-env GOOS="windows" goimports -w ${staged_go_files}
+env GOOS="darwin" goimports -w -local "github.com/couchbase/tools-common" ${staged_go_files}
+env GOOS="linux" goimports -w -local "github.com/couchbase/tools-common" ${staged_go_files}
+env GOOS="windows" goimports -w -local "github.com/couchbase/tools-common" ${staged_go_files}
 
 # we are safe to re-add any files that were modified
 git add ${staged_go_files}

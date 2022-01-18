@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/couchbase/tools-common/fsutil"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objval"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMPDownloaderOptionsDefaults(t *testing.T) {

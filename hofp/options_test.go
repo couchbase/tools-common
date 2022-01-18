@@ -3,8 +3,9 @@ package hofp
 import (
 	"testing"
 
-	"github.com/couchbase/tools-common/system"
 	"github.com/stretchr/testify/require"
+
+	"github.com/couchbase/tools-common/system"
 )
 
 func TestOptionsDefaults(t *testing.T) {

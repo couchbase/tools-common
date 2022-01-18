@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/aws/aws-sdk-go/aws"
+
 	"github.com/couchbase/tools-common/maths"
 )
 
