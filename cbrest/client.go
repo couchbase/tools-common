@@ -871,7 +871,7 @@ func (c *Client) GetAllServiceHosts(service Service) ([]string, error) {
 
 // GetClusterInfo gets commonly used information about the cluster; this includes the uuid and version.
 func (c *Client) GetClusterInfo() (*cbvalue.ClusterInfo, error) {
-	enterprise, uuid, err := c.GetClusterMetaData()
+	meta, err := c.GetClusterMetaData()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster metadata: %w", err)
 	}
@@ -887,17 +887,24 @@ func (c *Client) GetClusterInfo() (*cbvalue.ClusterInfo, error) {
 	}
 
 	return &cbvalue.ClusterInfo{
-		Enterprise:      enterprise,
-		UUID:            uuid,
-		Version:         version,
-		MaxVBuckets:     maxVBuckets,
-		UniformVBuckets: uniformVBuckets,
+		Enterprise:       meta.Enterprise,
+		UUID:             meta.UUID,
+		DeveloperPreview: meta.DeveloperPreview,
+		Version:          version,
+		MaxVBuckets:      maxVBuckets,
+		UniformVBuckets:  uniformVBuckets,
 	}, nil
 }
 
-// GetClusterMetaData extracts some common metadata from the cluster. Returns a boolean indicating if this is an
-// enterprise cluster, and the cluster uuid.
-func (c *Client) GetClusterMetaData() (bool, string, error) {
+// ClusterMetadata wraps some common cluster metadata.
+type ClusterMetadata struct {
+	Enterprise       bool   `json:"isEnterprise"`
+	UUID             string `json:"uuid"`
+	DeveloperPreview bool   `json:"isDeveloperPreview"`
+}
+
+// GetClusterMetaData extracts some common metadata from the cluster.
+func (c *Client) GetClusterMetaData() (*ClusterMetadata, error) {
 	request := &Request{
 		ContentType:        ContentTypeURLEncoded,
 		Endpoint:           EndpointPools,
@@ -908,28 +915,23 @@ func (c *Client) GetClusterMetaData() (bool, string, error) {
 
 	response, err := c.Execute(request)
 	if err != nil {
-		return false, "", fmt.Errorf("failed to execute request: %w", err)
+		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
-	type overlay struct {
-		Enterprise bool   `json:"isEnterprise"`
-		UUID       string `json:"uuid"`
-	}
-
-	var decoded *overlay
+	var decoded *ClusterMetadata
 
 	err = json.Unmarshal(response.Body, &decoded)
 	if err == nil {
-		return decoded.Enterprise, decoded.UUID, nil
+		return decoded, nil
 	}
 
 	// We will fail to unmarshal the response from the node if it's uninitialized, this is because the "uuid" field will
 	// be an empty array, instead of a string; if this is the case, return a clearer error message.
 	if bytes.Contains(response.Body, []byte(`"uuid":[]`)) {
-		return false, "", ErrNodeUninitialized
+		return nil, ErrNodeUninitialized
 	}
 
-	return false, "", fmt.Errorf("failed to unmarshal response: %w", err)
+	return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 }
 
 // GetClusterVersion extracts version information from the cluster nodes.

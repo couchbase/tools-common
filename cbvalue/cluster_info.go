@@ -4,8 +4,9 @@ package cbvalue
 // information to avoid multiple REST requests to the same endpoints (for the same information).
 type ClusterInfo struct {
 	// Retrieved via the /pools endpoint
-	Enterprise bool   `json:"enterprise"`
-	UUID       string `json:"uuid"`
+	Enterprise       bool   `json:"enterprise"`
+	UUID             string `json:"uuid"`
+	DeveloperPreview bool   `json:"developer_preview"`
 
 	// Retrieved via the /pools/default endpoint
 	Version ClusterVersion `json:"version"`

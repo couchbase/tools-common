@@ -13,7 +13,7 @@ func totalMemory() (uint64, error) {
 		return 0, err // Purposefully not wrapped
 	}
 
-	matches := regexp.MustCompile(`hw\.memsize:\s+(\d+)`).FindStringSubmatch(string(output))
+	matches := regexp.MustCompile(`hw\.memsize:\s+(\d+)`).FindStringSubmatch(output)
 	if matches == nil {
 		return 0, fmt.Errorf("expected to find 'hw.memsize' in 'sysctl hw.memsize' output")
 	}

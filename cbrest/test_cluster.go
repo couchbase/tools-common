@@ -22,8 +22,9 @@ import (
 // configure the behavior/setup of the cluster.
 type TestClusterOptions struct {
 	// Used for the /pools endpoint
-	Enterprise bool
-	UUID       string
+	Enterprise       bool
+	UUID             string
+	DeveloperPreview bool
 
 	// Used for both the /pools/default and the /pools/default/nodeServices endpoint
 	Nodes TestNodes
@@ -158,11 +159,13 @@ func (t *TestCluster) Handler(writer http.ResponseWriter, request *http.Request)
 // Pools implements the /pools endpoint, the return values can be modified using the cluster options.
 func (t *TestCluster) Pools(writer http.ResponseWriter, request *http.Request) {
 	testutil.EncodeJSON(t.t, writer, struct {
-		Enterprise bool   `json:"isEnterprise"`
-		UUID       string `json:"uuid"`
+		Enterprise       bool   `json:"isEnterprise"`
+		UUID             string `json:"uuid"`
+		DeveloperPreview bool   `json:"isDeveloperPreview"`
 	}{
-		Enterprise: t.options.Enterprise,
-		UUID:       t.options.UUID,
+		Enterprise:       t.options.Enterprise,
+		UUID:             t.options.UUID,
+		DeveloperPreview: t.options.DeveloperPreview,
 	})
 }
 

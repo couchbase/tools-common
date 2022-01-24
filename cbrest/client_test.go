@@ -785,7 +785,7 @@ func TestClientExecuteStandardError(t *testing.T) {
 
 	expected := &Response{
 		StatusCode: http.StatusOK,
-		Body:       []byte(`{"isEnterprise":false,"uuid":""}` + "\n"),
+		Body:       []byte(`{"isEnterprise":false,"uuid":"","isDeveloperPreview":false}` + "\n"),
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1521,35 +1521,45 @@ func TestGetClusterVersion(t *testing.T) {
 
 func TestGetClusterMetaData(t *testing.T) {
 	type test struct {
-		name     string
-		input    bool
-		expected bool
+		name             string
+		enterprise       bool
+		developerPreview bool
 	}
 
 	tests := []*test{
 		{
-			name:     "EE",
-			input:    true,
-			expected: true,
+			name:       "EE",
+			enterprise: true,
 		},
 		{
 			name: "CE",
+		},
+		{
+			name:             "EE-DP",
+			enterprise:       true,
+			developerPreview: true,
+		},
+		{
+			name:             "CE-DP",
+			developerPreview: true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cluster := NewTestCluster(t, TestClusterOptions{
-				Enterprise: test.input,
+				Enterprise:       test.enterprise,
+				DeveloperPreview: test.developerPreview,
 			})
 			defer cluster.Close()
 
 			client, err := newTestClient(cluster, true)
 			require.NoError(t, err)
 
-			enterprise, _, err := client.GetClusterMetaData()
+			meta, err := client.GetClusterMetaData()
 			require.NoError(t, err)
-			require.Equal(t, test.expected, enterprise)
+			require.Equal(t, test.enterprise, meta.Enterprise)
+			require.Equal(t, test.developerPreview, meta.DeveloperPreview)
 		})
 	}
 }
