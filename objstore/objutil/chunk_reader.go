@@ -27,8 +27,8 @@ func (c ChunkReader) ForEach(fn func(chunk *io.SectionReader) error) error {
 		return fmt.Errorf("failed to determine length of reader: %w", err)
 	}
 
-	for s, e := int64(0), c.size-1; s <= length; s, e = s+c.size, e+c.size {
-		if err := fn(io.NewSectionReader(c.reader, s, maths.MinInt64(e-s+1, length))); err != nil {
+	for s, e := int64(0), c.size-1; s < length; s, e = s+c.size, e+c.size {
+		if err := fn(io.NewSectionReader(c.reader, s, maths.MinInt64(e+1, length)-s)); err != nil {
 			return err
 		}
 	}
