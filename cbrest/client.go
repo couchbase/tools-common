@@ -434,6 +434,13 @@ func (c *Client) ClusterVersion() cbvalue.ClusterVersion {
 	return c.clusterInfo.Version
 }
 
+// DeveloperPreview returns a boolean indicating whether this cluster is in Developer Preview mode.
+//
+// NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterMetaData'.
+func (c *Client) DeveloperPreview() bool {
+	return c.clusterInfo.DeveloperPreview
+}
+
 // MaxVBuckets returns the maximum number of vBuckets on the target cluster.
 //
 // NOTE: This function may return stale data, for the most up-to-date information, use 'GetMaxVBuckets'.
