@@ -422,9 +422,11 @@ func TestClientDeleteDirectory(t *testing.T) {
 
 	mbAPI.On("Object", mock.Anything).Return(moAPI)
 
-	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(
-		func(query *storage.Query) bool { return query.Prefix == "prefix" },
-	)).Return(miAPI)
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
 
 	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
 		Name:    "/path/to/key1",
@@ -473,9 +475,11 @@ func TestClientIterateObjects(t *testing.T) {
 
 	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
 
-	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(
-		func(query *storage.Query) bool { return query.Prefix == "prefix" },
-	)).Return(miAPI)
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
 
 	miAPI.On("Next").Return(nil, iterator.Done)
 
@@ -509,9 +513,11 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 
 	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
 
-	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(
-		func(query *storage.Query) bool { return query.Prefix == "prefix" },
-	)).Return(miAPI)
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
 
 	miAPI.On("Next").Return(&storage.ObjectAttrs{}, nil)
 

@@ -186,7 +186,22 @@ func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regex
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
-	it := c.serviceAPI.Bucket(bucket).Objects(context.Background(), &storage.Query{Prefix: prefix})
+	query := &storage.Query{
+		Prefix:     prefix,
+		Projection: storage.ProjectionNoACL,
+	}
+
+	err := query.SetAttrSelection([]string{
+		"Name",
+		"Etag",
+		"Size",
+		"Updated",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set attribute selection: %w", err)
+	}
+
+	it := c.serviceAPI.Bucket(bucket).Objects(context.Background(), query)
 
 	for {
 		remote, err := it.Next()
