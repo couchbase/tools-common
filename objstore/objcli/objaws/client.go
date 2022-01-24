@@ -361,11 +361,12 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	}
 
 	input := &s3.UploadPartInput{
-		Body:       body,
-		Bucket:     aws.String(bucket),
-		Key:        aws.String(key),
-		PartNumber: aws.Int64(int64(number)),
-		UploadId:   aws.String(id),
+		Body:          body,
+		Bucket:        aws.String(bucket),
+		ContentLength: aws.Int64(size),
+		Key:           aws.String(key),
+		PartNumber:    aws.Int64(int64(number)),
+		UploadId:      aws.String(id),
 	}
 
 	output, err := c.serviceAPI.UploadPart(input)
