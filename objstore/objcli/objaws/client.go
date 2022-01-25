@@ -264,7 +264,8 @@ func (c *Client) deleteObjects(bucket string, keys ...string) error {
 	return nil
 }
 
-func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc) error {
+func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
+	fn objcli.IterateFunc) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
@@ -272,13 +273,14 @@ func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regex
 	var err error
 
 	callback := func(page *s3.ListObjectsV2Output, _ bool) bool {
-		err = c.iterateObjects(page.Contents, include, exclude, fn)
+		err = c.handlePage(page, include, exclude, fn)
 		return err == nil
 	}
 
 	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-		Prefix: aws.String(prefix),
+		Bucket:    aws.String(bucket),
+		Prefix:    aws.String(prefix),
+		Delimiter: aws.String(delimiter),
 	}
 
 	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
@@ -289,18 +291,23 @@ func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regex
 	return err
 }
 
-// iterateObjects iterates over the given page (<=1000) of objects executing the given function for each object which
+// handlePage iterates over common prefixes/objects in the given page executing the given function for each object which
 // has not been explicitly ignored by the user.
-func (c *Client) iterateObjects(objects []*s3.Object, include, exclude []*regexp.Regexp, fn objcli.IterateFunc) error {
-	for _, object := range objects {
-		if objcli.ShouldIgnore(*object.Key, include, exclude) {
-			continue
-		}
+func (c *Client) handlePage(page *s3.ListObjectsV2Output, include, exclude []*regexp.Regexp,
+	fn objcli.IterateFunc) error {
+	converted := make([]*objval.ObjectAttrs, 0, len(page.CommonPrefixes)+len(page.Contents))
 
-		attrs := &objval.ObjectAttrs{
-			Key:          *object.Key,
-			Size:         *object.Size,
-			LastModified: object.LastModified,
+	for _, cp := range page.CommonPrefixes {
+		converted = append(converted, &objval.ObjectAttrs{Key: *cp.Prefix})
+	}
+
+	for _, o := range page.Contents {
+		converted = append(converted, &objval.ObjectAttrs{Key: *o.Key, Size: *o.Size, LastModified: o.LastModified})
+	}
+
+	for _, attrs := range converted {
+		if objcli.ShouldIgnore(attrs.Key, include, exclude) {
+			continue
 		}
 
 		// If the caller has returned an error, stop iteration, and return control to them

@@ -38,6 +38,29 @@ func (_m *mockContainerAPI) ListBlobsFlatSegment(ctx context.Context, marker azb
 	return r0, r1
 }
 
+// ListBlobsHierarchySegment provides a mock function with given fields: ctx, marker, delimiter, o
+func (_m *mockContainerAPI) ListBlobsHierarchySegment(ctx context.Context, marker azblob.Marker, delimiter string, o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsHierarchySegmentResponse, error) {
+	ret := _m.Called(ctx, marker, delimiter, o)
+
+	var r0 *azblob.ListBlobsHierarchySegmentResponse
+	if rf, ok := ret.Get(0).(func(context.Context, azblob.Marker, string, azblob.ListBlobsSegmentOptions) *azblob.ListBlobsHierarchySegmentResponse); ok {
+		r0 = rf(ctx, marker, delimiter, o)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*azblob.ListBlobsHierarchySegmentResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, azblob.Marker, string, azblob.ListBlobsSegmentOptions) error); ok {
+		r1 = rf(ctx, marker, delimiter, o)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ToBlobAPI provides a mock function with given fields: blob
 func (_m *mockContainerAPI) ToBlobAPI(blob string) blobAPI {
 	ret := _m.Called(blob)

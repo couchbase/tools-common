@@ -9,6 +9,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
@@ -178,16 +179,18 @@ func (c *Client) DeleteDirectory(bucket, prefix string) error {
 		return c.DeleteObjects(bucket, attrs.Key)
 	}
 
-	return c.IterateObjects(bucket, prefix, nil, nil, fn)
+	return c.IterateObjects(bucket, prefix, "", nil, nil, fn)
 }
 
-func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc) error {
+func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
+	fn objcli.IterateFunc) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
 	query := &storage.Query{
 		Prefix:     prefix,
+		Delimiter:  delimiter,
 		Projection: storage.ProjectionNoACL,
 	}
 
@@ -218,11 +221,23 @@ func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regex
 			continue
 		}
 
+		var (
+			key     = remote.Prefix
+			size    int64
+			updated *time.Time
+		)
+
+		// If "key" is empty this isn't a directory stub, treat it as a normal object
+		if key == "" {
+			key = remote.Name
+			size = remote.Size
+			updated = &remote.Updated
+		}
+
 		attrs := &objval.ObjectAttrs{
-			Key:          remote.Name,
-			ETag:         remote.Etag,
-			Size:         remote.Size,
-			LastModified: &remote.Updated,
+			Key:          key,
+			Size:         size,
+			LastModified: updated,
 		}
 
 		// If the caller has returned an error, stop iteration, and return control to them
@@ -253,7 +268,7 @@ func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
 		return nil
 	}
 
-	err := c.IterateObjects(bucket, prefix, nil, nil, fn)
+	err := c.IterateObjects(bucket, prefix, "/", nil, nil, fn)
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}

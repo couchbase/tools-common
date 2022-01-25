@@ -12,8 +12,15 @@ type ObjectAttrs struct {
 	ETag string // NOTE: Not populated during object iteration.
 
 	// Attributes about the object itself
+	//
+	// NOTE: Not populated if 'IsDir' is true.
 	Size         int64
 	LastModified *time.Time
+}
+
+// IsDir returns a boolean indicating whether this object is a virtual/synthetic directory stub.
+func (o *ObjectAttrs) IsDir() bool {
+	return o.Size == 0 && o.LastModified == nil
 }
 
 // Object represents an object stored in the cloud, simply the attributes and it's body.

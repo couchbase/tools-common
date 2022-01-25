@@ -476,7 +476,7 @@ func TestClientIterateObjects(t *testing.T) {
 	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
 
 	fn1 := func(query *storage.Query) bool {
-		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+		return query.Prefix == "prefix" && query.Delimiter == "delimiter" && query.Projection == storage.ProjectionNoACL
 	}
 
 	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
@@ -485,7 +485,7 @@ func TestClientIterateObjects(t *testing.T) {
 
 	client := &Client{serviceAPI: msAPI}
 
-	require.NoError(t, client.IterateObjects("bucket", "prefix", nil, nil, nil))
+	require.NoError(t, client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, nil))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
@@ -497,10 +497,69 @@ func TestClientIterateObjects(t *testing.T) {
 	miAPI.AssertNumberOfCalls(t, "Next", 1)
 }
 
+func TestClientIterateObjectsDirectoryStub(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{Prefix: "/path/to/key2"}, nil)
+
+	call.Repeatability = 1
+
+	call = miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "/path/to/key1",
+		Size:    64,
+		Updated: (time.Time{}).Add(24 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	var (
+		client  = &Client{serviceAPI: msAPI}
+		dirs    int
+		objects int
+	)
+
+	fn := func(attrs *objval.ObjectAttrs) error {
+		if attrs.IsDir() {
+			dirs++
+		} else {
+			objects++
+		}
+
+		return nil
+	}
+
+	require.NoError(t, client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, fn))
+	require.Equal(t, 1, dirs)
+	require.Equal(t, 1, objects)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
+
+	miAPI.AssertExpectations(t)
+	miAPI.AssertNumberOfCalls(t, "Next", 3)
+}
+
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	client := &Client{}
 
-	err := client.IterateObjects("bucket", "prefix", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
+	err := client.IterateObjects("bucket", "prefix", "delimiter", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
@@ -523,7 +582,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 
 	client := &Client{serviceAPI: msAPI}
 
-	err := client.IterateObjects("bucket", "prefix", nil, nil, func(attrs *objval.ObjectAttrs) error {
+	err := client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, func(attrs *objval.ObjectAttrs) error {
 		return assert.AnError
 	})
 	require.ErrorIs(t, err, assert.AnError)
@@ -686,10 +745,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 			var all []*objval.ObjectAttrs
 
-			err := client.IterateObjects("bucket", "", test.include, test.exclude, func(attrs *objval.ObjectAttrs) error {
+			fn := func(attrs *objval.ObjectAttrs) error {
 				all = append(all, attrs)
 				return nil
-			})
+			}
+
+			err := client.IterateObjects("bucket", "", "", test.include, test.exclude, fn)
 			require.NoError(t, err)
 			require.Equal(t, test.all, all)
 

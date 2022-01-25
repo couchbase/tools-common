@@ -50,7 +50,7 @@ type Client interface {
 
 	// IterateObjects iterates through the objects a bucket running the provided iteration function for each object
 	// which matches the given filtering parameters.
-	IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn IterateFunc) error
+	IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp, fn IterateFunc) error
 
 	// CreateMultipartUpload creates a new multipart upload for the given key.
 	//

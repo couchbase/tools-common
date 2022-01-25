@@ -197,50 +197,103 @@ func (c *Client) DeleteDirectory(bucket, prefix string) error {
 		return c.DeleteObjects(bucket, attrs.Key)
 	}
 
-	return c.IterateObjects(bucket, prefix, nil, nil, fn)
+	return c.IterateObjects(bucket, prefix, "", nil, nil, fn)
 }
 
-func (c *Client) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc) error {
+func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
+	fn objcli.IterateFunc) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
 	var (
 		containerURL = c.storageAPI.ToContainerAPI(bucket)
-		marker       azblob.Marker
 		options      = azblob.ListBlobsSegmentOptions{Prefix: prefix}
+		objects      []*objval.ObjectAttrs
+		marker       azblob.Marker
+		err          error
 	)
 
 	for marker.NotDone() {
-		resp, err := containerURL.ListBlobsFlatSegment(context.Background(), marker, options)
+		objects, marker, err = c.listBlobs(containerURL, marker, delimiter, options)
 		if err != nil {
 			return handleError(bucket, "", err)
 		}
 
-		err = c.iterateObjects(resp.Segment, include, exclude, fn)
+		err = c.iterateObjects(objects, include, exclude, fn)
 		if err != nil {
 			return handleError(bucket, "", err)
 		}
-
-		marker = resp.NextMarker
 	}
 
 	return nil
 }
 
+// listBlobs lists blobs using either a flat or hierarchical listing depending on whether a delimiter is supplied.
+//
+// NOTE: The returned marker should be used for the next call to 'listBlobs' to retrieve the next page of items.
+func (c *Client) listBlobs(containerURL containerAPI, marker azblob.Marker, delimiter string,
+	options azblob.ListBlobsSegmentOptions) ([]*objval.ObjectAttrs, azblob.Marker, error) {
+	if delimiter == "" {
+		return c.listBlobsFlat(containerURL, marker, options)
+	}
+
+	return c.listBlobsHier(containerURL, marker, delimiter, options)
+}
+
+// listBlobsFlat performs a flat blob listing returning a page of objects.
+func (c *Client) listBlobsFlat(containerURL containerAPI, marker azblob.Marker,
+	options azblob.ListBlobsSegmentOptions) ([]*objval.ObjectAttrs, azblob.Marker, error) {
+	resp, err := containerURL.ListBlobsFlatSegment(context.Background(), marker, options)
+	if err != nil {
+		return nil, azblob.Marker{}, err // Purposefully not wrapped
+	}
+
+	converted := make([]*objval.ObjectAttrs, 0, len(resp.Segment.BlobItems))
+
+	for _, b := range resp.Segment.BlobItems {
+		converted = append(converted, &objval.ObjectAttrs{
+			Key:          b.Name,
+			Size:         *b.Properties.ContentLength,
+			LastModified: &b.Properties.LastModified,
+		})
+	}
+
+	return converted, resp.NextMarker, nil
+}
+
+// listBlobsHier performs a hierarchical blob listing returning a page of directory stubs/blobs.
+func (c *Client) listBlobsHier(containerURL containerAPI, marker azblob.Marker, delimiter string,
+	options azblob.ListBlobsSegmentOptions) ([]*objval.ObjectAttrs, azblob.Marker, error) {
+	resp, err := containerURL.ListBlobsHierarchySegment(context.Background(), marker, delimiter, options)
+	if err != nil {
+		return nil, azblob.Marker{}, err // Purposefully not wrapped
+	}
+
+	converted := make([]*objval.ObjectAttrs, 0, len(resp.Segment.BlobItems))
+
+	for _, p := range resp.Segment.BlobPrefixes {
+		converted = append(converted, &objval.ObjectAttrs{Key: p.Name})
+	}
+
+	for _, b := range resp.Segment.BlobItems {
+		converted = append(converted, &objval.ObjectAttrs{
+			Key:          b.Name,
+			Size:         *b.Properties.ContentLength,
+			LastModified: &b.Properties.LastModified,
+		})
+	}
+
+	return converted, resp.NextMarker, nil
+}
+
 // iterateObjects iterates over the given segment (<=5000) of objects executing the given function for each object which
 // has not been explicitly ignored by the user.
-func (c *Client) iterateObjects(segment azblob.BlobFlatListSegment, include, exclude []*regexp.Regexp,
+func (c *Client) iterateObjects(objects []*objval.ObjectAttrs, include, exclude []*regexp.Regexp,
 	fn objcli.IterateFunc) error {
-	for _, blob := range segment.BlobItems {
-		if objcli.ShouldIgnore(blob.Name, include, exclude) {
+	for _, attrs := range objects {
+		if objcli.ShouldIgnore(attrs.Key, include, exclude) {
 			continue
-		}
-
-		attrs := &objval.ObjectAttrs{
-			Key:          blob.Name,
-			Size:         *blob.Properties.ContentLength,
-			LastModified: &blob.Properties.LastModified,
 		}
 
 		// If the caller has returned an error, stop iteration, and return control to them

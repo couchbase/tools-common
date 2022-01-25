@@ -603,18 +603,19 @@ func TestClientIterateObjects(t *testing.T) {
 
 	fn := func(input *s3.ListObjectsV2Input) bool {
 		var (
-			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			prefix = input.Prefix != nil && *input.Prefix == "prefix"
+			bucket    = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix    = input.Prefix != nil && *input.Prefix == "prefix"
+			delimiter = input.Delimiter != nil && *input.Delimiter == "delimiter"
 		)
 
-		return bucket && prefix
+		return bucket && prefix && delimiter
 	}
 
 	api.On("ListObjectsV2Pages", mock.MatchedBy(fn), mock.Anything).Return(nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.IterateObjects("bucket", "prefix", nil, nil, nil))
+	require.NoError(t, client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, nil))
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
@@ -623,8 +624,66 @@ func TestClientIterateObjects(t *testing.T) {
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	client := &Client{}
 
-	err := client.IterateObjects("bucket", "prefix", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
+	err := client.IterateObjects("bucket", "prefix", "delimiter", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
+}
+
+func TestClientIterateObjectsDirectoryStub(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.ListObjectsV2Input) bool {
+		var (
+			bucket    = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix    = input.Prefix != nil && *input.Prefix == "prefix"
+			delimiter = input.Delimiter != nil && *input.Delimiter == "delimiter"
+		)
+
+		return bucket && prefix && delimiter
+	}
+
+	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
+		fn(&s3.ListObjectsV2Output{
+			CommonPrefixes: []*s3.CommonPrefix{
+				{
+					Prefix: aws.String("/path/to/key1"),
+				},
+			},
+			Contents: []*s3.Object{
+				{
+					Key:          aws.String("/path/to/key1"),
+					Size:         aws.Int64(64),
+					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+				},
+			},
+		}, true)
+
+		return true
+	}
+
+	api.On("ListObjectsV2Pages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+
+	var (
+		client  = &Client{serviceAPI: api}
+		dirs    int
+		objects int
+	)
+
+	fn := func(attrs *objval.ObjectAttrs) error {
+		if attrs.IsDir() {
+			dirs++
+		} else {
+			objects++
+		}
+
+		return nil
+	}
+
+	require.NoError(t, client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, fn))
+	require.Equal(t, 1, dirs)
+	require.Equal(t, 1, objects)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
 }
 
 func TestClientIterateObjectsPropagateUserError(t *testing.T) {
@@ -632,11 +691,12 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 
 	fn1 := func(input *s3.ListObjectsV2Input) bool {
 		var (
-			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			prefix = input.Prefix != nil && *input.Prefix == "prefix"
+			bucket    = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix    = input.Prefix != nil && *input.Prefix == "prefix"
+			delimiter = input.Delimiter != nil && *input.Delimiter == "delimiter"
 		)
 
-		return bucket && prefix
+		return bucket && prefix && delimiter
 	}
 
 	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
@@ -655,7 +715,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	err := client.IterateObjects("bucket", "prefix", nil, nil, func(attrs *objval.ObjectAttrs) error {
+	err := client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, func(attrs *objval.ObjectAttrs) error {
 		return assert.AnError
 	})
 	require.ErrorIs(t, err, assert.AnError)
@@ -811,10 +871,9 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 			var all []*objval.ObjectAttrs
 
-			err := client.IterateObjects("bucket", "prefix", test.include, test.exclude, func(attrs *objval.ObjectAttrs) error {
-				all = append(all, attrs)
-				return nil
-			})
+			fn := func(attrs *objval.ObjectAttrs) error { all = append(all, attrs); return nil }
+
+			err := client.IterateObjects("bucket", "prefix", "delimiter", test.include, test.exclude, fn)
 			require.NoError(t, err)
 			require.Equal(t, test.all, all)
 

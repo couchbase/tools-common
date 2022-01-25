@@ -133,7 +133,8 @@ func (t *TestClient) DeleteDirectory(bucket, prefix string) error {
 	return nil
 }
 
-func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*regexp.Regexp, fn IterateFunc) error {
+func (t *TestClient) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
+	fn IterateFunc) error {
 	if include != nil && exclude != nil {
 		return ErrIncludeAndExcludeAreMutuallyExclusive
 	}
@@ -151,7 +152,19 @@ func (t *TestClient) IterateObjects(bucket, prefix string, include, exclude []*r
 			continue
 		}
 
-		if err := fn(&object.ObjectAttrs); err != nil {
+		var (
+			trimmed = strings.TrimPrefix(key, prefix)
+			attrs   = object.ObjectAttrs
+		)
+
+		// If this is a nested key, convert it into a directory stub
+		if delimiter != "" && strings.Count(trimmed, delimiter) > 1 {
+			attrs.Key = rootDirectory(trimmed)
+			attrs.Size = 0
+			attrs.LastModified = nil
+		}
+
+		if err := fn(&attrs); err != nil {
 			return err
 		}
 	}
@@ -177,7 +190,7 @@ func (t *TestClient) ListParts(bucket, id, key string) ([]objval.Part, error) {
 		return nil
 	}
 
-	err := t.IterateObjects(bucket, prefix, nil, nil, fn)
+	err := t.IterateObjects(bucket, prefix, "/", nil, nil, fn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to iterate objects: %w", err)
 	}
@@ -322,4 +335,14 @@ func partKey(id, key string) string {
 // partPrefix returns the prefix which will be used for all parts in the given upload for the provided key.
 func partPrefix(id, key string) string {
 	return fmt.Sprintf("%s-mpu-%s", key, id)
+}
+
+// rootDirectory returns the root directory for the provided key.
+func rootDirectory(key string) string {
+	dir := path.Dir(key)
+	if dir == "." || dir == "/" {
+		return key
+	}
+
+	return rootDirectory(dir)
 }

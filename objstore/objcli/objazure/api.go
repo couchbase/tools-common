@@ -28,6 +28,8 @@ func (s serviceURL) ToContainerAPI(container string) containerAPI {
 type containerAPI interface {
 	ListBlobsFlatSegment(ctx context.Context, marker azblob.Marker,
 		o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsFlatSegmentResponse, error)
+	ListBlobsHierarchySegment(ctx context.Context, marker azblob.Marker, delimiter string,
+		o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsHierarchySegmentResponse, error)
 	ToBlobAPI(blob string) blobAPI
 }
 
@@ -39,6 +41,11 @@ type containerURL struct {
 func (c containerURL) ListBlobsFlatSegment(ctx context.Context, marker azblob.Marker,
 	o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsFlatSegmentResponse, error) {
 	return c.url.ListBlobsFlatSegment(ctx, marker, o)
+}
+
+func (c containerURL) ListBlobsHierarchySegment(ctx context.Context, marker azblob.Marker, delimiter string,
+	o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsHierarchySegmentResponse, error) {
+	return c.url.ListBlobsHierarchySegment(ctx, marker, delimiter, o)
 }
 
 func (c containerURL) ToBlobAPI(blob string) blobAPI {

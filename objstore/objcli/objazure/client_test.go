@@ -599,7 +599,7 @@ func TestClientIterateObjects(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.IterateObjects("container", "prefix", nil, nil, nil))
+	require.NoError(t, client.IterateObjects("container", "prefix", "", nil, nil, nil))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
@@ -608,10 +608,132 @@ func TestClientIterateObjects(t *testing.T) {
 	mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 1)
 }
 
+func TestClientIterateObjectsWithoutDelimiter(t *testing.T) {
+	var (
+		msAPI = &mockBlobStorageAPI{}
+		mcAPI = &mockContainerAPI{}
+	)
+
+	msAPI.On("ToContainerAPI", mock.MatchedBy(
+		func(container string) bool { return container == "container" })).Return(mcAPI)
+
+	output := &azblob.ListBlobsFlatSegmentResponse{
+		NextMarker: azblob.Marker{Val: aws.String("")},
+		Segment: azblob.BlobFlatListSegment{
+			BlobItems: []azblob.BlobItemInternal{
+				{
+					Name: "blob",
+					Properties: azblob.BlobProperties{
+						ContentLength: aws.Int64(42),
+						LastModified:  time.Time{}.Add(24 * time.Hour),
+					},
+				},
+			},
+		},
+	}
+
+	mcAPI.On(
+		"ListBlobsFlatSegment",
+		mock.Anything,
+		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
+		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
+	).Return(output, nil)
+
+	var (
+		client  = &Client{storageAPI: msAPI}
+		dirs    int
+		objects int
+	)
+
+	fn := func(attrs *objval.ObjectAttrs) error {
+		if attrs.IsDir() {
+			dirs++
+		} else {
+			objects++
+		}
+
+		return nil
+	}
+
+	require.NoError(t, client.IterateObjects("container", "prefix", "", nil, nil, fn))
+	require.Zero(t, dirs)
+	require.Equal(t, 1, objects)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+
+	mcAPI.AssertExpectations(t)
+	mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 1)
+}
+
+func TestClientIterateObjectsWithDelimiter(t *testing.T) {
+	var (
+		msAPI = &mockBlobStorageAPI{}
+		mcAPI = &mockContainerAPI{}
+	)
+
+	msAPI.On("ToContainerAPI", mock.MatchedBy(
+		func(container string) bool { return container == "container" })).Return(mcAPI)
+
+	output := &azblob.ListBlobsHierarchySegmentResponse{
+		NextMarker: azblob.Marker{Val: aws.String("")},
+		Segment: azblob.BlobHierarchyListSegment{
+			BlobPrefixes: []azblob.BlobPrefix{
+				{
+					Name: "prefix",
+				},
+			},
+			BlobItems: []azblob.BlobItemInternal{
+				{
+					Name: "blob",
+					Properties: azblob.BlobProperties{
+						ContentLength: aws.Int64(42),
+						LastModified:  time.Time{}.Add(24 * time.Hour),
+					},
+				},
+			},
+		},
+	}
+
+	mcAPI.On(
+		"ListBlobsHierarchySegment",
+		mock.Anything,
+		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
+		mock.MatchedBy(func(delimiter string) bool { return delimiter == "delimiter" }),
+		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
+	).Return(output, nil)
+
+	var (
+		client  = &Client{storageAPI: msAPI}
+		dirs    int
+		objects int
+	)
+
+	fn := func(attrs *objval.ObjectAttrs) error {
+		if attrs.IsDir() {
+			dirs++
+		} else {
+			objects++
+		}
+
+		return nil
+	}
+
+	require.NoError(t, client.IterateObjects("container", "prefix", "delimiter", nil, nil, fn))
+	require.Equal(t, 1, dirs)
+	require.Equal(t, 1, objects)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+
+	mcAPI.AssertExpectations(t)
+	mcAPI.AssertNumberOfCalls(t, "ListBlobsHierarchySegment", 1)
+}
+
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	client := &Client{}
 
-	err := client.IterateObjects("bucket", "prefix", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
+	err := client.IterateObjects("bucket", "prefix", "delimiter", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
@@ -624,9 +746,9 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
 		func(container string) bool { return container == "container" })).Return(mcAPI)
 
-	output := &azblob.ListBlobsFlatSegmentResponse{
+	output := &azblob.ListBlobsHierarchySegmentResponse{
 		NextMarker: azblob.Marker{Val: aws.String("")},
-		Segment: azblob.BlobFlatListSegment{BlobItems: []azblob.BlobItemInternal{
+		Segment: azblob.BlobHierarchyListSegment{BlobItems: []azblob.BlobItemInternal{
 			{
 				Name: "blob1",
 				Properties: azblob.BlobProperties{
@@ -638,15 +760,16 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	}
 
 	mcAPI.On(
-		"ListBlobsFlatSegment",
+		"ListBlobsHierarchySegment",
 		mock.Anything,
 		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
+		mock.MatchedBy(func(delimiter string) bool { return delimiter == "delimiter" }),
 		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
 	).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
 
-	err := client.IterateObjects("container", "prefix", nil, nil, func(attrs *objval.ObjectAttrs) error {
+	err := client.IterateObjects("container", "prefix", "delimiter", nil, nil, func(attrs *objval.ObjectAttrs) error {
 		return assert.AnError
 	})
 	require.ErrorIs(t, err, assert.AnError)
@@ -655,7 +778,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 
 	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 1)
+	mcAPI.AssertNumberOfCalls(t, "ListBlobsHierarchySegment", 1)
 }
 
 func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
@@ -820,7 +943,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 			var all []*objval.ObjectAttrs
 
-			err := client.IterateObjects("container", "", test.include, test.exclude, func(attrs *objval.ObjectAttrs) error {
+			err := client.IterateObjects("container", "", "", test.include, test.exclude, func(attrs *objval.ObjectAttrs) error {
 				all = append(all, attrs)
 				return nil
 			})
