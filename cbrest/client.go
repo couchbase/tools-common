@@ -395,8 +395,7 @@ func (c *Client) unmarshalCC(host string, body []byte) (*ClusterConfig, error) {
 
 		// We do the same for possible ipv6 alternate addresses
 		if node.AlternateAddresses.External != nil {
-			node.AlternateAddresses.External.Hostname =
-				netutil.ReconstructIPV6(node.AlternateAddresses.External.Hostname)
+			node.AlternateAddresses.External.Hostname = netutil.ReconstructIPV6(node.AlternateAddresses.External.Hostname)
 		}
 	}
 

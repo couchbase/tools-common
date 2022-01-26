@@ -14,6 +14,8 @@ pipeline {
         GOBIN = "${GOROOT}/bin"
         PATH="${PATH}:${GOBIN}:${WORKSPACE}/bin"
 
+        GOLANGCI_LINT_VERSION = "v1.44.0"
+
         PROJECT = "${WORKSPACE}/tools-common"
     }
 
@@ -51,7 +53,7 @@ pipeline {
                     sh "wget -q -O- ${GO_TARBALL_URL} | tar xz"
 
                     // get golangci-lint binary
-                    sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v1.39.0/install.sh | sh -s -- -b ${GOBIN} v1.39.0"
+                    sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT_VERSION}/install.sh | sh -s -- -b ${GOBIN} ${GOLANGCI_LINT_VERSION}"
                     sh "golangci-lint --version"
 
                     withEnv(["GO111MODULE=off"]) {
