@@ -3,6 +3,7 @@ package netutil
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"syscall"
 	"testing"
@@ -40,6 +41,11 @@ func TestIsTemporaryError(t *testing.T) {
 		{
 			name:     "ImplementsTemporaryInterface",
 			input:    &net.OpError{Op: "accept", Err: syscall.ECONNRESET},
+			expected: true,
+		},
+		{
+			name:     "UnexpectedEOF",
+			input:    io.ErrUnexpectedEOF,
 			expected: true,
 		},
 	}

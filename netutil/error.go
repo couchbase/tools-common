@@ -2,6 +2,7 @@ package netutil
 
 import (
 	"errors"
+	"io"
 	"net"
 	"strings"
 )
@@ -33,7 +34,10 @@ func IsTemporaryError(err error) bool {
 		opError    *net.OpError
 	)
 
-	if errors.As(err, &dnsErr) || errors.As(err, &unknownErr) || (errors.As(err, &opError) && opError.Op == "dial") {
+	if errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.As(err, &dnsErr) ||
+		errors.As(err, &unknownErr) ||
+		(errors.As(err, &opError) && opError.Op == "dial") {
 		return true
 	}
 
