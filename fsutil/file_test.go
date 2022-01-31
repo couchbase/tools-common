@@ -317,7 +317,7 @@ func TestWriteTempFileUseProvidedDir(t *testing.T) {
 func TestWriteTempFileUseOSTempDir(t *testing.T) {
 	path, err := WriteTempFile("", []byte("Hello, World!"))
 	require.NoError(t, err)
-	require.Equal(t, os.TempDir(), filepath.Dir(path))
+	require.Equal(t, filepath.Clean(os.TempDir()), filepath.Dir(path))
 	require.FileExists(t, path)
 
 	data, err := os.ReadFile(path)
