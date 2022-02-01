@@ -57,7 +57,7 @@ func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objva
 		return nil, err
 	}
 
-	var offset, length int64 = 0, int64(len(object.Body))
+	var offset, length int64 = 0, int64(len(object.Body) + 1)
 	if br != nil {
 		offset, length = br.ToOffsetLength(length)
 	}

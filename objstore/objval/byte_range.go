@@ -33,7 +33,7 @@ func (b *ByteRange) Valid(required bool) error {
 		return ErrByteRangeRequired
 	}
 
-	if b == nil || b != nil && b.End >= b.Start {
+	if b == nil || b.End == 0 || b.End >= b.Start {
 		return nil
 	}
 

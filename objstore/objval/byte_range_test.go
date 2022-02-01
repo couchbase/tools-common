@@ -33,6 +33,15 @@ func TestByteRangeValid(t *testing.T) {
 			name: "ProvidedNotValidStartBeforeEnd",
 			br:   &ByteRange{Start: 128, End: 64},
 		},
+		{
+			name:  "ZeroValueEnd",
+			br:    &ByteRange{Start: 128},
+			valid: true,
+		},
+		{
+			name: "NegativeEnd",
+			br:   &ByteRange{Start: 128, End: -1},
+		},
 	}
 
 	for _, test := range tests {

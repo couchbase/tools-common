@@ -378,7 +378,7 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 
 	var offset, length int64 = 0, azblob.CountToEnd
 	if br != nil {
-		offset, length = br.Start, br.End-offset+1
+		offset, length = br.ToOffsetLength(length)
 	}
 
 	var (

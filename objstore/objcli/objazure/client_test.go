@@ -1102,7 +1102,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 			name:    "WithByteRange",
 			br:      &objval.ByteRange{Start: 64, End: 128},
 			eOffset: 64,
-			eLength: 129,
+			eLength: 65,
 		},
 	}
 
