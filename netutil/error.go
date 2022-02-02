@@ -28,6 +28,10 @@ var TemporaryErrorMessages = []string{
 // IsTemporaryError returns a boolean indicating whether the provided error is a result of a temporary failure and
 // should be retried.
 func IsTemporaryError(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	var (
 		dnsErr     *net.DNSError
 		unknownErr net.UnknownNetworkError

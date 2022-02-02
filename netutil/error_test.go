@@ -20,6 +20,9 @@ func TestIsTemporaryError(t *testing.T) {
 
 	tests := []*test{
 		{
+			name: "Nil",
+		},
+		{
 			name:  "NotTemporary",
 			input: errors.New("not temporary"),
 		},

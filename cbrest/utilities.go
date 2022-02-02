@@ -197,5 +197,5 @@ func shouldRetry(err error) bool {
 		unknownAuth  *UnknownAuthorityError
 	)
 
-	return err != nil && netutil.IsTemporaryError(err) || errors.As(err, &socketClosed) || errors.As(err, &unknownAuth)
+	return netutil.IsTemporaryError(err) || errors.As(err, &socketClosed) || errors.As(err, &unknownAuth)
 }
