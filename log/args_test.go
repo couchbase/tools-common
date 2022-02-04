@@ -45,6 +45,20 @@ func TestUserTagArguments(t *testing.T) {
 	}
 }
 
+func TestUserTagCBMArguments(t *testing.T) {
+	require.Equal(t,
+		[]string{
+			"-u", "<ud>username</ud>", "--username", "<ud>username</ud>", "-k", "<ud>key</ud>", "--key",
+			"<ud>key</ud>", "--filter-keys", "<ud>filter</ud>", "--filter-values", "<ud>vals</ud>", "--km-key-url",
+			"<ud>url</ud>",
+		},
+		UserTagCBMArguments([]string{
+			"-u", "username", "--username", "username", "-k", "key", "--key", "key",
+			"--filter-keys", "filter", "--filter-values", "vals", "--km-key-url", "url",
+		}),
+	)
+}
+
 func TestMaskArguments(t *testing.T) {
 	cases := []argumentsTestCase{
 		{
@@ -78,6 +92,20 @@ func TestMaskArguments(t *testing.T) {
 			require.Equal(t, tc.expected, MaskArguments(tc.arguments, []string{"-p", "--password"}))
 		})
 	}
+}
+
+func TestMaskCBMArguments(t *testing.T) {
+	require.Equal(t,
+		[]string{
+			"-p", "*****", "--password", "*****", "--obj-access-key-id", "*****",
+			"--obj-secret-access-key", "*****", "--obj-refresh-token", "*****", "--km-secret-access-key", "*****",
+			"--passphrase", "*****",
+		},
+		MaskCBMArguments([]string{
+			"-p", "pass", "--password", "pass", "--obj-access-key-id", "keyid",
+			"--obj-secret-access-key", "secret", "--obj-refresh-token", "token", "--km-secret-access-key", "secret",
+			"--passphrase", "pass",
+		}))
 }
 
 func TestMaskAndTagArguments(t *testing.T) {
@@ -120,4 +148,18 @@ func TestMaskAndTagArguments(t *testing.T) {
 				[]string{"-p", "--password"}))
 		})
 	}
+}
+
+func TestMaskAndTagCBMArguments(t *testing.T) {
+	require.Equal(t,
+		"-p ***** --password ***** --obj-access-key-id ***** --obj-secret-access-key ***** --obj-refresh-token ***** "+
+			"--km-secret-access-key ***** --passphrase ***** -u <ud>username</ud> --username <ud>username</ud> -k "+
+			"<ud>key</ud> --key <ud>key</ud> --filter-keys <ud>filter</ud> --filter-values <ud>vals</ud> --km-key-url "+
+			"<ud>url</ud>",
+		MaskAndUserTagCBMArguments([]string{
+			"-p", "pass", "--password", "pass", "--obj-access-key-id", "keyid",
+			"--obj-secret-access-key", "secret", "--obj-refresh-token", "token", "--km-secret-access-key", "secret",
+			"--passphrase", "pass", "-u", "username", "--username", "username", "-k", "key", "--key", "key", "--filter-keys",
+			"filter", "--filter-values", "vals", "--km-key-url", "url",
+		}))
 }

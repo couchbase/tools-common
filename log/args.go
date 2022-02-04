@@ -5,6 +5,17 @@ import (
 	"strings"
 )
 
+var (
+	cbmFlagsToMask = []string{
+		"-p", "--password", "--obj-access-key-id", "--obj-secret-access-key", "--obj-refresh-token",
+		"--km-access-key-id", "--km-secret-access-key", "--passphrase",
+	}
+	cbmFlagsToTag = []string{
+		"-u", "--username", "-k", "--key", "--filter-keys", "--filter-values",
+		"--km-key-url",
+	}
+)
+
 // UserTagArguments returns a new slice with the values for the flags given in flagsToTag surrounded by the <ud></ud>
 // tags.
 func UserTagArguments(args, flagsToTag []string) []string {
@@ -20,6 +31,10 @@ func UserTagArguments(args, flagsToTag []string) []string {
 	}
 
 	return ret
+}
+
+func UserTagCBMArguments(args []string) []string {
+	return UserTagArguments(args, cbmFlagsToTag)
 }
 
 // MaskArguments returns a new slice with the values of the flags given in flagsToMask replaced by a fix number of *.
@@ -39,10 +54,18 @@ func MaskArguments(args, flagsToMask []string) []string {
 	return ret
 }
 
+func MaskCBMArguments(args []string) []string {
+	return MaskArguments(args, cbmFlagsToMask)
+}
+
 // MaskAndUserTagArguments is a convenient way of calling both UserTagArguments and MaskArguments on the given data. It
 // will return the resulting string slice joined with a space between element for easy logging.
 func MaskAndUserTagArguments(args, flagsToTag, flagsToMask []string) string {
 	return strings.TrimSpace(strings.Join(MaskArguments(UserTagArguments(args, flagsToTag), flagsToMask), " "))
+}
+
+func MaskAndUserTagCBMArguments(args []string) string {
+	return MaskAndUserTagArguments(args, cbmFlagsToTag, cbmFlagsToMask)
 }
 
 func flagMatches(flag string, flags []string) bool {
