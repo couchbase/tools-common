@@ -97,7 +97,7 @@ pipeline {
                     sh "go clean -testcache"
 
                     // Run the unit testing
-                    sh "2>&1 go test -v -timeout=15m -count=1 -coverprofile=coverage.out ./... | tee ${WORKSPACE}/reports/test.raw"
+                    sh "2>&1 go test -v -timeout=15m -count=1 -coverprofile=coverage.out -parallel 1 ./... | tee ${WORKSPACE}/reports/test.raw"
 
                     // Convert the test output into valid 'junit' xml
                     sh "cat ${WORKSPACE}/reports/test.raw | go-junit-report > ${WORKSPACE}/reports/test.xml"
