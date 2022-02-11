@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"hash/crc32"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -23,7 +24,7 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
-	require.Equal(t, &Client{serviceAPI: &serviceClient{c: &storage.Client{}}}, NewClient(&storage.Client{}))
+	require.Equal(t, &Client{serviceAPI: serviceClient{c: &storage.Client{}}}, NewClient(&storage.Client{}))
 }
 
 func TestClientProvider(t *testing.T) {
@@ -206,6 +207,10 @@ func TestClientPutObject(t *testing.T) {
 
 	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
 
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
 	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
 
 	fn1 := func(sum []byte) bool {
@@ -244,6 +249,7 @@ func TestClientPutObject(t *testing.T) {
 	mbAPI.AssertNumberOfCalls(t, "Object", 1)
 
 	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
 	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
 
 	mwAPI.AssertExpectations(t)
@@ -286,6 +292,10 @@ func TestClientAppendToObjectNotFoundOrEmpty(t *testing.T) {
 
 			mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
 
+			moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+				return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+			})).Return(moAPI)
+
 			moAPI.On("Attrs", mock.Anything).Return(test.attrs, test.err)
 			moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
 
@@ -311,6 +321,7 @@ func TestClientAppendToObjectNotFoundOrEmpty(t *testing.T) {
 			mbAPI.AssertNumberOfCalls(t, "Object", 2)
 
 			moAPI.AssertExpectations(t)
+			moAPI.AssertNumberOfCalls(t, "Retryer", 1)
 			moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
 
 			mwAPI.AssertExpectations(t)
@@ -336,6 +347,10 @@ func TestClientAppendToObjectUsingObjectComposition(t *testing.T) {
 	mbAPI.On("Object", mock.MatchedBy(
 		func(key string) bool { return key == "key" || strings.HasPrefix(key, "key-") },
 	)).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
 
 	moAPI.On("Attrs", mock.Anything).Return(&storage.ObjectAttrs{Size: 5}, nil)
 	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
@@ -369,6 +384,7 @@ func TestClientAppendToObjectUsingObjectComposition(t *testing.T) {
 
 	moAPI.AssertExpectations(t)
 	moAPI.AssertNumberOfCalls(t, "Attrs", 1)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
 	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
 	moAPI.AssertNumberOfCalls(t, "ComposerFrom", 1)
 	moAPI.AssertNumberOfCalls(t, "Delete", 1)
@@ -832,6 +848,10 @@ func TestClientUploadPart(t *testing.T) {
 
 	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return strings.HasPrefix(key, "key-") })).Return(moAPI)
 
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
 	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
 
 	fn1 := func(sum []byte) bool {
@@ -873,6 +893,7 @@ func TestClientUploadPart(t *testing.T) {
 	mbAPI.AssertNumberOfCalls(t, "Object", 1)
 
 	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
 	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
 
 	mwAPI.AssertExpectations(t)

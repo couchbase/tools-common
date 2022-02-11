@@ -36,7 +36,7 @@ var _ objcli.Client = (*Client)(nil)
 // NewClient returns a new client which uses the given storage client, in general this should be the one created using
 // the 'storage.NewClient' function exposed by the SDK.
 func NewClient(client *storage.Client) *Client {
-	return &Client{serviceAPI: &serviceClient{client}}
+	return &Client{serviceAPI: serviceClient{client}}
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -97,7 +97,7 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 	var (
 		md5sum = md5.New()
 		crc32c = crc32.New(crc32.MakeTable(crc32.Castagnoli))
-		writer = c.serviceAPI.Bucket(bucket).Object(key).NewWriter(ctx)
+		writer = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways)).NewWriter(ctx)
 	)
 
 	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum, crc32c), body)

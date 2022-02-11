@@ -34,7 +34,7 @@ type bucketHandle struct {
 }
 
 func (b bucketHandle) Object(key string) objectAPI {
-	return &objectHandle{h: b.h.Object(key)}
+	return objectHandle{h: b.h.Object(key)}
 }
 
 func (b bucketHandle) Objects(ctx context.Context, query *storage.Query) objectIteratorAPI {
@@ -49,6 +49,7 @@ type objectAPI interface {
 	NewWriter(ctx context.Context) writerAPI
 	ComposerFrom(srcs ...objectAPI) composeAPI
 	CopierFrom(src objectAPI) copierAPI
+	Retryer(opts ...storage.RetryOption) objectAPI
 }
 
 // objectHandle implements the 'objectAPI' interface and encapsulates the Google Storage SDK into a unit testable
@@ -71,11 +72,11 @@ func (o objectHandle) NewRangeReader(ctx context.Context, offset, length int64) 
 		return nil, err
 	}
 
-	return &reader{r: r}, nil
+	return reader{r: r}, nil
 }
 
 func (o objectHandle) NewWriter(ctx context.Context) writerAPI {
-	writer := &writer{w: o.h.NewWriter(ctx)}
+	writer := writer{w: o.h.NewWriter(ctx)}
 
 	// Disable SDK upload chunking
 	writer.w.ChunkSize = 0
@@ -86,14 +87,18 @@ func (o objectHandle) NewWriter(ctx context.Context) writerAPI {
 func (o objectHandle) ComposerFrom(srcs ...objectAPI) composeAPI {
 	converted := make([]*storage.ObjectHandle, 0, len(srcs))
 	for _, src := range srcs {
-		converted = append(converted, src.(*objectHandle).h)
+		converted = append(converted, src.(objectHandle).h)
 	}
 
-	return &composer{c: o.h.ComposerFrom(converted...)}
+	return composer{c: o.h.ComposerFrom(converted...)}
 }
 
 func (o objectHandle) CopierFrom(src objectAPI) copierAPI {
-	return &copier{c: o.h.CopierFrom(src.(*objectHandle).h)}
+	return copier{c: o.h.CopierFrom(src.(objectHandle).h)}
+}
+
+func (o objectHandle) Retryer(opts ...storage.RetryOption) objectAPI {
+	return objectHandle{h: o.h.Retryer(opts...)}
 }
 
 // readerAPI is a range aware reader API which is used to stream object data from Google Storage.

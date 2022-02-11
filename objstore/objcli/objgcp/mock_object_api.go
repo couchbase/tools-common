@@ -127,3 +127,25 @@ func (_m *mockObjectAPI) NewWriter(ctx context.Context) writerAPI {
 
 	return r0
 }
+
+// Retryer provides a mock function with given fields: opts
+func (_m *mockObjectAPI) Retryer(opts ...storage.RetryOption) objectAPI {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 objectAPI
+	if rf, ok := ret.Get(0).(func(...storage.RetryOption) objectAPI); ok {
+		r0 = rf(opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(objectAPI)
+		}
+	}
+
+	return r0
+}
