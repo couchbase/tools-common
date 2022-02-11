@@ -8,7 +8,7 @@ lint:
 	@golangci-lint run
 
 test:
-	@go test ./$(PACKAGE)/... -run=$(TESTS) -count=1 -cover -failfast -shuffle=on -parallel 1
+	@go test ./$(PACKAGE)/... -run=$(TESTS) -count=1 -cover -failfast -shuffle=on
 
 clean:
 	@rm -f coverage.out
