@@ -121,7 +121,70 @@ func TestAuthProviderGetServiceHost(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual, err := test.provider.GetServiceHost(test.service)
+			actual, err := test.provider.GetServiceHost(test.service, 0)
+			require.NoError(t, err)
+			require.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestAuthProviderGetServiceHostSingleNodeMultipleAttempts(t *testing.T) {
+	provider := &AuthProvider{
+		resolved: &connstr.ResolvedConnectionString{
+			Addresses: []connstr.Address{{Host: "localhost", Port: 8091}},
+		},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{Nodes: Nodes{{Hostname: "localhost", Services: testServices}}},
+		},
+	}
+
+	actual, err := provider.GetServiceHost(ServiceManagement, 42)
+	require.NoError(t, err)
+	require.Equal(t, "http://localhost:8091", actual)
+}
+
+func TestAuthProviderGetServiceHostMultipleAttempts(t *testing.T) {
+	type test struct {
+		name     string
+		attempt  int
+		expected string
+	}
+
+	tests := []*test{
+		{
+			name:     "FirstAttempt",
+			expected: "http://localhost:8091",
+		},
+		{
+			name:     "SecondAttempt",
+			attempt:  1,
+			expected: "http://localhost:8092",
+		},
+		{
+			name:     "ThirdAttemptShouldWrap",
+			attempt:  2,
+			expected: "http://localhost:8091",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider := &AuthProvider{
+				resolved: &connstr.ResolvedConnectionString{
+					Addresses: []connstr.Address{
+						{Host: "localhost", Port: 8091},
+						{Host: "localhost", Port: 8092},
+					},
+				},
+				manager: &ClusterConfigManager{
+					config: &ClusterConfig{Nodes: Nodes{
+						{Hostname: "localhost", Services: testServices},
+						{Hostname: "localhost", Services: testAltServices},
+					}},
+				},
+			}
+
+			actual, err := provider.GetServiceHost(ServiceManagement, test.attempt)
 			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
 		})
@@ -293,7 +356,7 @@ func TestAuthProviderGetHostServiceNotAvailable(t *testing.T) {
 		},
 	}
 
-	_, err := provider.GetServiceHost(ServiceAnalytics)
+	_, err := provider.GetServiceHost(ServiceAnalytics, 0)
 
 	var errServiceNotAvailable *ServiceNotAvailableError
 
@@ -316,7 +379,7 @@ func TestAuthProviderGetHostServiceShouldUseBootstrapHost(t *testing.T) {
 			},
 		}
 
-		hostname, err := provider.GetServiceHost(ServiceAnalytics)
+		hostname, err := provider.GetServiceHost(ServiceAnalytics, 0)
 		require.NoError(t, err)
 		require.Equal(t, hostname, "http://bootstrap:54321")
 	})
@@ -336,7 +399,7 @@ func TestAuthProviderGetHostServiceShouldUseBootstrapHost(t *testing.T) {
 			},
 		}
 
-		hostname, err := provider.GetServiceHost(ServiceAnalytics)
+		hostname, err := provider.GetServiceHost(ServiceAnalytics, 0)
 		require.NoError(t, err)
 		require.Equal(t, hostname, "http://localhost:12345")
 	})

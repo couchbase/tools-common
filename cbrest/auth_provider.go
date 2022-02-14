@@ -34,8 +34,11 @@ func NewAuthProvider(resolved *connstr.ResolvedConnectionString, provider aprov.
 // GetServiceHost gets the host required to execute a REST request. A service may be provided to indicate that this
 // request needs to be sent to a specific service.
 //
+// Supplying an offest will (where possible) "shift" the node index so that we dispatch the request to a different node;
+// this may help in certain cases where a node is currently being removed from the cluster.
+//
 // NOTE: The returned string is a fully qualified hostname with scheme and port.
-func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
+func (a *AuthProvider) GetServiceHost(service Service, offset int) (string, error) {
 	hosts, err := a.GetAllServiceHosts(service)
 	if err != nil {
 		return "", err // Purposefully not wrapped
@@ -44,7 +47,7 @@ func (a *AuthProvider) GetServiceHost(service Service) (string, error) {
 	// If the bootstrap host is running the required service, it will be placed at the beginning of the slice by the
 	// 'GetAllServiceHosts' function; this means we prioritize sending requests to the node which we bootstrapped
 	// against.
-	return hosts[0], nil
+	return hosts[offset%len(hosts)], nil
 }
 
 // GetAllServiceHosts gets all the possible hosts for a given service type.

@@ -775,9 +775,9 @@ func (c *Client) do(ctx *retry.Context, request *Request) (*http.Response, error
 
 // prepare converts the request into a raw HTTP request which can be dispatched to the cluster. Uses the same context
 // meaning the request timeout is not reset by retries.
-func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, error) {
+func (c *Client) prepare(ctx *retry.Context, request *Request) (*http.Request, error) {
 	// Get the fully qualified address to the node that we are sending this request to
-	host, err := c.serviceHost(request.Service)
+	host, err := c.serviceHost(request.Service, ctx.Attempt()-1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host for service '%s': %w", request.Service, err)
 	}
@@ -809,8 +809,8 @@ func (c *Client) prepare(ctx context.Context, request *Request) (*http.Request, 
 }
 
 // serviceHost returns the service host that this request should be dispatched too.
-func (c *Client) serviceHost(service Service) (string, error) {
-	host, err := c.authProvider.GetServiceHost(service)
+func (c *Client) serviceHost(service Service, attempt int) (string, error) {
+	host, err := c.authProvider.GetServiceHost(service, attempt)
 	if err != nil {
 		return "", fmt.Errorf("failed to get host for service '%s': %w", service, err)
 	}
@@ -858,7 +858,7 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 
 // GetServiceHost retrieves the address for a single node in the cluster which is running the provided service.
 func (c *Client) GetServiceHost(service Service) (string, error) {
-	return c.serviceHost(service)
+	return c.serviceHost(service, 0)
 }
 
 // GetAllServiceHosts retrieves a list of all the nodes in the cluster that are running the provided service.
