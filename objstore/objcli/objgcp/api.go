@@ -78,8 +78,10 @@ func (o objectHandle) NewRangeReader(ctx context.Context, offset, length int64) 
 func (o objectHandle) NewWriter(ctx context.Context) writerAPI {
 	writer := writer{w: o.h.NewWriter(ctx)}
 
-	// Disable SDK upload chunking
-	writer.w.ChunkSize = 0
+	// Reduce the default chunk size from 16MiB; this avoids allocating large(er) amounts of memory for smaller uploads.
+	//
+	// NOTE: Chunking should not be disabled because that'll implicitly disable request retries.
+	writer.w.ChunkSize = ChunkSize
 
 	return writer
 }
