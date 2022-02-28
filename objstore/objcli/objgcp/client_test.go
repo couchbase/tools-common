@@ -384,7 +384,7 @@ func TestClientAppendToObjectUsingObjectComposition(t *testing.T) {
 
 	moAPI.AssertExpectations(t)
 	moAPI.AssertNumberOfCalls(t, "Attrs", 1)
-	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 3)
 	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
 	moAPI.AssertNumberOfCalls(t, "ComposerFrom", 1)
 	moAPI.AssertNumberOfCalls(t, "Delete", 1)
@@ -410,6 +410,10 @@ func TestClientDeleteObjects(t *testing.T) {
 
 	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return strings.HasPrefix(key, "key") })).Return(moAPI)
 
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
 	moAPI.On("Delete", mock.Anything).Return(nil)
 
 	client := &Client{serviceAPI: msAPI}
@@ -423,6 +427,7 @@ func TestClientDeleteObjects(t *testing.T) {
 	mbAPI.AssertNumberOfCalls(t, "Object", 3)
 
 	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 3)
 	moAPI.AssertNumberOfCalls(t, "Delete", 3)
 }
 
@@ -437,6 +442,10 @@ func TestClientDeleteDirectory(t *testing.T) {
 	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
 
 	mbAPI.On("Object", mock.Anything).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
 
 	fn1 := func(query *storage.Query) bool {
 		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
@@ -479,6 +488,7 @@ func TestClientDeleteDirectory(t *testing.T) {
 	miAPI.AssertNumberOfCalls(t, "Next", 3)
 
 	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 2)
 	moAPI.AssertNumberOfCalls(t, "Delete", 2)
 }
 
@@ -943,6 +953,10 @@ func TestClientUploadPartCopy(t *testing.T) {
 				return strings.HasPrefix(key, "dst-mpu-")
 			})).Return(mdoAPI)
 
+			mdoAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+				return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+			})).Return(mdoAPI)
+
 			mdoAPI.On("CopierFrom", mock.Anything).Return(mcAPI)
 
 			mcAPI.On("Run", mock.Anything).Return(nil, nil)
@@ -976,7 +990,8 @@ func TestClientUploadPartCopy(t *testing.T) {
 			msoAPI.AssertExpectations(t)
 			msoAPI.AssertNumberOfCalls(t, "Attrs", 1)
 
-			msoAPI.AssertExpectations(t)
+			mdoAPI.AssertExpectations(t)
+			mdoAPI.AssertNumberOfCalls(t, "Retryer", 1)
 			mdoAPI.AssertNumberOfCalls(t, "CopierFrom", 1)
 		})
 	}
@@ -995,6 +1010,10 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	mbAPI.On("Object", mock.MatchedBy(
 		func(key string) bool { return key == "key" || strings.HasPrefix(key, "key-") },
 	)).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
 
 	expected := make([]interface{}, 0, MaxComposable)
 
@@ -1050,6 +1069,10 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 
 	mbAPI.On("Object", mock.Anything).Return(moAPI)
 
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
 	moAPI.On("Delete", mock.Anything).Return(nil)
 
 	client := &Client{serviceAPI: msAPI}
@@ -1063,5 +1086,6 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 	mbAPI.AssertNumberOfCalls(t, "Object", 1)
 
 	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
 	moAPI.AssertNumberOfCalls(t, "Delete", 1)
 }

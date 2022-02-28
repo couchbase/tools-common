@@ -83,6 +83,17 @@ func (o objectHandle) NewWriter(ctx context.Context) writerAPI {
 	// NOTE: Chunking should not be disabled because that'll implicitly disable request retries.
 	writer.w.ChunkSize = ChunkSize
 
+	// Increase the chunk retry deadline from 32s; this means chunks that fail to upload will be retried for longer. As
+	// indicated in the SDK documentation:
+	//
+	// "The default value is 32s. Users may want to pick a longer deadline if they are using larger values for ChunkSize
+	// or if they expect to have a slow or unreliable internet connection."
+	//
+	// NOTE: This encompasses the time taken in the attempt to upload the chunk, as an example imagine the case where we
+	// timeout receiving the HTTP response headers after 30s, this leaves us only a small window to retry our request
+	// and it's quite possible that retries could be cut short unexpectedly.
+	writer.w.ChunkRetryDeadline = ChunkRetryDeadline
+
 	return writer
 }
 

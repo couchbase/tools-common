@@ -97,6 +97,9 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 	var (
 		md5sum = md5.New()
 		crc32c = crc32.New(crc32.MakeTable(crc32.Castagnoli))
+		// We always want to retry failed 'PutObject' requests, we generally have a lockfile which ensures (or we make
+		// the assumption) that we have exclusive access to a given path prefix in GCP so we don't need to worry about
+		// potentially overwriting objects.
 		writer = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways)).NewWriter(ctx)
 	)
 
@@ -153,7 +156,13 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	})
 
 	del := func(key string) error {
-		err := c.serviceAPI.Bucket(bucket).Object(key).Delete(context.Background())
+		var (
+			// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
+			// prefix in GCP, always retry.
+			handle = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
+			err    = handle.Delete(context.Background())
+		)
+
 		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
 			return handleError(bucket, key, err)
 		}
@@ -311,10 +320,13 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 
 	var (
 		intermediate = partKey(id, dst)
-		handle       = c.serviceAPI.Bucket(bucket).Object(src)
+		srcHdle      = c.serviceAPI.Bucket(bucket).Object(src)
+		// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
+		// destination object, always retry.
+		dstHdle = c.serviceAPI.Bucket(bucket).Object(intermediate).Retryer(storage.WithPolicy(storage.RetryAlways))
 	)
 
-	_, err = c.serviceAPI.Bucket(bucket).Object(intermediate).CopierFrom(handle).Run(context.Background())
+	_, err = dstHdle.CopierFrom(srcHdle).Run(context.Background())
 	if err != nil {
 		return objval.Part{}, handleError(bucket, intermediate, err)
 	}
@@ -369,19 +381,25 @@ func (c *Client) compose(bucket, key string, parts ...string) error {
 		handles = append(handles, c.serviceAPI.Bucket(bucket).Object(part))
 	}
 
-	_, err := c.serviceAPI.Bucket(bucket).Object(key).ComposerFrom(handles...).Run(context.Background())
+	var (
+		// Object composition is non-destructive from the source perspective and we don't mind potentially "overwriting"
+		// the destination object, always retry.
+		dst    = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
+		_, err = dst.ComposerFrom(handles...).Run(context.Background())
+	)
 
 	return handleError(bucket, key, err)
 }
 
 // cleanup attempts to remove the given keys, logging them if we receive an error.
 func (c *Client) cleanup(bucket string, keys ...string) {
-	if err := c.DeleteObjects(bucket, keys...); err == nil {
+	err := c.DeleteObjects(bucket, keys...)
+	if err == nil {
 		return
 	}
 
-	log.Errorf(`(Objaws) Failed to cleanup intermediate keys, they should be removed manually | {"keys":[%s]}`,
-		strings.Join(keys, ","))
+	log.Errorf(`(Objaws) Failed to cleanup intermediate keys, they should be removed manually `+
+		`| {"keys":[%s],"error":"%s"}`, strings.Join(keys, ","), err)
 }
 
 func (c *Client) AbortMultipartUpload(bucket, id, key string) error {
