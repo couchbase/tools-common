@@ -72,3 +72,11 @@ func TestMultiErrorStrings(t *testing.T) {
 		})
 	}
 }
+
+func TestMultiErrorErrOrNil(t *testing.T) {
+	me := new(MultiError)
+	require.Nil(t, me.ErrOrNil(), "received error when should have got nil")
+
+	me.Add(fmt.Errorf("oh no"))
+	require.Error(t, me.ErrOrNil(), "didn't get error when expected")
+}
