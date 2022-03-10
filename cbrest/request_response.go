@@ -54,6 +54,8 @@ type Request struct {
 	ExpectedStatusCode int
 
 	// Timeout overrides the default client timeout. If not set the client timeout will be used instead.
+	//
+	// NOTE: A value of -1 indicates that the timeout should be disabled.
 	Timeout time.Duration
 
 	// Idempotent indicates whether this request is idempotent and can be retried.

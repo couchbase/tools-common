@@ -28,6 +28,9 @@ var (
 	// ErrConnectionModeRequiresNonTLS is returned if the user attempts to connect using TLS when the connection mode
 	// requires non-TLS communication.
 	ErrConnectionModeRequiresNonTLS = errors.New("connection mode requires non-TLS communication")
+
+	// ErrStreamWithTimeout is returned if the user attempts to execute a stream with a non-zero timeout.
+	ErrStreamWithTimeout = errors.New("using a timeout when executing a streaming request is unsupported")
 )
 
 // BootstrapFailureError is returned to the user if we've failed to bootstrap the REST client.

@@ -530,6 +530,14 @@ func (c *Client) ExecuteStream(request *Request) (<-chan StreamingResponse, erro
 // 1) The remote connection closes the socket, in this case no error will be returned
 // 2) The given context is cancelled, again no error will be returned
 func (c *Client) ExecuteStreamWithContext(ctx context.Context, request *Request) (<-chan StreamingResponse, error) {
+	if request.Timeout != -1 && request.Timeout != 0 {
+		return nil, ErrStreamWithTimeout
+	}
+
+	// Use a timeout of -1 to indicate that we want to disable the 'Client.Timeout' since streaming responses may remain
+	// open indefinitely.
+	request.Timeout = -1
+
 	ctx = retry.NewContext(ctx)
 
 	resp, err := c.Do(ctx, request)
@@ -838,8 +846,8 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 
 	// We only use the custom timeout if it is bigger than the client one. This is so that it can be overridden via
 	// environmental variables.
-	if timeout > 0 && timeout > client.Timeout {
-		client = newHTTPClient(timeout, client.Transport)
+	if timeout == -1 || timeout > client.Timeout {
+		client = newHTTPClient(time.Duration(maths.MaxInt64(0, int64(timeout))), client.Transport)
 	}
 
 	resp, err := client.Do(req)

@@ -22,13 +22,14 @@ import (
 // newHTTPTransport returns a new HTTP transport using the given TLS config.
 func newHTTPTransport(tlsConfig *tls.Config) *http.Transport {
 	return &http.Transport{
-		DialContext:         (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2:   true,
-		IdleConnTimeout:     90 * time.Second,
-		MaxIdleConns:        100,
-		Proxy:               http.ProxyFromEnvironment,
-		TLSClientConfig:     tlsConfig,
-		TLSHandshakeTimeout: 10 * time.Second,
+		DialContext:           (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		ForceAttemptHTTP2:     true,
+		IdleConnTimeout:       90 * time.Second,
+		MaxIdleConns:          100,
+		Proxy:                 http.ProxyFromEnvironment,
+		ResponseHeaderTimeout: 10 * time.Second,
+		TLSClientConfig:       tlsConfig,
+		TLSHandshakeTimeout:   10 * time.Second,
 	}
 }
 

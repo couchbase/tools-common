@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1083,6 +1084,102 @@ func TestClientExecuteStream(t *testing.T) {
 	}
 
 	require.Equal(t, 5, responses)
+}
+
+func TestClientExecuteStreamNoTimeout(t *testing.T) {
+	os.Setenv("CB_REST_CLIENT_TIMEOUT_SECS", "50ms")
+	defer os.Unsetenv("CB_REST_CLIENT_TIMEOUT_SECS")
+
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithStream(t, 5, []byte(strings.Repeat("a", 4096))))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	stream, err := client.ExecuteStream(request)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	time.Sleep(100 * time.Millisecond)
+
+	var responses int
+
+	for response := range stream {
+		require.NoError(t, response.Error)
+
+		responses++
+	}
+
+	require.Equal(t, 5, responses)
+}
+
+func TestClientExecuteStreamAcceptMinusOneTimeout(t *testing.T) {
+	handlers := make(TestHandlers)
+	handlers.Add(http.MethodGet, "/test", NewTestHandlerWithStream(t, 5, []byte(`"payload"`)))
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+		Timeout:            -1,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	stream, err := client.ExecuteStream(request)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	var responses int
+
+	for response := range stream {
+		require.NoError(t, response.Error)
+
+		responses++
+	}
+
+	require.Equal(t, 5, responses)
+}
+
+func TestClientExecuteStreamDoNotAcceptTimeout(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		Service:            ServiceManagement,
+		Timeout:            time.Second,
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	_, err = client.ExecuteStream(request)
+	require.ErrorIs(t, err, ErrStreamWithTimeout)
 }
 
 func TestClientExecuteStreamCloseOnContextCancel(t *testing.T) {
