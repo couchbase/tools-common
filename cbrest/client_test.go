@@ -61,7 +61,7 @@ func TestNewClientWithTransportDefaults(t *testing.T) {
 	require.Equal(t, 100, transport.MaxIdleConns)
 	require.Equal(t, 90*time.Second, transport.IdleConnTimeout)
 	require.NotNil(t, transport.DialContext)
-	require.NotNil(t, transport.Proxy)
+	require.Nil(t, transport.Proxy)
 	require.NotNil(t, transport.TLSClientConfig)
 	require.True(t, transport.ForceAttemptHTTP2)
 }

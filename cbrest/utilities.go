@@ -26,7 +26,6 @@ func newHTTPTransport(tlsConfig *tls.Config) *http.Transport {
 		ForceAttemptHTTP2:     true,
 		IdleConnTimeout:       90 * time.Second,
 		MaxIdleConns:          100,
-		Proxy:                 http.ProxyFromEnvironment,
 		ResponseHeaderTimeout: 10 * time.Second,
 		TLSClientConfig:       tlsConfig,
 		TLSHandshakeTimeout:   10 * time.Second,
