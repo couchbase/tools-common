@@ -71,16 +71,14 @@ var (
 
 func TestNewTLSConfigMiscOptions(t *testing.T) {
 	config, err := NewTLSConfig(TLSConfigOptions{
-		ClientAuthType:           tls.VerifyClientCertIfGiven,
-		CipherSuites:             []uint16{8, 16, 32, 64, 128},
-		MinVersion:               42,
-		PreferServerCipherSuites: true,
+		ClientAuthType: tls.VerifyClientCertIfGiven,
+		CipherSuites:   []uint16{8, 16, 32, 64, 128},
+		MinVersion:     42,
 	})
 	require.NoError(t, err)
 	require.Equal(t, tls.VerifyClientCertIfGiven, config.ClientAuth)
 	require.Equal(t, []uint16{8, 16, 32, 64, 128}, config.CipherSuites)
 	require.Equal(t, uint16(42), config.MinVersion)
-	require.True(t, config.PreferServerCipherSuites)
 }
 
 func TestNewTLSConfigValidClientKeyPair(t *testing.T) {
@@ -115,7 +113,7 @@ func TestNewTLSConfigClientCAs(t *testing.T) {
 			ClientCAs:      validCertPEM,
 		})
 		require.NoError(t, err)
-		require.Len(t, config.ClientCAs.Subjects(), 1)
+		require.Len(t, config.ClientCAs.Subjects(), 1) //nolint:staticcheck
 		require.Nil(t, config.Certificates)
 	})
 
@@ -146,7 +144,7 @@ func TestNewTLSConfigValidRootCAs(t *testing.T) {
 	config, err := NewTLSConfig(TLSConfigOptions{RootCAs: validCertPEM})
 	require.NoError(t, err)
 	require.False(t, config.InsecureSkipVerify)
-	require.Len(t, config.RootCAs.Subjects(), len(pool.Subjects())+1)
+	require.Len(t, config.RootCAs.Subjects(), len(pool.Subjects())+1) //nolint:staticcheck
 	require.Nil(t, config.Certificates)
 
 	config, err = NewTLSConfig(TLSConfigOptions{})

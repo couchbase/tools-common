@@ -28,11 +28,10 @@ func NewTLSConfig(options TLSConfigOptions) (*tls.Config, error) {
 	}
 
 	config := &tls.Config{
-		CipherSuites:             options.CipherSuites,
-		ClientAuth:               options.ClientAuthType,
-		InsecureSkipVerify:       options.NoSSLVerify,
-		MinVersion:               options.MinVersion,
-		PreferServerCipherSuites: options.PreferServerCipherSuites,
+		CipherSuites:       options.CipherSuites,
+		ClientAuth:         options.ClientAuthType,
+		InsecureSkipVerify: options.NoSSLVerify,
+		MinVersion:         options.MinVersion,
 	}
 
 	err = populateClientCert(config, options)

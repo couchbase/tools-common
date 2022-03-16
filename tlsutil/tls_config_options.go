@@ -18,9 +18,8 @@ type TLSConfigOptions struct {
 	RootCAs     []byte
 	NoSSLVerify bool
 
-	CipherSuites             []uint16
-	MinVersion               uint16
-	PreferServerCipherSuites bool
+	CipherSuites []uint16
+	MinVersion   uint16
 }
 
 // Validate returns an error if the given TLS config is invalid for some reason.
