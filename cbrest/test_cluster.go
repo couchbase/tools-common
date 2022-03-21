@@ -67,7 +67,8 @@ func NewTestCluster(t *testing.T, options TestClusterOptions) *TestCluster {
 
 	// def will set the provided endpoint in the handlers if there isn't already a definition.
 	def := func(method string, endpoint Endpoint,
-		handler func(writer http.ResponseWriter, request *http.Request)) {
+		handler func(writer http.ResponseWriter, request *http.Request),
+	) {
 		_, ok := options.Handlers[fmt.Sprintf("%s:%s", method, endpoint)]
 		if ok {
 			return

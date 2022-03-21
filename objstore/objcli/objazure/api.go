@@ -39,12 +39,14 @@ type containerURL struct {
 }
 
 func (c containerURL) ListBlobsFlatSegment(ctx context.Context, marker azblob.Marker,
-	o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsFlatSegmentResponse, error) {
+	o azblob.ListBlobsSegmentOptions,
+) (*azblob.ListBlobsFlatSegmentResponse, error) {
 	return c.url.ListBlobsFlatSegment(ctx, marker, o)
 }
 
 func (c containerURL) ListBlobsHierarchySegment(ctx context.Context, marker azblob.Marker, delimiter string,
-	o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsHierarchySegmentResponse, error) {
+	o azblob.ListBlobsSegmentOptions,
+) (*azblob.ListBlobsHierarchySegmentResponse, error) {
 	return c.url.ListBlobsHierarchySegment(ctx, marker, delimiter, o)
 }
 
@@ -75,17 +77,20 @@ func (b blobURL) ToBlockBlobAPI() blockBlobAPI {
 }
 
 func (b blobURL) Delete(ctx context.Context, deleteOptions azblob.DeleteSnapshotsOptionType,
-	ac azblob.BlobAccessConditions) (*azblob.BlobDeleteResponse, error) {
+	ac azblob.BlobAccessConditions,
+) (*azblob.BlobDeleteResponse, error) {
 	return b.url.Delete(ctx, deleteOptions, ac)
 }
 
 func (b blobURL) Download(ctx context.Context, offset, count int64, ac azblob.BlobAccessConditions,
-	rangeGetContentMD5 bool, cpk azblob.ClientProvidedKeyOptions) (*azblob.DownloadResponse, error) {
+	rangeGetContentMD5 bool, cpk azblob.ClientProvidedKeyOptions,
+) (*azblob.DownloadResponse, error) {
 	return b.url.Download(ctx, offset, count, ac, rangeGetContentMD5, cpk)
 }
 
 func (b blobURL) GetProperties(ctx context.Context,
-	ac azblob.BlobAccessConditions, cpk azblob.ClientProvidedKeyOptions) (*azblob.BlobGetPropertiesResponse, error) {
+	ac azblob.BlobAccessConditions, cpk azblob.ClientProvidedKeyOptions,
+) (*azblob.BlobGetPropertiesResponse, error) {
 	return b.url.GetProperties(ctx, ac, cpk)
 }
 
@@ -122,20 +127,23 @@ func (b blockBlobURL) CommitBlockList(
 }
 
 func (b blockBlobURL) GetBlockList(ctx context.Context, listType azblob.BlockListType,
-	ac azblob.LeaseAccessConditions) (*azblob.BlockList, error) {
+	ac azblob.LeaseAccessConditions,
+) (*azblob.BlockList, error) {
 	return b.url.GetBlockList(ctx, listType, ac)
 }
 
 func (b blockBlobURL) StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker,
 	ac azblob.LeaseAccessConditions, transactionalMD5 []byte,
-	cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobStageBlockResponse, error) {
+	cpk azblob.ClientProvidedKeyOptions,
+) (*azblob.BlockBlobStageBlockResponse, error) {
 	return b.url.StageBlock(ctx, base64BlockID, body, ac, transactionalMD5, cpk)
 }
 
 func (b blockBlobURL) StageBlockFromURL(ctx context.Context, base64BlockID string, sourceURL url.URL,
 	offset, count int64, destinationAccessConditions azblob.LeaseAccessConditions,
 	sourceAccessConditions azblob.ModifiedAccessConditions,
-	cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobStageBlockFromURLResponse, error) {
+	cpk azblob.ClientProvidedKeyOptions,
+) (*azblob.BlockBlobStageBlockFromURLResponse, error) {
 	return b.url.StageBlockFromURL(ctx, base64BlockID, sourceURL, offset, count, destinationAccessConditions,
 		sourceAccessConditions, cpk)
 }
@@ -146,6 +154,7 @@ func (b blockBlobURL) URL() url.URL {
 
 func (b blockBlobURL) Upload(ctx context.Context, body io.ReadSeeker, h azblob.BlobHTTPHeaders,
 	metadata azblob.Metadata, ac azblob.BlobAccessConditions, tier azblob.AccessTierType,
-	blobTagsMap azblob.BlobTagsMap, cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobUploadResponse, error) {
+	blobTagsMap azblob.BlobTagsMap, cpk azblob.ClientProvidedKeyOptions,
+) (*azblob.BlockBlobUploadResponse, error) {
 	return b.url.Upload(ctx, body, h, metadata, ac, tier, blobTagsMap, cpk)
 }

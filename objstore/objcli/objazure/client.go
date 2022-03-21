@@ -201,7 +201,8 @@ func (c *Client) DeleteDirectory(bucket, prefix string) error {
 }
 
 func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc) error {
+	fn objcli.IterateFunc,
+) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
@@ -233,7 +234,8 @@ func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclu
 //
 // NOTE: The returned marker should be used for the next call to 'listBlobs' to retrieve the next page of items.
 func (c *Client) listBlobs(containerURL containerAPI, marker azblob.Marker, delimiter string,
-	options azblob.ListBlobsSegmentOptions) ([]*objval.ObjectAttrs, azblob.Marker, error) {
+	options azblob.ListBlobsSegmentOptions,
+) ([]*objval.ObjectAttrs, azblob.Marker, error) {
 	if delimiter == "" {
 		return c.listBlobsFlat(containerURL, marker, options)
 	}
@@ -243,7 +245,8 @@ func (c *Client) listBlobs(containerURL containerAPI, marker azblob.Marker, deli
 
 // listBlobsFlat performs a flat blob listing returning a page of objects.
 func (c *Client) listBlobsFlat(containerURL containerAPI, marker azblob.Marker,
-	options azblob.ListBlobsSegmentOptions) ([]*objval.ObjectAttrs, azblob.Marker, error) {
+	options azblob.ListBlobsSegmentOptions,
+) ([]*objval.ObjectAttrs, azblob.Marker, error) {
 	resp, err := containerURL.ListBlobsFlatSegment(context.Background(), marker, options)
 	if err != nil {
 		return nil, azblob.Marker{}, err // Purposefully not wrapped
@@ -264,7 +267,8 @@ func (c *Client) listBlobsFlat(containerURL containerAPI, marker azblob.Marker,
 
 // listBlobsHier performs a hierarchical blob listing returning a page of directory stubs/blobs.
 func (c *Client) listBlobsHier(containerURL containerAPI, marker azblob.Marker, delimiter string,
-	options azblob.ListBlobsSegmentOptions) ([]*objval.ObjectAttrs, azblob.Marker, error) {
+	options azblob.ListBlobsSegmentOptions,
+) ([]*objval.ObjectAttrs, azblob.Marker, error) {
 	resp, err := containerURL.ListBlobsHierarchySegment(context.Background(), marker, delimiter, options)
 	if err != nil {
 		return nil, azblob.Marker{}, err // Purposefully not wrapped
@@ -290,7 +294,8 @@ func (c *Client) listBlobsHier(containerURL containerAPI, marker azblob.Marker, 
 // iterateObjects iterates over the given segment (<=5000) of objects executing the given function for each object which
 // has not been explicitly ignored by the user.
 func (c *Client) iterateObjects(objects []*objval.ObjectAttrs, include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc) error {
+	fn objcli.IterateFunc,
+) error {
 	for _, attrs := range objects {
 		if objcli.ShouldIgnore(attrs.Key, include, exclude) {
 			continue

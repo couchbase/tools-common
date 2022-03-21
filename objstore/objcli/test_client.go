@@ -134,7 +134,8 @@ func (t *TestClient) DeleteDirectory(bucket, prefix string) error {
 }
 
 func (t *TestClient) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
-	fn IterateFunc) error {
+	fn IterateFunc,
+) error {
 	if include != nil && exclude != nil {
 		return ErrIncludeAndExcludeAreMutuallyExclusive
 	}
@@ -215,7 +216,8 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 }
 
 func (t *TestClient) UploadPartCopy(bucket, id, dst, src string, number int,
-	br *objval.ByteRange) (objval.Part, error) {
+	br *objval.ByteRange,
+) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

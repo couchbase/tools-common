@@ -81,7 +81,8 @@ func NewTestHandlerWithStreamHijack(t *testing.T) http.HandlerFunc {
 // NewTestHandlerWithRetries builds upon the basic handler by simulating a flaky/busy endpoint which forces retries a
 // configurable number of times before providing a valid response.
 func NewTestHandlerWithRetries(t *testing.T, numRetries, retryStatus, successStatus int,
-	after string, body []byte) http.HandlerFunc {
+	after string, body []byte,
+) http.HandlerFunc {
 	var retries int
 
 	return func(writer http.ResponseWriter, request *http.Request) {

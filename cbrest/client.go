@@ -839,7 +839,8 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 // perform synchronously executes the provided request returning the response and any error that occurred during the
 // process.
 func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
-	timeout time.Duration) (*http.Response, error) {
+	timeout time.Duration,
+) (*http.Response, error) {
 	log.Logf(level, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", ctx.Attempt(), req.Method, req.URL)
 
 	client := c.client
