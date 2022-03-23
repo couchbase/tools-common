@@ -11,17 +11,17 @@ import (
 )
 
 func TestCacheNew(t *testing.T) {
-	expected := &Cache{
+	expected := &Cache[int, string]{
 		capacity: 42,
 		list:     list.New(),
-		elements: make(map[interface{}]*list.Element),
+		elements: make(map[int]*list.Element),
 	}
 
-	require.Equal(t, expected, New(42))
+	require.Equal(t, expected, New[int, string](42))
 }
 
 func TestCacheGeneralUse(t *testing.T) {
-	cache := New(42)
+	cache := New[string, string](42)
 
 	require.Equal(t, 0, cache.list.Len())
 	require.Len(t, cache.elements, 0)
@@ -50,21 +50,24 @@ func TestCacheGeneralUse(t *testing.T) {
 }
 
 func TestCacheOverCapacity(t *testing.T) {
-	cache := New(2)
+	cache := New[string, string](2)
 
 	require.False(t, cache.Set("key1", "value1"))
-	require.Equal(t, &item{key: "key1", value: "value1"}, cache.list.Front().Value.(*item))
+	require.Equal(t,
+		&item[string, string]{key: "key1", value: "value1"}, cache.list.Front().Value.(*item[string, string]))
 
 	require.False(t, cache.Set("key2", "value2"))
-	require.Equal(t, &item{key: "key2", value: "value2"}, cache.list.Front().Value.(*item))
+	require.Equal(t,
+		&item[string, string]{key: "key2", value: "value2"}, cache.list.Front().Value.(*item[string, string]))
 
 	require.False(t, cache.Set("key3", "value3"))
-	require.Equal(t, &item{key: "key3", value: "value3"}, cache.list.Front().Value.(*item))
+	require.Equal(t,
+		&item[string, string]{key: "key3", value: "value3"}, cache.list.Front().Value.(*item[string, string]))
 
 	require.False(t, cache.Has("key1"))
 
 	val, ok := cache.Get("key1")
-	require.Nil(t, val)
+	require.Zero(t, val)
 	require.False(t, ok)
 
 	require.True(t, cache.Has("key2"))
@@ -75,7 +78,7 @@ func TestCacheOverCapacity(t *testing.T) {
 }
 
 func TestCacheForEach(t *testing.T) {
-	cache := New(42)
+	cache := New[string, string](42)
 
 	for i := 1; i <= 84; i++ {
 		require.False(t, cache.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i)))
@@ -84,7 +87,7 @@ func TestCacheForEach(t *testing.T) {
 	// Should come out in reverse order
 	i := 84
 
-	err := cache.ForEach(func(key, value interface{}) error {
+	err := cache.ForEach(func(key, value string) error {
 		require.Equal(t, fmt.Sprintf("key%d", i), key)
 		require.Equal(t, fmt.Sprintf("value%d", i), value)
 		i--
@@ -94,7 +97,7 @@ func TestCacheForEach(t *testing.T) {
 }
 
 func TestCacheForEachPropagateUserError(t *testing.T) {
-	cache := New(42)
+	cache := New[string, string](42)
 
 	for i := 1; i <= 84; i++ {
 		require.False(t, cache.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i)))
@@ -102,13 +105,13 @@ func TestCacheForEachPropagateUserError(t *testing.T) {
 
 	var called int
 
-	err := cache.ForEach(func(key, value interface{}) error { called++; return assert.AnError })
+	err := cache.ForEach(func(key, value string) error { called++; return assert.AnError })
 	require.ErrorIs(t, err, assert.AnError)
 	require.Equal(t, 1, called)
 }
 
 func BenchmarkCacheSetSameKey(b *testing.B) {
-	cache := New(1024)
+	cache := New[string, string](1024)
 
 	for i := 0; i < b.N; i++ {
 		cache.Set("key", "value")
@@ -116,7 +119,7 @@ func BenchmarkCacheSetSameKey(b *testing.B) {
 }
 
 func BenchmarkCacheDifferentKey(b *testing.B) {
-	cache := New(1024)
+	cache := New[string, string](1024)
 
 	for i := 0; i < b.N; i++ {
 		cache.Set("key"+strconv.Itoa(i), "value")
@@ -124,7 +127,7 @@ func BenchmarkCacheDifferentKey(b *testing.B) {
 }
 
 func BenchmarkCacheEviction(b *testing.B) {
-	cache := New(0)
+	cache := New[string, string](0)
 
 	for i := 0; i < b.N; i++ {
 		cache.Set("key", "value")
