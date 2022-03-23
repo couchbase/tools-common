@@ -5,32 +5,39 @@ linters:
   fast: false
   enable:
     - asciicheck
-    - bodyclose
+    # - bodyclose
     - deadcode
     - dogsled
     - godox
     - gofmt
     - gofumpt
     - goimports
-    - gosimple
+    # - gosimple
     - ineffassign
     - lll
     - misspell
     - nakedret
     - nestif
-    - nolintlint
+    # - nolintlint
     - prealloc
     - revive
-    - rowserrcheck
-    - sqlclosecheck
-    - staticcheck
-    - structcheck
+    # - rowserrcheck
+    # - sqlclosecheck
+    # - staticcheck
+    # - structcheck
     - unconvert
-    - unparam
+    # - unparam
     - varcheck
-    - wastedassign
+    # - wastedassign
     - whitespace
     - wsl
+  disable:
+    - gosimple
+    - staticcheck
+    - structcheck
+    - unused
+run:
+  go: 1.18
 linters-settings:
   lll:
     line-length: 120
