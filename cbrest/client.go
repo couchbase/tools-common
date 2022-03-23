@@ -848,7 +848,7 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 	// We only use the custom timeout if it is bigger than the client one. This is so that it can be overridden via
 	// environmental variables.
 	if timeout == -1 || timeout > client.Timeout {
-		client = newHTTPClient(time.Duration(maths.MaxInt64(0, int64(timeout))), client.Transport)
+		client = newHTTPClient(maths.Max(0, timeout), client.Transport)
 	}
 
 	resp, err := client.Do(req)

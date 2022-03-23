@@ -28,7 +28,7 @@ func (c ChunkReader) ForEach(fn func(chunk *io.SectionReader) error) error {
 	}
 
 	for s, e := int64(0), c.size-1; s < length; s, e = s+c.size, e+c.size {
-		if err := fn(io.NewSectionReader(c.reader, s, maths.MinInt64(e+1, length)-s)); err != nil {
+		if err := fn(io.NewSectionReader(c.reader, s, maths.Min(e+1, length)-s)); err != nil {
 			return err
 		}
 	}

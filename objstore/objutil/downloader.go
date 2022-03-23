@@ -44,7 +44,7 @@ type MPDownloaderOptions struct {
 
 // defaults populates the options with sensible defaults.
 func (m *MPDownloaderOptions) defaults() {
-	m.PartSize = maths.MaxInt64(m.PartSize, MinPartSize)
+	m.PartSize = maths.Max(m.PartSize, MinPartSize)
 }
 
 // MPDownloader is a multipart downloader which downloads an object from a remote cloud by performing multiple requests
@@ -98,7 +98,7 @@ func (m *MPDownloader) download(br *objval.ByteRange) error {
 
 	for s, e := br.Start, m.opts.PartSize-1; s <= br.End; s, e = s+m.opts.PartSize, e+m.opts.PartSize {
 		// Can ignore this error, the same error will be propagated by the call to 'Stop' below.
-		if err := queue(&objval.ByteRange{Start: s, End: maths.MinInt64(e, br.End)}); err != nil {
+		if err := queue(&objval.ByteRange{Start: s, End: maths.Min(e, br.End)}); err != nil {
 			break
 		}
 	}

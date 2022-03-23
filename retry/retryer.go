@@ -121,8 +121,8 @@ func (r Retryer) duration(attempt int) time.Duration {
 		return r.options.MaxDelay
 	}
 
-	duration = time.Duration(maths.MaxInt64(int64(r.options.MinDelay), int64(duration)))
-	duration = time.Duration(maths.MinInt64(int64(r.options.MaxDelay), int64(duration)))
+	duration = maths.Max(r.options.MinDelay, duration)
+	duration = maths.Min(r.options.MaxDelay, duration)
 
 	return duration
 }

@@ -117,7 +117,7 @@ func waitForRetryAfter(resp *http.Response) {
 		return
 	}
 
-	time.Sleep(time.Duration(maths.MinInt64(int64(duration), int64(time.Minute))))
+	time.Sleep(maths.Min(duration, time.Minute))
 }
 
 // waitForRetryDuration returns the duration to wait until we've satisfied the given 'Retry-After' header.

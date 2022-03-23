@@ -62,8 +62,8 @@ type UploadOptions struct {
 
 // defaults populates the options with sensible defaults.
 func (u *UploadOptions) defaults() {
-	u.PartSize = maths.MaxInt64(u.PartSize, MinPartSize)
-	u.MPUThreshold = maths.MaxInt64(u.MPUThreshold, MPUThreshold)
+	u.PartSize = maths.Max(u.PartSize, MinPartSize)
+	u.MPUThreshold = maths.Max(u.MPUThreshold, MPUThreshold)
 }
 
 // Upload an object to a remote cloud breaking it down into a multipart upload if the body is over a given size.
