@@ -1,7 +1,7 @@
 package pqutil
 
 // Item encapsulates a payload and its priority.
-type Item struct {
-	Payload  interface{}
+type Item[T any] struct {
+	Payload  T
 	Priority int
 }
