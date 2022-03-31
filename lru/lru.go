@@ -3,25 +3,23 @@ package lru
 
 import (
 	"container/list"
-
-	"golang.org/x/exp/constraints"
 )
 
 // item is a wrapper type used to track key/value pairs.
-type item[K constraints.Ordered, V any] struct {
+type item[K comparable, V any] struct {
 	key   K
 	value V
 }
 
 // Cache exposes an interface for an LRU cache.
-type Cache[K constraints.Ordered, V any] struct {
+type Cache[K comparable, V any] struct {
 	capacity int
 	list     *list.List
 	elements map[K]*list.Element
 }
 
 // New returns a new cache with the given capacity.
-func New[K constraints.Ordered, V any](capacity uint) *Cache[K, V] {
+func New[K comparable, V any](capacity uint) *Cache[K, V] {
 	return &Cache[K, V]{
 		capacity: int(capacity),
 		list:     list.New(),
