@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/couchbase/tools-common/slice"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -85,7 +85,7 @@ func Parse(connectionString string) (*ConnectionString, error) {
 		Scheme: parts[2],
 	}
 
-	if !slice.ContainsString([]string{"", "http", "https", "couchbase", "couchbases"}, parsed.Scheme) {
+	if !slices.Contains([]string{"", "http", "https", "couchbase", "couchbases"}, parsed.Scheme) {
 		return nil, ErrBadScheme
 	}
 

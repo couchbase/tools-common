@@ -1,24 +1,18 @@
 package slice
 
-// UnionString returns a slice of elements that are present in both input slices.
+import "github.com/couchbase/tools-common/maputil"
+
+// Union returns a slice of elements that are present in both input slices.
 //
 // NOTE: The returned slice will not contain any duplicates.
-func UnionString(a, b []string) []string {
-	unionMap := make(map[string]uint8)
+func Union[S []E, E comparable](a, b S) S {
+	union := make(map[E]uint64)
 
-	for _, slice := range [][]string{a, b} {
+	for _, slice := range []S{a, b} {
 		for _, v := range slice {
-			unionMap[v]++
+			union[v]++
 		}
 	}
 
-	union := make([]string, 0, len(unionMap))
-
-	for val, count := range unionMap {
-		if count > 1 {
-			union = append(union, val)
-		}
-	}
-
-	return union
+	return maputil.Keys(union, func(_ E, v uint64) bool { return v > 1 })
 }

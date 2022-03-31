@@ -1,9 +1,9 @@
 package slice
 
-// SubsetStrings - Returns a boolean indicating whether a, is a subset of b.
+// Subset returns a boolean indicating whether a, is a subset of b.
 //
 // NOTE: Returns true if a has zero elements since an empty set is a subset of all sets.
-func SubsetStrings(a, b []string) bool {
+func Subset[S []E, E comparable](a, b S) bool {
 	if len(a) == 0 {
 		return true
 	}
@@ -12,7 +12,8 @@ func SubsetStrings(a, b []string) bool {
 		return false
 	}
 
-	conv := make(map[string]struct{})
+	conv := make(map[E]struct{})
+
 	for _, e := range b {
 		conv[e] = struct{}{}
 	}

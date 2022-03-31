@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSubsetStrings(t *testing.T) {
+func TestSubset(t *testing.T) {
 	type test struct {
 		name     string
 		a, b     []string
@@ -54,7 +54,7 @@ func TestSubsetStrings(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, SubsetStrings(test.a, test.b))
+			require.Equal(t, test.expected, Subset(test.a, test.b))
 		})
 	}
 }

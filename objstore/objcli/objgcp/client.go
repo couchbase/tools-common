@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
+	"golang.org/x/exp/slices"
 	"google.golang.org/api/iterator"
 
 	"github.com/couchbase/tools-common/hofp"
@@ -19,11 +22,7 @@ import (
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
-	"github.com/couchbase/tools-common/slice"
 	"github.com/couchbase/tools-common/system"
-
-	"cloud.google.com/go/storage"
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in Google Storage.
@@ -348,8 +347,8 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 	}
 
 	// Object composition may use the source object in the output, ensure that we don't delete it by mistake
-	if idx := slice.FindString(converted, key); idx >= 0 {
-		converted, _ = slice.RemoveStringAt(converted, idx)
+	if idx := slices.Index(converted, key); idx >= 0 {
+		converted = slices.Delete(converted, idx, idx+1)
 	}
 
 	c.cleanup(bucket, converted...)

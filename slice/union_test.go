@@ -41,7 +41,7 @@ func TestUnionString(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			out := UnionString(tc.a, tc.b)
+			out := Union(tc.a, tc.b)
 			sort.Strings(out)
 			require.Equal(t, tc.expected, out)
 		})

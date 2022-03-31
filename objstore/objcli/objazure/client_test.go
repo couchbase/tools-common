@@ -20,10 +20,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objval"
-	"github.com/couchbase/tools-common/slice"
 )
 
 // responseField is the unexported field used by the Azure SDK to store the HTTP response. We access/set/modify this
@@ -436,7 +436,7 @@ func TestClientAppendToObject(t *testing.T) {
 	).Return(nil, nil)
 
 	fn3 := func(parts []string) bool {
-		return len(parts) == 2 && slice.ContainsString(parts, "blob")
+		return len(parts) == 2 && slices.Contains(parts, "blob")
 	}
 
 	mBlockAPI.On(
@@ -1230,7 +1230,7 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
 
 	fn1 := func(parts []string) bool {
-		return slice.EqualStrings(parts, []string{"blob1", "blob2", "blob3"})
+		return slices.Equal(parts, []string{"blob1", "blob2", "blob3"})
 	}
 
 	mBlockAPI.On(

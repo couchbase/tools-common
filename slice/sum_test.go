@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSumFloat64(t *testing.T) {
+func TestSum(t *testing.T) {
 	type test struct {
 		name     string
 		s        []float64
@@ -35,7 +35,7 @@ func TestSumFloat64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := SumFloat64(test.s)
+			actual := Sum(test.s)
 			require.Equal(t, test.expected, actual)
 		})
 	}

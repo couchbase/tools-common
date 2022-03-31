@@ -24,7 +24,8 @@ import (
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/retry"
-	"github.com/couchbase/tools-common/slice"
+
+	"golang.org/x/exp/slices"
 )
 
 // NOTE: Naming conventions for requests/responses in this file, are as follows:
@@ -717,14 +718,14 @@ func (c *Client) shouldRetryWithResponse(ctx *retry.Context, request *Request, r
 
 	// Either this request can't be retried, or the user has explicitly stated that they don't want this status code
 	// retried, don't retry.
-	if !request.IsIdempotent() || slice.ContainsInt(request.NoRetryOnStatusCodes, resp.StatusCode) {
+	if !request.IsIdempotent() || slices.Contains(request.NoRetryOnStatusCodes, resp.StatusCode) {
 		return false
 	}
 
 	var (
-		updateCC = slice.ContainsInt([]int{http.StatusUnauthorized}, resp.StatusCode)
+		updateCC = slices.Contains([]int{http.StatusUnauthorized}, resp.StatusCode)
 		retry    = updateCC || netutil.IsTemporaryFailure(resp.StatusCode) ||
-			slice.ContainsInt(request.RetryOnStatusCodes, resp.StatusCode)
+			slices.Contains(request.RetryOnStatusCodes, resp.StatusCode)
 	)
 
 	if !retry {
