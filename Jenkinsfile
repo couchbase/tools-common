@@ -56,14 +56,12 @@ pipeline {
                     sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT_VERSION}/install.sh | sh -s -- -b ${GOBIN} ${GOLANGCI_LINT_VERSION}"
                     sh "golangci-lint --version"
 
-                    withEnv(["GO111MODULE=off"]) {
-                        // Unit test reporting
-                        sh "go get github.com/jstemmer/go-junit-report"
+                    // Unit test reporting
+                    sh "go install github.com/jstemmer/go-junit-report@latest"
 
-                        // Coverage reporting
-                        sh "go get github.com/axw/gocov/gocov"
-                        sh "go get github.com/AlekSi/gocov-xml"
-                    }
+                    // Coverage reporting
+                    sh "go install github.com/jhendrixMSFT/gocov/gocov@v1.0.1-0.20220325195445-df8497555dba"
+                    sh "go install github.com/AlekSi/gocov-xml@latest"
 
                     // clone project
                     sh "git clone git@github.com:couchbase/tools-common.git"
