@@ -12,13 +12,13 @@ var (
 	numCPUOnce sync.Once
 )
 
-// NumCPU returns the number of vCPUs detected by the runtime multiplied by a constant. This function should be used
-// when determining how many Goroutines to create for performing short running tasks which benefit from being performed
-// concurrently. We currently multiply the value by 0.75 to avoid over-saturating the CPU in cases where multiple
-// instances of cbbackupmgr can be run on a single machine e.g. when running info during a merge.
+// NumCPU returns GOMAXPROCS (defaults to vCPUs) detected by the runtime multiplied by a constant. This function should
+// be used when determining how many Goroutines to create for performing short running tasks which benefit from being
+// performed concurrently. We currently multiply the value by 0.75 to avoid over-saturating the CPU in cases where
+// multiple instances of cbbackupmgr can be run on a single machine e.g. when running info during a merge.
 func NumCPU() int {
 	numCPUOnce.Do(func() {
-		numCPU = maths.Max(1, int(float64(runtime.NumCPU())*0.75))
+		numCPU = maths.Max(1, int(float64(runtime.GOMAXPROCS(0))*0.75))
 	})
 
 	return numCPU
