@@ -1,6 +1,7 @@
 package system
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"regexp"
@@ -8,8 +9,27 @@ import (
 	"strings"
 )
 
-// totalMemory returns the total physical memory available on the host machine in bytes.
+// totalMemory returns the total physical memory available on the host machine in bytes, or the cgroup limit if one has
+// been specified
 func totalMemory() (uint64, error) {
+	computerMem, err := readMemInfo()
+	if err != nil {
+		return 0, err
+	}
+
+	cGroupLimit, err := getCGroupMemoryLimit()
+	if err != nil && !errors.Is(err, errNoLimitSpecified) {
+		return 0, err
+	}
+
+	if err != nil || cGroupLimit > computerMem || cGroupLimit == 0 {
+		return computerMem, nil
+	}
+
+	return cGroupLimit, nil
+}
+
+func readMemInfo() (uint64, error) {
 	meminfo, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, fmt.Errorf("failed to read '/proc/meminfo': %w", err)
