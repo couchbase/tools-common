@@ -7,6 +7,8 @@ import (
 	"cloud.google.com/go/storage"
 )
 
+//go:generate mockery --all --case underscore --inpackage
+
 // storageAPI is a top level interface which allows interactions with Google cloud storage.
 type serviceAPI interface {
 	Bucket(name string) bucketAPI

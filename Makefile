@@ -4,6 +4,9 @@ TESTS=
 coverage:
 	@go test ./$(PACKAGE)/... -run=$(TESTS) -count=1 -covermode=atomic -coverprofile=coverage.out -failfast -shuffle=on && go tool cover -html=coverage.out
 
+generate:
+	@go generate ./$(PACKAGE)/...
+
 lint:
 	@golangci-lint run
 
@@ -13,4 +16,4 @@ test:
 clean:
 	@rm -f coverage.out
 
-.PHONY: coverage test lint clean
+.PHONY: coverage generate lint test clean

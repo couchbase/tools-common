@@ -8,6 +8,8 @@ import (
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
+//go:generate mockery --all --case underscore --inpackage
+
 // blobStorageAPI is a top level interface which allows interactions with the Azure blob storage service.
 type blobStorageAPI interface {
 	ToContainerAPI(container string) containerAPI

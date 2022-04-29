@@ -2,6 +2,8 @@ package objaws
 
 import "github.com/aws/aws-sdk-go/service/s3"
 
+//go:generate mockery --all --case underscore --inpackage
+
 // serviceAPI is the minimal subset of functions that we use from the AWS SDK, this allows for a greatly reduce surface
 // area for mock generation.
 type serviceAPI interface {
