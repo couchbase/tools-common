@@ -7,15 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
-	"unsafe"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
@@ -26,42 +23,8 @@ import (
 	"github.com/couchbase/tools-common/slice"
 )
 
-// responseField is the unexported field used by the Azure SDK to store the HTTP response. We access/set/modify this
-// field for unit testing purposes.
-const responseField = "rawResponse"
-
-// accessUnexportedField the Azure SDK returns structs which encapsulate a '*http.Response', to be able to mock the API
-// we need to be able to access fields from these unexported structs.
-func accessUnexportedField(value reflect.Value, field string) reflect.Value {
-	return value.Elem().FieldByName(field)
-}
-
-// allocateUnexportedField the Azure SDK may return a struct which has a pointer field to an unexported struct, we need
-// to be able to allocate this field so that we can assign to the encapsulated '*http.Response'.
-func allocateUnexportedField(field reflect.Value) reflect.Value {
-	return reflect.New(field.Type().Elem())
-}
-
-// assignToUnexportedField the Azure SDK returns structs which encapsulate a '*http.Response'; these structs are all
-// unexported (but expose public functions). To be able to mock the API we must be able to assign to these unexported
-// fields.
-func assignToUnexportedField(field reflect.Value, value interface{}) {
-	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
-}
-
-type mockError struct {
-	resp  *http.Response
-	inner azblob.ServiceCodeType
-}
-
-func (e *mockError) Error() string                       { return "" }
-func (e *mockError) Timeout() bool                       { return false }
-func (e *mockError) Temporary() bool                     { return false }
-func (e *mockError) Response() *http.Response            { return e.resp }
-func (e *mockError) ServiceCode() azblob.ServiceCodeType { return e.inner }
-
 func TestNewClient(t *testing.T) {
-	require.Equal(t, &Client{storageAPI: serviceURL{url: azblob.ServiceURL{}}}, NewClient(azblob.ServiceURL{}))
+	require.Equal(t, &Client{storageAPI: serviceClient{client: nil}}, NewClient(nil))
 }
 
 func TestClientProvider(t *testing.T) {
@@ -71,39 +34,27 @@ func TestClientProvider(t *testing.T) {
 func TestClientGetObject(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
-		mcAPI = &mockContainerAPI{}
 		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mbAPI)
+	output := azblob.BlobDownloadResponse{}
 
-	output := &azblob.DownloadResponse{}
-	r := accessUnexportedField(reflect.ValueOf(output), "r")
-
-	allocated := allocateUnexportedField(r)
-	rawResponse := accessUnexportedField(allocated, responseField)
-
-	assignToUnexportedField(rawResponse, &http.Response{
-		Header: http.Header{
-			"Content-Length": {"42"},
-			"Last-Modified":  {(time.Time{}).Add(24 * time.Hour).Format(time.RFC1123)},
-		},
+	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
+	output.ContentLength = aws.Int64(42)
+	output.RawResponse = &http.Response{
 		Body: io.NopCloser(strings.NewReader("value")),
-	})
-
-	assignToUnexportedField(r, allocated.Interface())
+	}
 
 	mbAPI.On(
 		"Download",
 		mock.Anything,
-		mock.MatchedBy(func(offset int64) bool { return offset == 0 }),
-		mock.MatchedBy(func(length int64) bool { return length == 0 }),
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
+		mock.MatchedBy(func(o azblob.BlobDownloadOptions) bool { return *o.Offset == 0 && *o.Count == 0 }),
 	).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
@@ -123,10 +74,7 @@ func TestClientGetObject(t *testing.T) {
 	require.Equal(t, expected, object)
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
-
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
 	mbAPI.AssertExpectations(t)
 	mbAPI.AssertNumberOfCalls(t, "Download", 1)
@@ -135,39 +83,27 @@ func TestClientGetObject(t *testing.T) {
 func TestClientGetObjectWithByteRange(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
-		mcAPI = &mockContainerAPI{}
 		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mbAPI)
+	output := azblob.BlobDownloadResponse{}
 
-	output := &azblob.DownloadResponse{}
-	r := accessUnexportedField(reflect.ValueOf(output), "r")
-
-	allocated := allocateUnexportedField(r)
-	rawResponse := accessUnexportedField(allocated, responseField)
-
-	assignToUnexportedField(rawResponse, &http.Response{
-		Header: http.Header{
-			"Content-Length": {"42"},
-			"Last-Modified":  {(time.Time{}).Add(24 * time.Hour).Format(time.RFC1123)},
-		},
+	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
+	output.ContentLength = aws.Int64(42)
+	output.RawResponse = &http.Response{
 		Body: io.NopCloser(strings.NewReader("value")),
-	})
-
-	assignToUnexportedField(r, allocated.Interface())
+	}
 
 	mbAPI.On(
 		"Download",
 		mock.Anything,
-		mock.MatchedBy(func(offset int64) bool { return offset == 64 }),
-		mock.MatchedBy(func(length int64) bool { return length == 65 }),
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
+		mock.MatchedBy(func(o azblob.BlobDownloadOptions) bool { return *o.Offset == 64 && *o.Count == 65 }),
 	).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
@@ -187,10 +123,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 	require.Equal(t, expected, object)
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
-
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
 	mbAPI.AssertExpectations(t)
 	mbAPI.AssertNumberOfCalls(t, "Download", 1)
@@ -209,27 +142,22 @@ func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 func TestClientGetObjectAttrs(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
-		mcAPI = &mockContainerAPI{}
 		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mbAPI)
+	output := azblob.BlobGetPropertiesResponse{}
 
-	output := &azblob.BlobGetPropertiesResponse{}
-	rawResponse := accessUnexportedField(reflect.ValueOf(output), responseField)
+	output.ContentLength = aws.Int64(42)
+	output.ETag = aws.String("etag")
+	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
 
-	assignToUnexportedField(rawResponse, &http.Response{
-		Header: http.Header{
-			"Content-Length": {"42"},
-			"Etag":           {"etag"},
-			"Last-Modified":  {(time.Time{}).Add(24 * time.Hour).Format(time.RFC1123)},
-		},
-	})
-
-	mbAPI.On("GetProperties", mock.Anything, mock.Anything, mock.Anything).Return(output, nil)
+	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -246,10 +174,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	require.Equal(t, expected, attrs)
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
-
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
 	mbAPI.AssertExpectations(t)
 	mbAPI.AssertNumberOfCalls(t, "GetProperties", 1)
@@ -257,40 +182,29 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 func TestClientPutObject(t *testing.T) {
 	var (
-		msAPI     = &mockBlobStorageAPI{}
-		mcAPI     = &mockContainerAPI{}
-		mBlobAPI  = &mockBlobAPI{}
-		mBlockAPI = &mockBlockBlobAPI{}
+		msAPI = &mockBlobStorageAPI{}
+		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mBlobAPI)
+	output := azblob.BlockBlobUploadResponse{}
 
-	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
-
-	fn1 := func(headers azblob.BlobHTTPHeaders) bool {
+	fn1 := func(options azblob.BlockBlobUploadOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
-		return bytes.Equal(headers.ContentMD5, expected[:])
+		return bytes.Equal(options.TransactionalContentMD5, expected[:])
 	}
 
-	output := &azblob.BlockBlobUploadResponse{}
-	rawResponse := accessUnexportedField(reflect.ValueOf(output), responseField)
-
-	assignToUnexportedField(rawResponse, &http.Response{})
-
-	mBlockAPI.On(
+	mbAPI.On(
 		"Upload",
 		mock.Anything,
 		strings.NewReader("value"),
 		mock.MatchedBy(fn1),
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
 	).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
@@ -298,59 +212,42 @@ func TestClientPutObject(t *testing.T) {
 	require.NoError(t, client.PutObject("container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
-
-	mBlobAPI.AssertExpectations(t)
-	mBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
-
-	mBlockAPI.AssertExpectations(t)
-	mBlockAPI.AssertNumberOfCalls(t, "Upload", 1)
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Upload", 1)
 }
 
 func TestClientAppendToObjectNotExists(t *testing.T) {
 	var (
-		msAPI     = &mockBlobStorageAPI{}
-		mcAPI     = &mockContainerAPI{}
-		mBlobAPI  = &mockBlobAPI{}
-		mBlockAPI = &mockBlockBlobAPI{}
+		msAPI = &mockBlobStorageAPI{}
+		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mBlobAPI)
-
-	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
-
-	mBlobAPI.On("GetProperties", mock.Anything, mock.Anything, mock.Anything).Return(
-		nil,
-		&mockError{inner: azblob.ServiceCodeBlobNotFound},
+	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(
+		azblob.BlobGetPropertiesResponse{},
+		&azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound},
 	)
 
-	fn1 := func(headers azblob.BlobHTTPHeaders) bool {
+	fn1 := func(options azblob.BlockBlobUploadOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
-		return bytes.Equal(headers.ContentMD5, expected[:])
+		return bytes.Equal(options.TransactionalContentMD5, expected[:])
 	}
 
-	output := &azblob.BlockBlobUploadResponse{}
-	rawResponse := accessUnexportedField(reflect.ValueOf(output), responseField)
+	output := azblob.BlockBlobUploadResponse{}
 
-	assignToUnexportedField(rawResponse, &http.Response{})
-
-	mBlockAPI.On(
+	mbAPI.On(
 		"Upload",
 		mock.Anything,
 		strings.NewReader("value"),
 		mock.MatchedBy(fn1),
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
 	).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
@@ -358,98 +255,67 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 2)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
 
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
-
-	mBlobAPI.AssertExpectations(t)
-	mBlobAPI.AssertNumberOfCalls(t, "GetProperties", 1)
-	mBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
-
-	mBlockAPI.AssertExpectations(t)
-	mBlockAPI.AssertNumberOfCalls(t, "Upload", 1)
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "GetProperties", 1)
+	mbAPI.AssertNumberOfCalls(t, "Upload", 1)
 }
 
 func TestClientAppendToObject(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
-		mcAPI = &mockContainerAPI{}
-
-		mBlobAPI  = &mockBlobAPI{}
-		mBlockAPI = &mockBlockBlobAPI{}
+		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.Anything).Return(mBlobAPI)
+	output := azblob.BlobGetPropertiesResponse{}
 
-	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
+	output.ContentLength = aws.Int64(42)
+	output.ETag = aws.String("etag")
+	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
 
-	output := &azblob.BlobGetPropertiesResponse{}
-	rawResponse := accessUnexportedField(reflect.ValueOf(output), responseField)
+	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(output, nil)
+	mbAPI.On("URL").Return("example.com")
 
-	assignToUnexportedField(rawResponse, &http.Response{
-		Header: http.Header{
-			"Content-Length": {"42"},
-			"Etag":           {"etag"},
-			"Last-Modified":  {(time.Time{}).Add(24 * time.Hour).Format(time.RFC1123)},
-		},
-	})
-
-	mBlobAPI.On("GetProperties", mock.Anything, mock.Anything, mock.Anything).Return(output, nil)
-
-	mBlockAPI.On("URL").Return(url.URL{Host: "example.com"})
-
-	fn1 := func(sum []byte) bool {
-		expected := md5.Sum([]byte("value"))
-
-		return bytes.Equal(sum, expected[:])
+	fn1 := func(options azblob.BlockBlobStageBlockFromURLOptions) bool {
+		return *options.Offset == 0 && *options.Count == azblob.CountToEnd
 	}
 
-	mBlockAPI.On(
+	mbAPI.On(
+		"StageBlockFromURL",
+		mock.Anything,
+		mock.Anything,
+		mock.MatchedBy(func(url string) bool { return url == "example.com" }),
+		mock.MatchedBy(func(length int64) bool { return length == 0 }),
+		mock.MatchedBy(fn1),
+	).Return(azblob.BlockBlobStageBlockFromURLResponse{}, nil)
+
+	fn2 := func(options azblob.BlockBlobStageBlockOptions) bool {
+		expected := md5.Sum([]byte("value"))
+
+		return bytes.Equal(options.TransactionalContentMD5, expected[:])
+	}
+
+	mbAPI.On(
 		"StageBlock",
 		mock.Anything,
 		mock.Anything,
 		strings.NewReader("value"),
-		mock.Anything,
-		mock.MatchedBy(fn1),
-		mock.Anything,
-	).Return(nil, nil)
-
-	fn2 := func(blob string) bool {
-		_, err := base64.StdEncoding.DecodeString(blob)
-		return err == nil
-	}
-
-	mBlockAPI.On(
-		"StageBlockFromURL",
-		mock.Anything,
 		mock.MatchedBy(fn2),
-		mock.Anything,
-		mock.MatchedBy(func(offset int64) bool { return offset == 0 }),
-		mock.MatchedBy(func(length int64) bool { return length == azblob.CountToEnd }),
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(nil, nil)
+	).Return(azblob.BlockBlobStageBlockResponse{}, nil)
 
-	fn3 := func(parts []string) bool {
-		return len(parts) == 2 && slice.ContainsString(parts, "blob")
-	}
-
-	mBlockAPI.On(
+	mbAPI.On(
 		"CommitBlockList",
 		mock.Anything,
-		mock.MatchedBy(fn3),
+		mock.MatchedBy(func(parts []string) bool { return len(parts) == 2 }),
 		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(nil, nil)
+	).Return(azblob.BlockBlobCommitBlockListResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -464,13 +330,13 @@ func TestClientDeleteObjects(t *testing.T) {
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob1" })).Return(mbAPI)
+	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob1" })).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob2" })).Return(mbAPI)
+	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob2" })).Return(mbAPI, nil)
 
-	mbAPI.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	mbAPI.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(azblob.BlobDeleteResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -494,13 +360,13 @@ func TestClientDeleteObjectsKeyNotFound(t *testing.T) {
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mbAPI)
+	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob" })).Return(mbAPI, nil)
 
 	mbAPI.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(
-		nil,
-		&mockError{inner: azblob.ServiceCodeBlobNotFound},
+		azblob.BlobDeleteResponse{},
+		&azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound},
 	)
 
 	client := &Client{storageAPI: msAPI}
@@ -522,43 +388,49 @@ func TestClientDeleteDirectory(t *testing.T) {
 		msAPI = &mockBlobStorageAPI{}
 		mcAPI = &mockContainerAPI{}
 		mbAPI = &mockBlobAPI{}
+		mpAPI = &mockListBlobsPagerAPI{}
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	output := &azblob.ListBlobsFlatSegmentResponse{
-		NextMarker: azblob.Marker{Val: aws.String("")},
-		Segment: azblob.BlobFlatListSegment{BlobItems: []azblob.BlobItemInternal{
-			{
-				Name: "blob1",
-				Properties: azblob.BlobProperties{
-					ContentLength: aws.Int64(64),
-					LastModified:  (time.Time{}).Add(24 * time.Hour),
-				},
+	blobs := []*azblob.BlobItemInternal{
+		{
+			Name: aws.String("blob1"),
+			Properties: &azblob.BlobPropertiesInternal{
+				ContentLength: aws.Int64(64),
+				LastModified:  aws.Time((time.Time{}).Add(48 * time.Hour)),
 			},
-			{
-				Name: "blob2",
-				Properties: azblob.BlobProperties{
-					ContentLength: aws.Int64(128),
-					LastModified:  (time.Time{}).Add(48 * time.Hour),
-				},
+		},
+		{
+			Name: aws.String("blob2"),
+			Properties: &azblob.BlobPropertiesInternal{
+				ContentLength: aws.Int64(128),
+				LastModified:  aws.Time((time.Time{}).Add(48 * time.Hour)),
 			},
-		}},
+		},
 	}
 
 	mcAPI.On(
-		"ListBlobsFlatSegment",
+		"GetListBlobsFlatPagerAPI",
 		mock.Anything,
-		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
+	).Return(mpAPI)
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
 		mock.Anything,
-	).Return(output, nil)
+	).Return(nil, blobs, nil).Once()
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob1" })).Return(mbAPI)
+	mpAPI.On(
+		"GetNextListBlobsSegment",
+		mock.Anything,
+	).Return(nil, nil, errPagerNoMorePages).Once()
 
-	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob2" })).Return(mbAPI)
+	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob1" })).Return(mbAPI, nil)
 
-	mbAPI.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "blob2" })).Return(mbAPI, nil)
+
+	mbAPI.On("Delete", mock.Anything, mock.Anything).Return(azblob.BlobDeleteResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -569,33 +441,46 @@ func TestClientDeleteDirectory(t *testing.T) {
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 3)
 
 	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 1)
+	mcAPI.AssertNumberOfCalls(t, "GetListBlobsFlatPagerAPI", 1)
 	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
 
 	mbAPI.AssertExpectations(t)
 	mbAPI.AssertNumberOfCalls(t, "Delete", 2)
+
+	mpAPI.AssertExpectations(t)
+	mpAPI.AssertNumberOfCalls(t, "GetNextListBlobsSegment", 2)
 }
 
 func TestClientIterateObjects(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
 		mcAPI = &mockContainerAPI{}
+		mpAPI = &mockListBlobsPagerAPI{}
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	output := &azblob.ListBlobsFlatSegmentResponse{
-		NextMarker: azblob.Marker{Val: aws.String("")},
-		Segment:    azblob.BlobFlatListSegment{BlobItems: make([]azblob.BlobItemInternal, 0)},
+	blobs := make([]*azblob.BlobItemInternal, 0)
+
+	fn1 := func(options azblob.ContainerListBlobsFlatOptions) bool {
+		return options.Marker == nil && *options.Prefix == "prefix"
 	}
 
 	mcAPI.On(
-		"ListBlobsFlatSegment",
+		"GetListBlobsFlatPagerAPI",
+		mock.MatchedBy(fn1),
+	).Return(mpAPI)
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
 		mock.Anything,
-		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
-		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
-	).Return(output, nil)
+	).Return(nil, blobs, nil).Once()
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
+		mock.Anything,
+	).Return(nil, nil, errPagerNoMorePages).Once()
 
 	client := &Client{storageAPI: msAPI}
 
@@ -605,39 +490,50 @@ func TestClientIterateObjects(t *testing.T) {
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 
 	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 1)
+	mcAPI.AssertNumberOfCalls(t, "GetListBlobsFlatPagerAPI", 1)
+
+	mpAPI.AssertExpectations(t)
+	mpAPI.AssertNumberOfCalls(t, "GetNextListBlobsSegment", 2)
 }
 
 func TestClientIterateObjectsWithoutDelimiter(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
 		mcAPI = &mockContainerAPI{}
+		mpAPI = &mockListBlobsPagerAPI{}
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	output := &azblob.ListBlobsFlatSegmentResponse{
-		NextMarker: azblob.Marker{Val: aws.String("")},
-		Segment: azblob.BlobFlatListSegment{
-			BlobItems: []azblob.BlobItemInternal{
-				{
-					Name: "blob",
-					Properties: azblob.BlobProperties{
-						ContentLength: aws.Int64(42),
-						LastModified:  time.Time{}.Add(24 * time.Hour),
-					},
-				},
+	blobs := []*azblob.BlobItemInternal{
+		{
+			Name: aws.String("blob"),
+			Properties: &azblob.BlobPropertiesInternal{
+				ContentLength: aws.Int64(42),
+				LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 			},
 		},
 	}
 
+	fn1 := func(options azblob.ContainerListBlobsFlatOptions) bool {
+		return options.Marker == nil && *options.Prefix == "prefix"
+	}
+
 	mcAPI.On(
-		"ListBlobsFlatSegment",
+		"GetListBlobsFlatPagerAPI",
+		mock.MatchedBy(fn1),
+	).Return(mpAPI)
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
 		mock.Anything,
-		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
-		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
-	).Return(output, nil)
+	).Return(nil, blobs, nil).Once()
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
+		mock.Anything,
+	).Return(nil, nil, errPagerNoMorePages).Once()
 
 	var (
 		client  = &Client{storageAPI: msAPI}
@@ -663,45 +559,57 @@ func TestClientIterateObjectsWithoutDelimiter(t *testing.T) {
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 
 	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 1)
+	mcAPI.AssertNumberOfCalls(t, "GetListBlobsFlatPagerAPI", 1)
+
+	mpAPI.AssertExpectations(t)
+	mpAPI.AssertNumberOfCalls(t, "GetNextListBlobsSegment", 2)
 }
 
 func TestClientIterateObjectsWithDelimiter(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
 		mcAPI = &mockContainerAPI{}
+		mpAPI = &mockListBlobsPagerAPI{}
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	output := &azblob.ListBlobsHierarchySegmentResponse{
-		NextMarker: azblob.Marker{Val: aws.String("")},
-		Segment: azblob.BlobHierarchyListSegment{
-			BlobPrefixes: []azblob.BlobPrefix{
-				{
-					Name: "prefix",
-				},
-			},
-			BlobItems: []azblob.BlobItemInternal{
-				{
-					Name: "blob",
-					Properties: azblob.BlobProperties{
-						ContentLength: aws.Int64(42),
-						LastModified:  time.Time{}.Add(24 * time.Hour),
-					},
-				},
+	prefixes := []*azblob.BlobPrefix{
+		{
+			Name: aws.String("prefix"),
+		},
+	}
+
+	blobs := []*azblob.BlobItemInternal{
+		{
+			Name: aws.String("blob"),
+			Properties: &azblob.BlobPropertiesInternal{
+				ContentLength: aws.Int64(42),
+				LastModified:  aws.Time(time.Time{}.Add(24 * time.Hour)),
 			},
 		},
 	}
 
+	fn1 := func(options azblob.ContainerListBlobsHierarchyOptions) bool {
+		return options.Marker == nil && *options.Prefix == "prefix"
+	}
+
 	mcAPI.On(
-		"ListBlobsHierarchySegment",
-		mock.Anything,
-		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
+		"GetListBlobsHierarchyPagerAPI",
 		mock.MatchedBy(func(delimiter string) bool { return delimiter == "delimiter" }),
-		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
-	).Return(output, nil)
+		mock.MatchedBy(fn1),
+	).Return(mpAPI)
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
+		mock.Anything,
+	).Return(prefixes, blobs, nil).Once()
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
+		mock.Anything,
+	).Return(nil, nil, errPagerNoMorePages).Once()
 
 	var (
 		client  = &Client{storageAPI: msAPI}
@@ -727,7 +635,10 @@ func TestClientIterateObjectsWithDelimiter(t *testing.T) {
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 
 	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ListBlobsHierarchySegment", 1)
+	mcAPI.AssertNumberOfCalls(t, "GetListBlobsHierarchyPagerAPI", 1)
+
+	mpAPI.AssertExpectations(t)
+	mpAPI.AssertNumberOfCalls(t, "GetNextListBlobsSegment", 2)
 }
 
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
@@ -741,31 +652,36 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	var (
 		msAPI = &mockBlobStorageAPI{}
 		mcAPI = &mockContainerAPI{}
+		mpAPI = &mockListBlobsPagerAPI{}
 	)
 
 	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+		func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
-	output := &azblob.ListBlobsHierarchySegmentResponse{
-		NextMarker: azblob.Marker{Val: aws.String("")},
-		Segment: azblob.BlobHierarchyListSegment{BlobItems: []azblob.BlobItemInternal{
-			{
-				Name: "blob1",
-				Properties: azblob.BlobProperties{
-					ContentLength: aws.Int64(42),
-					LastModified:  (time.Time{}).Add(24 * time.Hour),
-				},
+	blobs := []*azblob.BlobItemInternal{
+		{
+			Name: aws.String("blob"),
+			Properties: &azblob.BlobPropertiesInternal{
+				ContentLength: aws.Int64(42),
+				LastModified:  aws.Time(time.Time{}.Add(24 * time.Hour)),
 			},
-		}},
+		},
+	}
+
+	fn1 := func(options azblob.ContainerListBlobsHierarchyOptions) bool {
+		return options.Marker == nil && *options.Prefix == "prefix"
 	}
 
 	mcAPI.On(
-		"ListBlobsHierarchySegment",
-		mock.Anything,
-		mock.MatchedBy(func(marker azblob.Marker) bool { return marker.Val == nil }),
+		"GetListBlobsHierarchyPagerAPI",
 		mock.MatchedBy(func(delimiter string) bool { return delimiter == "delimiter" }),
-		mock.MatchedBy(func(options azblob.ListBlobsSegmentOptions) bool { return options.Prefix == "prefix" }),
-	).Return(output, nil)
+		mock.MatchedBy(fn1),
+	).Return(mpAPI)
+
+	mpAPI.On(
+		"GetNextListBlobsSegment",
+		mock.Anything,
+	).Return(nil, blobs, nil).Once()
 
 	client := &Client{storageAPI: msAPI}
 
@@ -778,7 +694,10 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 
 	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ListBlobsHierarchySegment", 1)
+	mcAPI.AssertNumberOfCalls(t, "GetListBlobsHierarchyPagerAPI", 1)
+
+	mpAPI.AssertExpectations(t)
+	mpAPI.AssertNumberOfCalls(t, "GetNextListBlobsSegment", 1)
 }
 
 func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
@@ -892,10 +811,11 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			var (
 				msAPI = &mockBlobStorageAPI{}
 				mcAPI = &mockContainerAPI{}
+				mpAPI = &mockListBlobsPagerAPI{}
 			)
 
 			msAPI.On("ToContainerAPI", mock.MatchedBy(
-				func(container string) bool { return container == "container" })).Return(mcAPI)
+				func(container string) bool { return container == "container" })).Return(mcAPI, nil)
 
 			blobs := []string{
 				"/path/to/blob1",
@@ -904,40 +824,35 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				"", // Final call should return an empty name (marker) which indicates the end of iteration
 			}
 
+			output := make([]*azblob.BlobItemInternal, 0, 3)
+
 			for i := int64(1); i <= 3; i++ {
-				output := &azblob.ListBlobsFlatSegmentResponse{
-					NextMarker: azblob.Marker{Val: aws.String(blobs[i])},
-					Segment: azblob.BlobFlatListSegment{BlobItems: []azblob.BlobItemInternal{
-						{
-							Name: blobs[i-1],
-							Properties: azblob.BlobProperties{
-								ContentLength: aws.Int64(64 << (i - 1)),
-								LastModified:  (time.Time{}).Add(time.Duration(i*24) * time.Hour),
-							},
-						},
-					}},
+				blobTime := (time.Time{}).Add(time.Duration(i*24) * time.Hour)
+				blob := &azblob.BlobItemInternal{
+					Name: &blobs[i-1],
+					Properties: &azblob.BlobPropertiesInternal{
+						ContentLength: aws.Int64(64 << (i - 1)),
+						LastModified:  &blobTime,
+					},
 				}
 
-				var expected *string
-				if i > 1 {
-					expected = aws.String(blobs[i-1])
-				}
-
-				call := mcAPI.On(
-					"ListBlobsFlatSegment",
-					mock.Anything,
-					mock.MatchedBy(func(marker azblob.Marker) bool { return reflect.DeepEqual(marker.Val, expected) }),
-					mock.Anything,
-				).Return(output, nil)
-
-				call.Repeatability = 1
+				output = append(output, blob)
 			}
 
-			output := &azblob.ListBlobsFlatSegmentResponse{
-				NextMarker: azblob.Marker{Val: aws.String("")},
-			}
+			mcAPI.On(
+				"GetListBlobsFlatPagerAPI",
+				mock.Anything,
+			).Return(mpAPI)
 
-			mcAPI.On("ListBlobsFlatSegment", mock.Anything, mock.Anything, mock.Anything).Return(output, nil)
+			mpAPI.On(
+				"GetNextListBlobsSegment",
+				mock.Anything,
+			).Return(nil, output, nil).Once()
+
+			mpAPI.On(
+				"GetNextListBlobsSegment",
+				mock.Anything,
+			).Return(nil, nil, errPagerNoMorePages).Once()
 
 			client := &Client{storageAPI: msAPI}
 
@@ -954,7 +869,10 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
 
 			mcAPI.AssertExpectations(t)
-			mcAPI.AssertNumberOfCalls(t, "ListBlobsFlatSegment", 3)
+			mcAPI.AssertNumberOfCalls(t, "GetListBlobsFlatPagerAPI", 1)
+
+			mpAPI.AssertExpectations(t)
+			mpAPI.AssertNumberOfCalls(t, "GetNextListBlobsSegment", 2)
 		})
 	}
 }
@@ -976,25 +894,41 @@ func TestClientUploadPartWithUploadID(t *testing.T) {
 
 func TestClientListParts(t *testing.T) {
 	var (
-		msAPI     = &mockBlobStorageAPI{}
-		mcAPI     = &mockContainerAPI{}
-		mBlobAPI  = &mockBlobAPI{}
-		mBlockAPI = &mockBlockBlobAPI{}
+		msAPI = &mockBlobStorageAPI{}
+		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.Anything).Return(mBlobAPI)
-
-	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
-
-	output := &azblob.BlockList{
-		CommittedBlocks:   []azblob.Block{{Name: "block1", Size: 64}, {Name: "block2", Size: 128}},
-		UncommittedBlocks: []azblob.Block{{Name: "block3", Size: 256}, {Name: "block4", Size: 512}},
+	output := azblob.BlockBlobGetBlockListResponse{}
+	output.BlockList = azblob.BlockList{
+		CommittedBlocks: []*azblob.Block{
+			{
+				Name: aws.String("block1"),
+				Size: aws.Int64(64),
+			},
+			{
+				Name: aws.String("block2"),
+				Size: aws.Int64(128),
+			},
+		},
+		UncommittedBlocks: []*azblob.Block{
+			{
+				Name: aws.String("block3"),
+				Size: aws.Int64(256),
+			},
+			{
+				Name: aws.String("block4"),
+				Size: aws.Int64(512),
+			},
+		},
 	}
 
-	mBlockAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(output, nil)
+	mbAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -1005,16 +939,10 @@ func TestClientListParts(t *testing.T) {
 	require.Equal(t, expected, parts)
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
-
-	mBlobAPI.AssertExpectations(t)
-	mBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
-
-	mBlockAPI.AssertExpectations(t)
-	mBlockAPI.AssertNumberOfCalls(t, "GetBlockList", 1)
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "GetBlockList", 1)
 }
 
 func TestClientListPartsWithUploadID(t *testing.T) {
@@ -1026,34 +954,29 @@ func TestClientListPartsWithUploadID(t *testing.T) {
 
 func TestClientUploadPart(t *testing.T) {
 	var (
-		msAPI     = &mockBlobStorageAPI{}
-		mcAPI     = &mockContainerAPI{}
-		mBlobAPI  = &mockBlobAPI{}
-		mBlockAPI = &mockBlockBlobAPI{}
+		msAPI = &mockBlobStorageAPI{}
+		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
-	mcAPI.On("ToBlobAPI", mock.Anything).Return(mBlobAPI)
-
-	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
-
-	fn1 := func(sum []byte) bool {
+	fn1 := func(options azblob.BlockBlobStageBlockOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
-		return bytes.Equal(sum, expected[:])
+		return bytes.Equal(options.TransactionalContentMD5, expected[:])
 	}
 
-	mBlockAPI.On(
+	mbAPI.On(
 		"StageBlock",
 		mock.Anything,
 		mock.Anything,
 		strings.NewReader("value"),
-		mock.Anything,
 		mock.MatchedBy(fn1),
-		mock.Anything,
-	).Return(nil, nil)
+	).Return(azblob.BlockBlobStageBlockResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -1073,16 +996,10 @@ func TestClientUploadPart(t *testing.T) {
 	require.Equal(t, expected, part)
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
-
-	mBlobAPI.AssertExpectations(t)
-	mBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
-
-	mBlockAPI.AssertExpectations(t)
-	mBlockAPI.AssertNumberOfCalls(t, "StageBlock", 1)
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "StageBlock", 1)
 }
 
 func TestClientUploadPartCopy(t *testing.T) {
@@ -1109,49 +1026,42 @@ func TestClientUploadPartCopy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				msAPI = &mockBlobStorageAPI{}
-				mcAPI = &mockContainerAPI{}
-
-				mSrcBlobAPI  = &mockBlobAPI{}
-				mSrcBlockAPI = &mockBlockBlobAPI{}
-
-				mDstBlobAPI  = &mockBlobAPI{}
-				mDstBlockAPI = &mockBlockBlobAPI{}
+				msAPI       = &mockBlobStorageAPI{}
+				mSrcBlobAPI = &mockBlobAPI{}
+				mDstBlobAPI = &mockBlobAPI{}
 			)
 
-			msAPI.On("ToContainerAPI", mock.MatchedBy(
-				func(container string) bool { return container == "container" })).Return(mcAPI)
+			msAPI.On(
+				"ToBlobAPI",
+				mock.MatchedBy(func(container string) bool { return container == "container" }),
+				mock.MatchedBy(func(blob string) bool { return blob == "dst" }),
+			).Return(mDstBlobAPI, nil)
 
-			mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "dst" })).Return(mDstBlobAPI)
+			msAPI.On(
+				"ToBlobAPI",
+				mock.MatchedBy(func(container string) bool { return container == "container" }),
+				mock.MatchedBy(func(blob string) bool { return blob == "src" }),
+			).Return(mSrcBlobAPI, nil)
 
-			mcAPI.On("ToBlobAPI", mock.MatchedBy(func(blob string) bool { return blob == "src" })).Return(mSrcBlobAPI)
-
-			mDstBlobAPI.On("ToBlockBlobAPI").Return(mDstBlockAPI)
-
-			mSrcBlobAPI.On("ToBlockBlobAPI").Return(mSrcBlockAPI)
-
-			mSrcBlockAPI.On("URL").Return(url.URL{Host: "example.com"})
+			mSrcBlobAPI.On("URL").Return("example.com")
 
 			fn1 := func(blob string) bool {
 				_, err := base64.StdEncoding.DecodeString(blob)
 				return err == nil
 			}
 
-			fn2 := func(u url.URL) bool {
-				return reflect.DeepEqual(url.URL{Host: "example.com"}, u)
+			fn2 := func(options azblob.BlockBlobStageBlockFromURLOptions) bool {
+				return *options.Offset == test.eOffset && *options.Count == test.eLength
 			}
 
-			mDstBlockAPI.On(
+			mDstBlobAPI.On(
 				"StageBlockFromURL",
 				mock.Anything,
 				mock.MatchedBy(fn1),
+				mock.MatchedBy(func(s string) bool { return "example.com" == s }),
+				mock.MatchedBy(func(length int64) bool { return length == 0 }),
 				mock.MatchedBy(fn2),
-				mock.MatchedBy(func(offset int64) bool { return offset == test.eOffset }),
-				mock.MatchedBy(func(length int64) bool { return length == test.eLength }),
-				mock.Anything,
-				mock.Anything,
-				mock.Anything,
-			).Return(nil, nil)
+			).Return(azblob.BlockBlobStageBlockFromURLResponse{}, nil)
 
 			client := &Client{storageAPI: msAPI}
 
@@ -1163,22 +1073,13 @@ func TestClientUploadPartCopy(t *testing.T) {
 			require.NoError(t, err)
 
 			msAPI.AssertExpectations(t)
-			msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
-
-			mcAPI.AssertExpectations(t)
-			mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
+			msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
 
 			mDstBlobAPI.AssertExpectations(t)
-			mDstBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
+			mDstBlobAPI.AssertNumberOfCalls(t, "StageBlockFromURL", 1)
 
 			mSrcBlobAPI.AssertExpectations(t)
-			mSrcBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
-
-			mDstBlockAPI.AssertExpectations(t)
-			mDstBlockAPI.AssertNumberOfCalls(t, "StageBlockFromURL", 1)
-
-			mSrcBlockAPI.AssertExpectations(t)
-			mSrcBlockAPI.AssertNumberOfCalls(t, "URL", 1)
+			mSrcBlobAPI.AssertNumberOfCalls(t, "URL", 1)
 		})
 	}
 }
@@ -1216,24 +1117,21 @@ func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 
 func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	var (
-		msAPI     = &mockBlobStorageAPI{}
-		mcAPI     = &mockContainerAPI{}
-		mBlobAPI  = &mockBlobAPI{}
-		mBlockAPI = &mockBlockBlobAPI{}
+		msAPI = &mockBlobStorageAPI{}
+		mbAPI = &mockBlobAPI{}
 	)
 
-	msAPI.On("ToContainerAPI", mock.MatchedBy(
-		func(container string) bool { return container == "container" })).Return(mcAPI)
-
-	mcAPI.On("ToBlobAPI", mock.Anything).Return(mBlobAPI)
-
-	mBlobAPI.On("ToBlockBlobAPI").Return(mBlockAPI)
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
+	).Return(mbAPI, nil)
 
 	fn1 := func(parts []string) bool {
 		return slice.EqualStrings(parts, []string{"blob1", "blob2", "blob3"})
 	}
 
-	mBlockAPI.On(
+	mbAPI.On(
 		"CommitBlockList",
 		mock.Anything,
 		mock.MatchedBy(fn1),
@@ -1243,7 +1141,7 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-	).Return(nil, nil)
+	).Return(azblob.BlockBlobCommitBlockListResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
 
@@ -1256,16 +1154,10 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	require.NoError(t, client.CompleteMultipartUpload("container", objcli.NoUploadID, "blob", parts...))
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
 
-	mcAPI.AssertExpectations(t)
-	mcAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
-
-	mBlobAPI.AssertExpectations(t)
-	mBlobAPI.AssertNumberOfCalls(t, "ToBlockBlobAPI", 1)
-
-	mBlockAPI.AssertExpectations(t)
-	mBlockAPI.AssertNumberOfCalls(t, "CommitBlockList", 1)
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "CommitBlockList", 1)
 }
 
 func TestClientAbortMultipartUpload(t *testing.T) {

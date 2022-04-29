@@ -4,14 +4,14 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
 	"github.com/couchbase/tools-common/objstore/objerr"
 )
 
 // handleError converts an error relating accessing an object via its key into a user friendly error where possible.
 func handleError(bucket, key string, err error) error {
-	var azureErr azblob.StorageError
+	var azureErr *azblob.StorageError
 	if err == nil || !errors.As(err, &azureErr) {
 		return objerr.HandleError(err)
 	}
@@ -32,15 +32,15 @@ func handleError(bucket, key string, err error) error {
 		return objerr.ErrUnauthorized
 	}
 
-	switch azureErr.ServiceCode() {
-	case azblob.ServiceCodeBlobNotFound:
+	switch azureErr.ErrorCode {
+	case azblob.StorageErrorCodeBlobNotFound:
 		// This shouldn't trigger but may aid in debugging in the future
 		if key == "" {
 			key = "<empty blob name>"
 		}
 
 		return &objerr.NotFoundError{Type: "blob", Name: key}
-	case azblob.ServiceCodeContainerNotFound:
+	case azblob.StorageErrorCodeContainerNotFound:
 		// This shouldn't trigger but may aid in debugging in the future
 		if bucket == "" {
 			bucket = "<empty container name>"
@@ -55,6 +55,6 @@ func handleError(bucket, key string, err error) error {
 
 // isKeyNotFound returns a boolean indicating whether the given error is a 'ServiceCodeBlobNotFound' error.
 func isKeyNotFound(err error) bool {
-	var azureErr azblob.StorageError
-	return errors.As(err, &azureErr) && azureErr.ServiceCode() == azblob.ServiceCodeBlobNotFound
+	var azureErr *azblob.StorageError
+	return errors.As(err, &azureErr) && azureErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound
 }
