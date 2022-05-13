@@ -5,7 +5,7 @@ linters:
   fast: false
   enable:
     - asciicheck
-    - bodyclose
+    # - bodyclose
     - deadcode
     - dogsled
     - godox
@@ -21,16 +21,18 @@ linters:
     - nolintlint
     - prealloc
     - revive
-    - rowserrcheck
-    - sqlclosecheck
+    # - rowserrcheck
+    # - sqlclosecheck
     - staticcheck
-    - structcheck
+    # - structcheck
     - unconvert
-    - unparam
+    # - unparam
     - varcheck
-    - wastedassign
+    # - wastedassign
     - whitespace
     - wsl
+  disable:
+    - structcheck
 linters-settings:
   lll:
     line-length: 120
