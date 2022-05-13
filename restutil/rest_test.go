@@ -141,7 +141,7 @@ func TestMarshalAndSendResponse(t *testing.T) {
 	var (
 		errorOccurred error
 		statusCode    int
-		data          interface{}
+		data          any
 	)
 
 	errLog := func(err error) {
@@ -156,7 +156,7 @@ func TestMarshalAndSendResponse(t *testing.T) {
 	type testCase struct {
 		name       string
 		statusCode int
-		data       interface{}
+		data       any
 		expected   []byte
 	}
 

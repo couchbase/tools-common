@@ -626,7 +626,7 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 //
 // NOTE: If the returned error is nil, the Response will contain a non-nil Body which the caller is expected to close.
 func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, error) {
-	shouldRetry := func(ctx *retry.Context, payload interface{}, err error) bool {
+	shouldRetry := func(ctx *retry.Context, payload any, err error) bool {
 		if resp := payload.(*http.Response); resp != nil {
 			return c.shouldRetryWithResponse(ctx, request, resp)
 		}
@@ -634,7 +634,7 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		return c.shouldRetryWithError(ctx, request, err)
 	}
 
-	logRetry := func(ctx *retry.Context, payload interface{}, err error) {
+	logRetry := func(ctx *retry.Context, payload any, err error) {
 		msg := fmt.Sprintf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s'", ctx.Attempt(), request.Method,
 			request.Endpoint)
 
@@ -649,7 +649,7 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		log.Warnf(msg)
 	}
 
-	cleanup := func(payload interface{}) {
+	cleanup := func(payload any) {
 		resp := payload.(*http.Response)
 		if resp == nil {
 			return
@@ -667,7 +667,7 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 
 	payload, err := retryer.DoWithContext(
 		ctx,
-		func(ctx *retry.Context) (interface{}, error) { return c.do(ctx, request) }, //nolint:bodyclose
+		func(ctx *retry.Context) (any, error) { return c.do(ctx, request) }, //nolint:bodyclose
 	)
 
 	resp := payload.(*http.Response)

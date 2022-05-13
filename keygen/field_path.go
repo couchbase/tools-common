@@ -54,7 +54,7 @@ func NewFieldPath(path string) (FieldPath, error) {
 
 // RemoveFrom removes the field path from the provided object if it exists. No changes will be made to the document if
 // the field does not exist.
-func (fp FieldPath) RemoveFrom(object map[string]interface{}) {
+func (fp FieldPath) RemoveFrom(object map[string]any) {
 	current := object
 
 	for idx := 0; idx < len(fp)-1; idx++ {
@@ -64,7 +64,7 @@ func (fp FieldPath) RemoveFrom(object map[string]interface{}) {
 			return
 		}
 
-		current = value.(map[string]interface{})
+		current = value.(map[string]any)
 	}
 
 	delete(current, fp[len(fp)-1])

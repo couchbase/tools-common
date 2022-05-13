@@ -9,7 +9,7 @@ import (
 )
 
 // RetryableFunc represents a function which is retryable.
-type RetryableFunc func(ctx *Context) (interface{}, error)
+type RetryableFunc func(ctx *Context) (any, error)
 
 // Retryer is a function retryer, which supports executing a given function a number of times until successful.
 type Retryer struct {
@@ -25,15 +25,15 @@ func NewRetryer(options RetryerOptions) Retryer {
 }
 
 // Do executes the given function until it's successful.
-func (r Retryer) Do(fn RetryableFunc) (interface{}, error) {
+func (r Retryer) Do(fn RetryableFunc) (any, error) {
 	return r.DoWithContext(context.Background(), fn)
 }
 
 // DoWithContext executes the given function until it's successful, the provided context may be used for cancellation.
-func (r Retryer) DoWithContext(ctx context.Context, fn RetryableFunc) (interface{}, error) {
+func (r Retryer) DoWithContext(ctx context.Context, fn RetryableFunc) (any, error) {
 	var (
 		wrapped = NewContext(ctx)
-		payload interface{}
+		payload any
 		done    bool
 		err     error
 	)
@@ -54,7 +54,7 @@ func (r Retryer) DoWithContext(ctx context.Context, fn RetryableFunc) (interface
 }
 
 // do executes the given function, returning the payload error and whether retries should stop.
-func (r Retryer) do(ctx *Context, fn RetryableFunc) (interface{}, bool, error) {
+func (r Retryer) do(ctx *Context, fn RetryableFunc) (any, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, true, &RetriesAbortedError{attempts: ctx.attempt - 1, err: err}
 	}
@@ -80,7 +80,7 @@ func (r Retryer) do(ctx *Context, fn RetryableFunc) (interface{}, bool, error) {
 // retry returns a boolean indicating whether the function should be executed again.
 //
 // NOTE: Users may supply a custom 'ShouldRetry' function for more complex retry behavior which depends on the payload.
-func (r Retryer) retry(ctx *Context, payload interface{}, err error) bool {
+func (r Retryer) retry(ctx *Context, payload any, err error) bool {
 	if r.options.ShouldRetry != nil {
 		return r.options.ShouldRetry(ctx, payload, err)
 	}

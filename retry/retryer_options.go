@@ -21,18 +21,18 @@ const (
 )
 
 // LogFunc is a function which is run before each retry attempt after failing to run the given 'RetryableFunc'.
-type LogFunc func(ctx *Context, payload interface{}, err error)
+type LogFunc func(ctx *Context, payload any, err error)
 
 // ShouldRetryFunc is a function which may be supplied to the retry options which allows more control over which types
 // of errors are retried.
 //
 // NOTE: If not supplied, retries will take place if the given 'RetryableFunc' returns an error.
-type ShouldRetryFunc func(ctx *Context, payload interface{}, err error) bool
+type ShouldRetryFunc func(ctx *Context, payload any, err error) bool
 
 // CleanupFunc is a function which is run with the payload for all, but the last retry attempt.
 //
 // NOTE: The final attempt is not cleaned up because the payload may want to be used/read to enhance returned errors.
-type CleanupFunc func(payload interface{})
+type CleanupFunc func(payload any)
 
 // RetryerOptions encapsulates the options available when creating a retryer.
 type RetryerOptions struct {

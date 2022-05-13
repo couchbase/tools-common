@@ -1015,7 +1015,7 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
 	})).Return(moAPI)
 
-	expected := make([]interface{}, 0, MaxComposable)
+	expected := make([]any, 0, MaxComposable)
 
 	for i := 0; i < MaxComposable; i++ {
 		expected = append(expected, mock.Anything)

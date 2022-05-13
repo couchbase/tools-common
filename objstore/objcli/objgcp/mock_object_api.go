@@ -39,11 +39,11 @@ func (_m *mockObjectAPI) Attrs(ctx context.Context) (*storage.ObjectAttrs, error
 
 // ComposerFrom provides a mock function with given fields: srcs
 func (_m *mockObjectAPI) ComposerFrom(srcs ...objectAPI) composeAPI {
-	_va := make([]interface{}, len(srcs))
+	_va := make([]any, len(srcs))
 	for _i := range srcs {
 		_va[_i] = srcs[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
@@ -130,11 +130,11 @@ func (_m *mockObjectAPI) NewWriter(ctx context.Context) writerAPI {
 
 // Retryer provides a mock function with given fields: opts
 func (_m *mockObjectAPI) Retryer(opts ...storage.RetryOption) objectAPI {
-	_va := make([]interface{}, len(opts))
+	_va := make([]any, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 

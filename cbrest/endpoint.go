@@ -39,7 +39,7 @@ const (
 //
 // NOTE: No validation takes place to ensure the correct number of arguments are supplied, that's down to you...
 func (e Endpoint) Format(args ...string) Endpoint {
-	escaped := make([]interface{}, len(args))
+	escaped := make([]any, len(args))
 	for index, arg := range args {
 		escaped[index] = url.PathEscape(arg)
 	}

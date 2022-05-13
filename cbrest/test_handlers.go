@@ -128,7 +128,7 @@ func NewTestHandlerWithHijack(t *testing.T) http.HandlerFunc {
 
 // NewTestHandlerWithValue creates a handler which reads and stores the request body in the provided interface. This
 // should be used to validate that a requests body was the expected value.
-func NewTestHandlerWithValue(t *testing.T, status int, body []byte, value interface{}) http.HandlerFunc {
+func NewTestHandlerWithValue(t *testing.T, status int, body []byte, value any) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		switch request.Header.Get("Content-Type") {
 		case string(ContentTypeJSON):

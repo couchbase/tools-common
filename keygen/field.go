@@ -39,7 +39,7 @@ func parseField(exp string, off int, fDel rune) (field, int, error) {
 // next will return the corresponding value to the field reference as a string if the field exists in the document
 // passed as a parameter. If it does not exist it will return an error.
 func (f field) next(data []byte) (string, error) {
-	converted := make([]interface{}, 0, len(f))
+	converted := make([]any, 0, len(f))
 	for _, field := range f {
 		converted = append(converted, field)
 	}

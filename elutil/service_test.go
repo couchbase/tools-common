@@ -72,7 +72,7 @@ func TestServiceReportTooBig(t *testing.T) {
 
 	err = service.report(Event{
 		EventID:         42,
-		ExtraAttributes: map[string]interface{}{"key": strings.Repeat("value", 650)},
+		ExtraAttributes: map[string]any{"key": strings.Repeat("value", 650)},
 	})
 	require.ErrorIs(t, err, ErrTooLarge)
 }

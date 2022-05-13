@@ -45,21 +45,21 @@ type Event struct {
 
 	// Optional attributes which may/or may not be supplied; the general recommendation is to include some additional
 	// useful information which describes the event.
-	ExtraAttributes interface{} `json:"extra_attributes"`
-	SubComponent    string      `json:"sub_component"`
+	ExtraAttributes any    `json:"extra_attributes"`
+	SubComponent    string `json:"sub_component"`
 }
 
 // MarshalJSON implements the 'json.Marshaller' interface, and fills in any required automatically generated fields.
 func (e Event) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Timestamp       string      `json:"timestamp,omitempty"`
-		Component       string      `json:"component,omitempty"`
-		Severity        string      `json:"severity,omitempty"`
-		EventID         uint        `json:"event_id,omitempty"`
-		Description     string      `json:"description,omitempty"`
-		UUID            string      `json:"uuid,omitempty"`
-		ExtraAttributes interface{} `json:"extra_attributes,omitempty"`
-		SubComponent    string      `json:"sub_component,omitempty"`
+		Timestamp       string `json:"timestamp,omitempty"`
+		Component       string `json:"component,omitempty"`
+		Severity        string `json:"severity,omitempty"`
+		EventID         uint   `json:"event_id,omitempty"`
+		Description     string `json:"description,omitempty"`
+		UUID            string `json:"uuid,omitempty"`
+		ExtraAttributes any    `json:"extra_attributes,omitempty"`
+		SubComponent    string `json:"sub_component,omitempty"`
 	}{
 		Timestamp:       timestamp(),
 		Component:       string(e.Component),

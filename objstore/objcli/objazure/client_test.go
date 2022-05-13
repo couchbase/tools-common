@@ -45,7 +45,7 @@ func allocateUnexportedField(field reflect.Value) reflect.Value {
 // assignToUnexportedField the Azure SDK returns structs which encapsulate a '*http.Response'; these structs are all
 // unexported (but expose public functions). To be able to mock the API we must be able to assign to these unexported
 // fields.
-func assignToUnexportedField(field reflect.Value, value interface{}) {
+func assignToUnexportedField(field reflect.Value, value any) {
 	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }
 

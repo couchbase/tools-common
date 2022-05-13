@@ -29,7 +29,7 @@ const (
 
 // Logger interface which allows applications to provide custom logger implementations.
 type Logger interface {
-	Log(level Level, format string, args ...interface{})
+	Log(level Level, format string, args ...any)
 }
 
 // logger is the logger which is used internally by the library. Any calls the functions below use/affect this logger.
@@ -43,7 +43,7 @@ func SetLogger(l Logger) {
 // Logf allows raw access to the underlying logger, most use cases should be through the functions below.
 //
 // NOTE: If no logger has been set using 'SetLogger' all logging information is omitted.
-func Logf(level Level, format string, args ...interface{}) {
+func Logf(level Level, format string, args ...any) {
 	if logger == nil {
 		return
 	}
@@ -52,32 +52,32 @@ func Logf(level Level, format string, args ...interface{}) {
 }
 
 // Tracef logs the provided information at the trace level.
-func Tracef(format string, args ...interface{}) {
+func Tracef(format string, args ...any) {
 	Logf(LevelTrace, format, args...)
 }
 
 // Debugf logs the provided information at the debug level.
-func Debugf(format string, args ...interface{}) {
+func Debugf(format string, args ...any) {
 	Logf(LevelDebug, format, args...)
 }
 
 // Infof logs the provided information at the info level.
-func Infof(format string, args ...interface{}) {
+func Infof(format string, args ...any) {
 	Logf(LevelInfo, format, args...)
 }
 
 // Warnf logs the provided information at the warn level.
-func Warnf(format string, args ...interface{}) {
+func Warnf(format string, args ...any) {
 	Logf(LevelWarning, format, args...)
 }
 
 // Errorf logs the provided information at the error level.
-func Errorf(format string, args ...interface{}) {
+func Errorf(format string, args ...any) {
 	Logf(LevelError, format, args...)
 }
 
 // Panicf logs the provided information at the panic level.
-func Panicf(format string, args ...interface{}) {
+func Panicf(format string, args ...any) {
 	Logf(LevelPanic, format, args...)
 	panic(fmt.Sprintf(format, args...))
 }

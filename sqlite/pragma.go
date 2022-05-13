@@ -25,7 +25,7 @@ const (
 
 // GetPragma queries the provided pragma and stores the result in the provided interface; its the job of the caller to
 // ensure the provided type is valid for the value returned by the pragma.
-func GetPragma(db Queryable, pragma Pragma, data interface{}) error {
+func GetPragma(db Queryable, pragma Pragma, data any) error {
 	query := Query{
 		Query: fmt.Sprintf("pragma %s;", pragma),
 	}
@@ -35,7 +35,7 @@ func GetPragma(db Queryable, pragma Pragma, data interface{}) error {
 
 // SetPragma sets the provided pragma to the given value; its the job of the caller to ensure the provided value is of a
 // valid type for the pragma.
-func SetPragma(db Executable, pragma Pragma, value interface{}) error {
+func SetPragma(db Executable, pragma Pragma, value any) error {
 	query := Query{
 		Query: fmt.Sprintf("pragma %s=%v;", pragma, value),
 	}

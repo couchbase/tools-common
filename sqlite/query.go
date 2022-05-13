@@ -10,11 +10,11 @@ import (
 // Query encapsulates a query and its arguments and is used by all the SQLite utility functions in this package.
 type Query struct {
 	Query     string
-	Arguments []interface{}
+	Arguments []any
 }
 
 // ScanCallback is a readability wrapper around the SQL 'Scan' function.
-type ScanCallback func(dest ...interface{}) error
+type ScanCallback func(dest ...any) error
 
 // RowCallback is a readability callback which will be run for each row returned by an SQLite query.
 type RowCallback func(scan ScanCallback) error
@@ -32,7 +32,7 @@ func ExecuteQuery(db Executable, query Query) (int64, error) {
 // QueryRow executes a query that is only expected to return a single row (or where we only care about the first
 // returned row). It's the callers job to ensure the destination types are valid for the expected return value from the
 // query.
-func QueryRow(db Queryable, query Query, dest ...interface{}) error {
+func QueryRow(db Queryable, query Query, dest ...any) error {
 	err := db.QueryRow(query.Query, query.Arguments...).Scan(dest...)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return ErrQueryReturnedNoRows

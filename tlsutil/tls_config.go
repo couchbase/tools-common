@@ -160,7 +160,7 @@ func parseEncryptedPKCS12Blocks(data, password []byte) ([]*pem.Block, error) {
 }
 
 // parseKey returns the private key which should be used for mTLS authentication.
-func parseKey(options TLSConfigOptions) (interface{}, error) {
+func parseKey(options TLSConfigOptions) (any, error) {
 	data := options.ClientKey
 
 	// For PKCS#12 we don't expect a client ca and a client key, they're both stored in the same file
@@ -191,7 +191,7 @@ func parseKey(options TLSConfigOptions) (interface{}, error) {
 
 // parseEncryptedKey attempts to decrypt, parse and return private key which should be used for mTLS, the key is
 // expected to be in either PKCS#8 or PKCS#12 format.
-func parseEncryptedKey(data []byte, options TLSConfigOptions) (interface{}, error) {
+func parseEncryptedKey(data []byte, options TLSConfigOptions) (any, error) {
 	// We've not been provided a password, so we assume this isn't an encrypted private key, and try to parse it as
 	// unencrypted.
 	if len(options.Password) == 0 {
@@ -220,7 +220,7 @@ func parseEncryptedKey(data []byte, options TLSConfigOptions) (interface{}, erro
 
 // parseEncryptedPKCS8Key attempts to decrypt, parse and return the private key which should be used for mTLS, the key
 // is expected to be in PKCS#8 format.
-func parseEncryptedPKCS8Key(data, password []byte) (interface{}, error) {
+func parseEncryptedPKCS8Key(data, password []byte) (any, error) {
 	block, _ := pem.Decode(data)
 	if block != nil {
 		data = block.Bytes
@@ -247,7 +247,7 @@ func parseEncryptedPKCS8Key(data, password []byte) (interface{}, error) {
 // the standard library.
 //
 // See https://github.com/golang/go/blob/go1.17/src/crypto/tls/tls.go#L339-L356 for more information.
-func parseUnencryptedPrivateKey(data []byte) interface{} {
+func parseUnencryptedPrivateKey(data []byte) any {
 	if key, err := x509.ParsePKCS1PrivateKey(data); err == nil {
 		return key
 	}

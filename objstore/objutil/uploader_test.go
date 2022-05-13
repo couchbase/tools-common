@@ -92,7 +92,7 @@ func TestMPUploaderUpload(t *testing.T) {
 func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 	var (
 		client   = objcli.NewTestClient(t, objval.ProviderAWS)
-		metadata interface{}
+		metadata any
 		part     objval.Part
 	)
 
@@ -100,7 +100,7 @@ func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 		Client: client,
 		Bucket: "bucket",
 		Key:    "key",
-		OnPartComplete: func(m interface{}, p objval.Part) error {
+		OnPartComplete: func(m any, p objval.Part) error {
 			metadata = m
 			part = p
 
@@ -133,7 +133,7 @@ func TestMPUploaderUploadWithOnPartCompletePropagateUserError(t *testing.T) {
 		Client:         client,
 		Bucket:         "bucket",
 		Key:            "key",
-		OnPartComplete: func(_ interface{}, _ objval.Part) error { return assert.AnError },
+		OnPartComplete: func(_ any, _ objval.Part) error { return assert.AnError },
 	}
 
 	uploader, err := NewMPUploader(options)

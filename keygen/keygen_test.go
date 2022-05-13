@@ -501,33 +501,33 @@ func TestFieldPathRemoveFrom(t *testing.T) {
 	type test struct {
 		name            string
 		path            string
-		input, expected map[string]interface{}
+		input, expected map[string]any
 	}
 
 	tests := []*test{
 		{
 			name:     "SimpleField",
 			path:     "field",
-			input:    map[string]interface{}{"field": "value"},
-			expected: make(map[string]interface{}),
+			input:    map[string]any{"field": "value"},
+			expected: make(map[string]any),
 		},
 		{
 			name:     "NestedField",
 			path:     "nested.field",
-			input:    map[string]interface{}{"nested": map[string]interface{}{"field": "value"}},
-			expected: map[string]interface{}{"nested": make(map[string]interface{})},
+			input:    map[string]any{"nested": map[string]any{"field": "value"}},
+			expected: map[string]any{"nested": make(map[string]any)},
 		},
 		{
 			name:     "NestedFieldNil",
 			path:     "nested.field",
-			input:    map[string]interface{}{"nested": nil},
-			expected: map[string]interface{}{"nested": nil},
+			input:    map[string]any{"nested": nil},
+			expected: map[string]any{"nested": nil},
 		},
 		{
 			name:     "NestedFieldNotAMap",
 			path:     "nested.field",
-			input:    map[string]interface{}{"field": "value"},
-			expected: map[string]interface{}{"field": "value"},
+			input:    map[string]any{"field": "value"},
+			expected: map[string]any{"field": "value"},
 		},
 	}
 

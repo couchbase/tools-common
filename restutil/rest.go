@@ -46,7 +46,7 @@ func SendJSONResponse(status int, data []byte, w http.ResponseWriter, errLog Err
 // MarshalAndSend will try and marshal the given interface, if it fails it will write an ErrorResponse to the client
 // with status 500 and a message saying that the response could not be marshaled. Otherwise it will send the marshaled
 // content.
-func MarshalAndSend(status int, data interface{}, w http.ResponseWriter, errLog ErrLogFn) {
+func MarshalAndSend(status int, data any, w http.ResponseWriter, errLog ErrLogFn) {
 	var (
 		rawData []byte
 		err     error
@@ -70,7 +70,7 @@ func MarshalAndSend(status int, data interface{}, w http.ResponseWriter, errLog 
 
 // DecodeJSONRequestBody tries to decode the body as JSON. If it fails it will send a 400 response and return false.
 // Otherwise it will return true and decode the body into dest.
-func DecodeJSONRequestBody(body io.ReadCloser, dest interface{}, w http.ResponseWriter) bool {
+func DecodeJSONRequestBody(body io.ReadCloser, dest any, w http.ResponseWriter) bool {
 	defer body.Close()
 
 	if err := json.NewDecoder(body).Decode(dest); err != nil {

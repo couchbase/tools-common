@@ -213,7 +213,7 @@ func ReadIfProvided(path string) ([]byte, error) {
 }
 
 // ReadJSONFile unmarshals data from the provided file into the given interface.
-func ReadJSONFile(path string, data interface{}) error {
+func ReadJSONFile(path string, data any) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func ReadJSONFile(path string, data interface{}) error {
 }
 
 // WriteJSONFile marshals the provided interface and writes it to a file at the given path.
-func WriteJSONFile(path string, data interface{}, mode os.FileMode) error {
+func WriteJSONFile(path string, data any, mode os.FileMode) error {
 	file, err := CreateFile(path, os.O_WRONLY, mode)
 	if err != nil {
 		return err

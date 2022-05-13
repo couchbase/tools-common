@@ -25,7 +25,7 @@ func TestNewRetryer(t *testing.T) {
 func TestRetryerDo(t *testing.T) {
 	var called int
 
-	payload, err := NewRetryer(RetryerOptions{}).Do(func(ctx *Context) (interface{}, error) {
+	payload, err := NewRetryer(RetryerOptions{}).Do(func(ctx *Context) (any, error) {
 		called++
 		return struct{}{}, nil
 	})
@@ -40,7 +40,7 @@ func TestRetryerDoWithLogFuncAllButLast(t *testing.T) {
 	var (
 		called  int
 		options = RetryerOptions{
-			Log: func(ctx *Context, _ interface{}, err error) {
+			Log: func(ctx *Context, _ any, err error) {
 				require.NotNil(t, ctx)
 				require.Equal(t, called+1, ctx.Attempt())
 				called++
@@ -48,7 +48,7 @@ func TestRetryerDoWithLogFuncAllButLast(t *testing.T) {
 		}
 	)
 
-	_, err := NewRetryer(options).Do(func(ctx *Context) (interface{}, error) { return nil, assert.AnError })
+	_, err := NewRetryer(options).Do(func(ctx *Context) (any, error) { return nil, assert.AnError })
 	require.Error(t, err)
 	require.Equal(t, 2, called)
 }
@@ -60,10 +60,10 @@ func TestRetryerDoCleanupAllButLast(t *testing.T) {
 	)
 
 	options := RetryerOptions{
-		Cleanup: func(payload interface{}) { cleanupCalled++ },
+		Cleanup: func(payload any) { cleanupCalled++ },
 	}
 
-	payload, err := NewRetryer(options).Do(func(ctx *Context) (interface{}, error) {
+	payload, err := NewRetryer(options).Do(func(ctx *Context) (any, error) {
 		fnCalled++
 		return nil, assert.AnError
 	})
@@ -81,7 +81,7 @@ func TestRetryerDoCleanupAllButLast(t *testing.T) {
 func TestRetryerDoWithError(t *testing.T) {
 	var called int
 
-	payload, err := NewRetryer(RetryerOptions{}).Do(func(ctx *Context) (interface{}, error) {
+	payload, err := NewRetryer(RetryerOptions{}).Do(func(ctx *Context) (any, error) {
 		called++
 		return nil, assert.AnError
 	})
@@ -98,11 +98,11 @@ func TestRetryerDoWithError(t *testing.T) {
 func TestRetryerDoShouldNotRetry(t *testing.T) {
 	var (
 		called  int
-		options = RetryerOptions{ShouldRetry: func(_ *Context, _ interface{}, _ error) bool { return false }}
+		options = RetryerOptions{ShouldRetry: func(_ *Context, _ any, _ error) bool { return false }}
 	)
 
 	payload, err := NewRetryer(options).Do(
-		func(ctx *Context) (interface{}, error) { called++; return nil, assert.AnError },
+		func(ctx *Context) (any, error) { called++; return nil, assert.AnError },
 	)
 
 	require.ErrorIs(t, err, assert.AnError)
@@ -116,7 +116,7 @@ func TestRetryerDoWithContext(t *testing.T) {
 
 	payload, err := NewRetryer(RetryerOptions{}).DoWithContext(
 		context.Background(),
-		func(ctx *Context) (interface{}, error) { called++; return struct{}{}, nil },
+		func(ctx *Context) (any, error) { called++; return struct{}{}, nil },
 	)
 
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestRetryerDoWithContext(t *testing.T) {
 func TestRetryerDoWithContextCancelled(t *testing.T) {
 	var called int
 
-	fn := func(ctx *Context) (interface{}, error) {
+	fn := func(ctx *Context) (any, error) {
 		called++
 
 		time.Sleep(100 * time.Millisecond)
@@ -161,7 +161,7 @@ func TestRetryerInternalDoContextCancelled(t *testing.T) {
 
 	payload, err := NewRetryer(RetryerOptions{}).DoWithContext(
 		ctx,
-		func(ctx *Context) (interface{}, error) { called++; return nil, assert.AnError },
+		func(ctx *Context) (any, error) { called++; return nil, assert.AnError },
 	)
 
 	var retriesAborted *RetriesAbortedError

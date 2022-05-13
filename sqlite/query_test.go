@@ -48,7 +48,7 @@ func TestQueries(t *testing.T) {
 	require.ErrorIs(t, err, ErrQueryReturnedNoRows)
 
 	query.Query = "insert into vbucket_42 (seqno) values (?);"
-	query.Arguments = []interface{}{128}
+	query.Arguments = []any{128}
 
 	affected, err = ExecuteQuery(db, query)
 	require.Nil(t, err)
@@ -61,7 +61,7 @@ func TestQueries(t *testing.T) {
 	require.Equal(t, uint64(128), value)
 
 	query.Query = "insert into vbucket_42 (seqno) values (?);"
-	query.Arguments = []interface{}{256}
+	query.Arguments = []any{256}
 
 	affected, err = ExecuteQuery(db, query)
 	require.Nil(t, err)

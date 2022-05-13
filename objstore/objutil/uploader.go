@@ -28,7 +28,7 @@ var (
 
 // OnPartCompleteFunc is a readability wrapper around a callback function which may be run after each part has been
 // uploaded.
-type OnPartCompleteFunc func(metadata interface{}, part objval.Part) error
+type OnPartCompleteFunc func(metadata any, part objval.Part) error
 
 // MPUploaderOptions encapsulates the options available when creating a 'MPUploader'.
 type MPUploaderOptions struct {
@@ -72,7 +72,7 @@ type MPUploaderOptions struct {
 // defaults populates the options with sensible defaults.
 func (m *MPUploaderOptions) defaults() {
 	if m.OnPartComplete == nil {
-		m.OnPartComplete = func(_ interface{}, _ objval.Part) error { return nil }
+		m.OnPartComplete = func(_ any, _ objval.Part) error { return nil }
 	}
 }
 
@@ -146,7 +146,7 @@ func (m *MPUploader) Upload(body io.ReadSeeker) error {
 // same time as the completed part.
 //
 // NOTE: This function is not thread safe.
-func (m *MPUploader) UploadWithMeta(metadata interface{}, body io.ReadSeeker) error {
+func (m *MPUploader) UploadWithMeta(metadata any, body io.ReadSeeker) error {
 	if len(m.opts.Parts) >= MaxUploadParts {
 		return ErrMPUploaderExceededMaxPartCount
 	}
@@ -161,7 +161,7 @@ func (m *MPUploader) UploadWithMeta(metadata interface{}, body io.ReadSeeker) er
 }
 
 // upload a new part with the given number/body.
-func (m *MPUploader) upload(number int, metadata interface{}, body io.ReadSeeker) error {
+func (m *MPUploader) upload(number int, metadata any, body io.ReadSeeker) error {
 	part, err := m.opts.Client.UploadPart(m.opts.Bucket, m.opts.ID, m.opts.Key, number, body)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)

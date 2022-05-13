@@ -15,11 +15,11 @@ func (p pq[T]) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
-func (p *pq[T]) Push(x interface{}) {
+func (p *pq[T]) Push(x any) {
 	*p = append(*p, x.(Item[T]))
 }
 
-func (p *pq[T]) Pop() interface{} {
+func (p *pq[T]) Pop() any {
 	x := (*p)[len(*p)-1]
 	(*p) = (*p)[:len(*p)-1]
 
