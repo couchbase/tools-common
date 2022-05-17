@@ -8,13 +8,13 @@ pipeline {
     agent { label "ubuntu-18.04&&master" }
 
     environment {
-        GO_TARBALL_URL = "https://golang.org/dl/go1.18.linux-amd64.tar.gz"
+        GO_TARBALL_URL = "https://golang.org/dl/go1.18.2.linux-amd64.tar.gz"
 
         GOROOT = "${WORKSPACE}/go"
         GOBIN = "${GOROOT}/bin"
         PATH="${PATH}:${GOBIN}:${WORKSPACE}/bin"
 
-        GOLANGCI_LINT_VERSION = "v1.45.0"
+        GOLANGCI_LINT_VERSION = "v1.46.1"
 
         PROJECT = "${WORKSPACE}/tools-common"
     }
@@ -60,7 +60,7 @@ pipeline {
                     sh "go install github.com/jstemmer/go-junit-report@latest"
 
                     // Coverage reporting
-                    sh "go install github.com/jhendrixMSFT/gocov/gocov@v1.0.1-0.20220325195445-df8497555dba"
+                    sh "go install github.com/axw/gocov/gocov@latest"
                     sh "go install github.com/AlekSi/gocov-xml@latest"
 
                     // clone project
