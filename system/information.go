@@ -27,6 +27,8 @@ func (i Information) String() string {
 }
 
 // GetInformation fetches and returns common system information in a platform agnostic fashion.
+//
+// NOTE: On supported platforms, the returned information may not be that of the host system but of any limits applied.
 func GetInformation() Information {
 	def := func(s string) string {
 		if s == "" {
@@ -56,7 +58,7 @@ func GetInformation() Information {
 		OS:       runtime.GOOS,
 		Version:  def(version),
 		Arch:     runtime.GOARCH,
-		VCPU:     runtime.NumCPU(),
+		VCPU:     NumCPU(),
 		Memory:   memory,
 	}
 }
