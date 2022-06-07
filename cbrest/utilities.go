@@ -2,12 +2,10 @@ package cbrest
 
 import (
 	"bufio"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,27 +15,26 @@ import (
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
+	"github.com/couchbase/tools-common/ptrutil"
 )
-
-// newHTTPTransport returns a new HTTP transport using the given TLS config.
-func newHTTPTransport(tlsConfig *tls.Config) *http.Transport {
-	return &http.Transport{
-		DialContext:           (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2:     true,
-		IdleConnTimeout:       90 * time.Second,
-		MaxIdleConns:          100,
-		Proxy:                 http.ProxyFromEnvironment,
-		ResponseHeaderTimeout: 10 * time.Second,
-		TLSClientConfig:       tlsConfig,
-		TLSHandshakeTimeout:   10 * time.Second,
-	}
-}
 
 // newHTTPClient returns a new HTTP client with the given client/transport.
 //
 // NOTE: This is used to ensure that all uses of a HTTP client use the same configuration.
 func newHTTPClient(timeout time.Duration, transport http.RoundTripper) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: transport}
+}
+
+// newDefaultHTTPTimeouts returns the default REST HTTP client timeouts.
+func newDefaultHTTPTimeouts() netutil.HTTPTimeouts {
+	return netutil.HTTPTimeouts{
+		Dialer:                  ptrutil.ToPtr(DefaultDialerTimeout),
+		KeepAlive:               ptrutil.ToPtr(DefaultDialerKeepAlive),
+		TransportIdleConn:       ptrutil.ToPtr(DefaultTransportIdleConnTimeout),
+		TransportContinue:       ptrutil.ToPtr(DefaultTransportContinueTimeout),
+		TransportResponseHeader: ptrutil.ToPtr(DefaultResponseHeaderTimeout),
+		TransportTLSHandshake:   ptrutil.ToPtr(DefaultTLSHandshakeTimeout),
+	}
 }
 
 // enhanceError returns a more informative error using information from the given request/response.

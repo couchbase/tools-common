@@ -118,10 +118,15 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, ErrConnectionModeRequiresNonTLS
 	}
 
+	timeouts, err := envvar.GetHTTPTimeouts(TimeoutsEnvVar, newDefaultHTTPTimeouts())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get timeouts for REST HTTP client: %w", err)
+	}
+
 	authProvider := NewAuthProvider(resolved, options.Provider)
 
 	client := &Client{
-		client:         newHTTPClient(clientTimeout, newHTTPTransport(options.TLSConfig)),
+		client:         newHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, *timeouts)),
 		authProvider:   authProvider,
 		connectionMode: options.ConnectionMode,
 		pollTimeout:    pollTimeout,
@@ -839,7 +844,8 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 // perform synchronously executes the provided request returning the response and any error that occurred during the
 // process.
 func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
-	timeout time.Duration) (*http.Response, error) {
+	timeout time.Duration,
+) (*http.Response, error) {
 	log.Logf(level, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", ctx.Attempt(), req.Method, req.URL)
 
 	client := c.client
