@@ -230,36 +230,42 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
 	).Return(mbAPI, nil)
 
-	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(
-		azblob.BlobGetPropertiesResponse{},
+	mbAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(
+		azblob.BlockBlobGetBlockListResponse{},
 		&azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound},
 	)
 
-	fn1 := func(options azblob.BlockBlobUploadOptions) bool {
+	fn2 := func(options azblob.BlockBlobStageBlockOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
 		return bytes.Equal(options.TransactionalContentMD5, expected[:])
 	}
 
-	output := azblob.BlockBlobUploadResponse{}
-
 	mbAPI.On(
-		"Upload",
+		"StageBlock",
+		mock.Anything,
 		mock.Anything,
 		strings.NewReader("value"),
-		mock.MatchedBy(fn1),
-	).Return(output, nil)
+		mock.MatchedBy(fn2),
+	).Return(azblob.BlockBlobStageBlockResponse{}, nil)
+
+	mbAPI.On(
+		"CommitBlockList",
+		mock.Anything,
+		mock.MatchedBy(func(parts []string) bool { return len(parts) == 1 }),
+		mock.Anything,
+	).Return(azblob.BlockBlobCommitBlockListResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
 
 	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 3)
 
 	mbAPI.AssertExpectations(t)
-	mbAPI.AssertNumberOfCalls(t, "GetProperties", 1)
-	mbAPI.AssertNumberOfCalls(t, "Upload", 1)
+	mbAPI.AssertNumberOfCalls(t, "StageBlock", 1)
+	mbAPI.AssertNumberOfCalls(t, "CommitBlockList", 1)
 }
 
 func TestClientAppendToObject(t *testing.T) {
@@ -274,27 +280,17 @@ func TestClientAppendToObject(t *testing.T) {
 		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
 	).Return(mbAPI, nil)
 
-	output := azblob.BlobGetPropertiesResponse{}
-
-	output.ContentLength = aws.Int64(42)
-	output.ETag = aws.String("etag")
-	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
-
-	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(output, nil)
-	mbAPI.On("URL").Return("example.com")
-
-	fn1 := func(options azblob.BlockBlobStageBlockFromURLOptions) bool {
-		return *options.Offset == 0 && *options.Count == azblob.CountToEnd
+	listOutput := azblob.BlockBlobGetBlockListResponse{}
+	listOutput.BlockList = azblob.BlockList{
+		CommittedBlocks: []*azblob.Block{
+			{
+				Name: aws.String("block1"),
+				Size: aws.Int64(64),
+			},
+		},
 	}
 
-	mbAPI.On(
-		"StageBlockFromURL",
-		mock.Anything,
-		mock.Anything,
-		mock.MatchedBy(func(url string) bool { return url == "example.com" }),
-		mock.MatchedBy(func(length int64) bool { return length == 0 }),
-		mock.MatchedBy(fn1),
-	).Return(azblob.BlockBlobStageBlockFromURLResponse{}, nil)
+	mbAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(listOutput, nil)
 
 	fn2 := func(options azblob.BlockBlobStageBlockOptions) bool {
 		expected := md5.Sum([]byte("value"))
@@ -320,6 +316,14 @@ func TestClientAppendToObject(t *testing.T) {
 	client := &Client{storageAPI: msAPI}
 
 	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 3)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "GetBlockList", 1)
+	mbAPI.AssertNumberOfCalls(t, "StageBlock", 1)
+	mbAPI.AssertNumberOfCalls(t, "CommitBlockList", 1)
 }
 
 func TestClientDeleteObjects(t *testing.T) {
@@ -906,16 +910,6 @@ func TestClientListParts(t *testing.T) {
 
 	output := azblob.BlockBlobGetBlockListResponse{}
 	output.BlockList = azblob.BlockList{
-		CommittedBlocks: []*azblob.Block{
-			{
-				Name: aws.String("block1"),
-				Size: aws.Int64(64),
-			},
-			{
-				Name: aws.String("block2"),
-				Size: aws.Int64(128),
-			},
-		},
 		UncommittedBlocks: []*azblob.Block{
 			{
 				Name: aws.String("block3"),

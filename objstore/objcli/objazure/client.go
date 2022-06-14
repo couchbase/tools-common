@@ -119,33 +119,26 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 }
 
 func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
-	attrs, err := c.GetObjectAttrs(bucket, key)
-
-	// As defined by the 'Client' interface, if the given object does not exist, we create it
-	if objerr.IsNotFoundError(err) || attrs != nil && attrs.Size == 0 {
-		return c.PutObject(bucket, key, data)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to get object attributes: %w", err)
-	}
-
 	id, err := c.CreateMultipartUpload(bucket, key)
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	existing, err := c.UploadPartCopy(bucket, id, key, key, 1, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get existing object part: %w", err)
+	parts, err := c.listParts(bucket, key, azblob.BlockListTypeCommitted)
+	// If the given object does not exist, we create it later in the function instead of failing as defined by the
+	// 'Client' interface
+	if err != nil && !objerr.IsNotFoundError(err) {
+		return fmt.Errorf("failed to get parts that are already committed to blob: %w", err)
 	}
 
-	intermediate, err := c.UploadPart(bucket, id, key, 2, data)
+	newPart, err := c.UploadPart(bucket, id, key, objcli.NoPartNumber, data)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(bucket, id, key, existing, intermediate)
+	parts = append(parts, newPart)
+
+	err = c.CompleteMultipartUpload(bucket, id, key, parts...)
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -326,6 +319,10 @@ func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
 		return nil, objcli.ErrExpectedNoUploadID
 	}
 
+	return c.listParts(bucket, key, azblob.BlockListTypeUncommitted)
+}
+
+func (c *Client) listParts(bucket, key string, blockType azblob.BlockListType) ([]objval.Part, error) {
 	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
 	if err != nil {
 		return nil, handleError(bucket, key, err)
@@ -333,14 +330,19 @@ func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
 
 	resp, err := blobClient.GetBlockList(
 		context.Background(),
-		azblob.BlockListTypeUncommitted,
+		blockType,
 		azblob.BlockBlobGetBlockListOptions{},
 	)
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
 
-	parts := make([]objval.Part, 0, len(resp.UncommittedBlocks))
+	// GetBlockList() will only return blocks of the required type/types so we can handle them in a general way
+	parts := make([]objval.Part, 0, len(resp.CommittedBlocks)+len(resp.UncommittedBlocks))
+
+	for _, block := range resp.CommittedBlocks {
+		parts = append(parts, objval.Part{ID: *block.Name, Size: *block.Size})
+	}
 
 	for _, block := range resp.UncommittedBlocks {
 		parts = append(parts, objval.Part{ID: *block.Name, Size: *block.Size})
