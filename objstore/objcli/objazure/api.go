@@ -3,160 +3,224 @@ package objazure
 import (
 	"context"
 	"io"
-	"net/url"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
 //go:generate mockery --all --case underscore --inpackage
+type readSeekNoopCloser struct {
+	io.ReadSeeker
+}
+
+func (r readSeekNoopCloser) Close() error { return nil }
 
 // blobStorageAPI is a top level interface which allows interactions with the Azure blob storage service.
 type blobStorageAPI interface {
-	ToContainerAPI(container string) containerAPI
+	ToContainerAPI(container string) (containerAPI, error)
+	ToBlobAPI(container, blob string) (blobAPI, error)
 }
 
-// serviceURL implements the 'blobStorageAPI' interface and encapsulates the Azure SDK in a unit
-// testable interface.
-type serviceURL struct {
-	url azblob.ServiceURL
+var _ blobStorageAPI = (*serviceClient)(nil)
+
+// serviceClient implements the 'blobStorageAPI' interface and encapsulates the Azure SDK in a unit testable interface.
+type serviceClient struct {
+	client *azblob.ServiceClient
 }
 
-func (s serviceURL) ToContainerAPI(container string) containerAPI {
-	url := s.url.NewContainerURL(container)
-	return containerURL{url: url}
+func (s serviceClient) ToContainerAPI(container string) (containerAPI, error) {
+	client, err := s.client.NewContainerClient(container)
+	if err != nil {
+		return nil, err
+	}
+
+	return containerClient{client: client}, nil
+}
+
+func (s serviceClient) ToBlobAPI(container, blob string) (blobAPI, error) {
+	containerClient, err := s.ToContainerAPI(container)
+	if err != nil {
+		return nil, err
+	}
+
+	blobClient, err := containerClient.ToBlobAPI(blob)
+	if err != nil {
+		return nil, err
+	}
+
+	return blobClient, nil
 }
 
 // containerAPI is a container level interface which allows interactions with an Azure blob storage container.
 type containerAPI interface {
-	ListBlobsFlatSegment(ctx context.Context, marker azblob.Marker,
-		o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsFlatSegmentResponse, error)
-	ListBlobsHierarchySegment(ctx context.Context, marker azblob.Marker, delimiter string,
-		o azblob.ListBlobsSegmentOptions) (*azblob.ListBlobsHierarchySegmentResponse, error)
-	ToBlobAPI(blob string) blobAPI
+	GetListBlobsFlatPagerAPI(options azblob.ContainerListBlobsFlatOptions) listBlobsPagerAPI
+	GetListBlobsHierarchyPagerAPI(delimiter string, options azblob.ContainerListBlobsHierarchyOptions) listBlobsPagerAPI
+	ToBlobAPI(blob string) (blobAPI, error)
 }
 
-// containerURL implements the 'containerAPI' interface and encapsulates the Azure SDK in a unit testable interface.
-type containerURL struct {
-	url azblob.ContainerURL
+var _ containerAPI = (*containerClient)(nil)
+
+// containerClient implements the 'containerAPI' interface and encapsulates the Azure SDK in a unit testable interface.
+type containerClient struct {
+	client *azblob.ContainerClient
 }
 
-func (c containerURL) ListBlobsFlatSegment(ctx context.Context, marker azblob.Marker,
-	o azblob.ListBlobsSegmentOptions,
-) (*azblob.ListBlobsFlatSegmentResponse, error) {
-	return c.url.ListBlobsFlatSegment(ctx, marker, o)
+type listBlobsPagerAPI interface {
+	GetNextListBlobsSegment(ctx context.Context) ([]*azblob.BlobPrefix, []*azblob.BlobItemInternal, error)
 }
 
-func (c containerURL) ListBlobsHierarchySegment(ctx context.Context, marker azblob.Marker, delimiter string,
-	o azblob.ListBlobsSegmentOptions,
-) (*azblob.ListBlobsHierarchySegmentResponse, error) {
-	return c.url.ListBlobsHierarchySegment(ctx, marker, delimiter, o)
+type commonAzurePager interface {
+	NextPage(ctx context.Context) bool
+	Err() error
 }
 
-func (c containerURL) ToBlobAPI(blob string) blobAPI {
-	url := c.url.NewBlobURL(blob)
-	return blobURL{url: url}
+type basePager struct {
+	pager commonAzurePager
 }
 
-// blobAPI is a blob level interface which allows interactions with a blob stored in an Azure container.
+func (b basePager) nextPage(ctx context.Context) error {
+	var (
+		hasNextPage = b.pager.NextPage(ctx)
+		err         = b.pager.Err()
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if !hasNextPage {
+		return errPagerNoMorePages
+	}
+
+	return nil
+}
+
+type flatPager struct {
+	basePager
+	pager *azblob.ContainerListBlobFlatPager
+}
+
+func (f flatPager) GetNextListBlobsSegment(ctx context.Context) ([]*azblob.BlobPrefix,
+	[]*azblob.BlobItemInternal, error,
+) {
+	err := f.nextPage(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return nil, f.pager.PageResponse().Segment.BlobItems, nil
+}
+
+type hierarchyPager struct {
+	basePager
+	pager *azblob.ContainerListBlobHierarchyPager
+}
+
+func (f hierarchyPager) GetNextListBlobsSegment(ctx context.Context) ([]*azblob.BlobPrefix,
+	[]*azblob.BlobItemInternal, error,
+) {
+	err := f.nextPage(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	segment := f.pager.PageResponse().Segment
+
+	return segment.BlobPrefixes, segment.BlobItems, nil
+}
+
+func (c containerClient) GetListBlobsFlatPagerAPI(options azblob.ContainerListBlobsFlatOptions) listBlobsPagerAPI {
+	pager := c.client.ListBlobsFlat(&options)
+
+	return flatPager{basePager: basePager{pager: pager}, pager: pager}
+}
+
+func (c containerClient) GetListBlobsHierarchyPagerAPI(delimiter string,
+	options azblob.ContainerListBlobsHierarchyOptions,
+) listBlobsPagerAPI {
+	pager := c.client.ListBlobsHierarchy(delimiter, &options)
+
+	return hierarchyPager{basePager: basePager{pager: pager}, pager: pager}
+}
+
+func (c containerClient) ToBlobAPI(blob string) (blobAPI, error) {
+	client, err := c.client.NewBlockBlobClient(blob)
+	if err != nil {
+		return nil, err
+	}
+
+	return blobClient{client: client}, nil
+}
+
+// blobAPI is a block blob interface which allows interactions with a block blob stored in an Azure container.
 type blobAPI interface {
-	Delete(ctx context.Context, deleteOptions azblob.DeleteSnapshotsOptionType,
-		ac azblob.BlobAccessConditions) (*azblob.BlobDeleteResponse, error)
-	Download(ctx context.Context, offset, count int64, ac azblob.BlobAccessConditions,
-		rangeGetContentMD5 bool, cpk azblob.ClientProvidedKeyOptions) (*azblob.DownloadResponse, error)
-	GetProperties(ctx context.Context, ac azblob.BlobAccessConditions,
-		cpk azblob.ClientProvidedKeyOptions) (*azblob.BlobGetPropertiesResponse, error)
-	ToBlockBlobAPI() blockBlobAPI
+	Delete(ctx context.Context, options azblob.BlobDeleteOptions) (azblob.BlobDeleteResponse, error)
+	Download(ctx context.Context, options azblob.BlobDownloadOptions) (azblob.BlobDownloadResponse, error)
+	GetProperties(ctx context.Context, options azblob.BlobGetPropertiesOptions) (azblob.BlobGetPropertiesResponse,
+		error)
+	CommitBlockList(ctx context.Context, base64BlockIDs []string, options azblob.BlockBlobCommitBlockListOptions,
+	) (azblob.BlockBlobCommitBlockListResponse, error)
+	GetBlockList(ctx context.Context, listType azblob.BlockListType, options azblob.BlockBlobGetBlockListOptions,
+	) (azblob.BlockBlobGetBlockListResponse, error)
+	StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker, options azblob.BlockBlobStageBlockOptions,
+	) (azblob.BlockBlobStageBlockResponse, error)
+	StageBlockFromURL(ctx context.Context, base64BlockID, sourceURL string, length int64,
+		options azblob.BlockBlobStageBlockFromURLOptions) (azblob.BlockBlobStageBlockFromURLResponse, error)
+	URL() string
+	Upload(ctx context.Context, body io.ReadSeeker, options azblob.BlockBlobUploadOptions,
+	) (azblob.BlockBlobUploadResponse, error)
 }
 
-// blobURL implements the 'blobAPI' interface and encapsulates the Azure SDK in a unit testable interface.
-type blobURL struct {
-	url azblob.BlobURL
+var _ blobAPI = (*blobClient)(nil)
+
+// blobClient implements the 'blobAPI' interface and encapsulates the Azure SDK in a unit testable interface.
+type blobClient struct {
+	client *azblob.BlockBlobClient
 }
 
-func (b blobURL) ToBlockBlobAPI() blockBlobAPI {
-	url := b.url.ToBlockBlobURL()
-	return blockBlobURL{url: url}
+func (b blobClient) Delete(ctx context.Context, options azblob.BlobDeleteOptions,
+) (azblob.BlobDeleteResponse, error) {
+	return b.client.Delete(ctx, &options)
 }
 
-func (b blobURL) Delete(ctx context.Context, deleteOptions azblob.DeleteSnapshotsOptionType,
-	ac azblob.BlobAccessConditions,
-) (*azblob.BlobDeleteResponse, error) {
-	return b.url.Delete(ctx, deleteOptions, ac)
+func (b blobClient) Download(ctx context.Context, options azblob.BlobDownloadOptions,
+) (azblob.BlobDownloadResponse, error) {
+	return b.client.Download(ctx, &options)
 }
 
-func (b blobURL) Download(ctx context.Context, offset, count int64, ac azblob.BlobAccessConditions,
-	rangeGetContentMD5 bool, cpk azblob.ClientProvidedKeyOptions,
-) (*azblob.DownloadResponse, error) {
-	return b.url.Download(ctx, offset, count, ac, rangeGetContentMD5, cpk)
+func (b blobClient) GetProperties(ctx context.Context, options azblob.BlobGetPropertiesOptions,
+) (azblob.BlobGetPropertiesResponse, error) {
+	return b.client.GetProperties(ctx, &options)
 }
 
-func (b blobURL) GetProperties(ctx context.Context,
-	ac azblob.BlobAccessConditions, cpk azblob.ClientProvidedKeyOptions,
-) (*azblob.BlobGetPropertiesResponse, error) {
-	return b.url.GetProperties(ctx, ac, cpk)
+func (b blobClient) CommitBlockList(ctx context.Context, base64BlockIDs []string,
+	options azblob.BlockBlobCommitBlockListOptions,
+) (azblob.BlockBlobCommitBlockListResponse, error) {
+	return b.client.CommitBlockList(ctx, base64BlockIDs, &options)
 }
 
-// blockBlobAPI is a block blob interface which allows interactions with a block blob stored in an Azure container.
-type blockBlobAPI interface {
-	CommitBlockList(ctx context.Context, base64BlockIDs []string, h azblob.BlobHTTPHeaders, metadata azblob.Metadata,
-		ac azblob.BlobAccessConditions, tier azblob.AccessTierType, blobTagsMap azblob.BlobTagsMap,
-		cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobCommitBlockListResponse, error)
-	GetBlockList(ctx context.Context, listType azblob.BlockListType,
-		ac azblob.LeaseAccessConditions) (*azblob.BlockList, error)
-	StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker, ac azblob.LeaseAccessConditions,
-		transactionalMD5 []byte, cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobStageBlockResponse, error)
-	StageBlockFromURL(ctx context.Context, base64BlockID string, sourceURL url.URL, offset, count int64,
-		destinationAccessConditions azblob.LeaseAccessConditions,
-		sourceAccessConditions azblob.ModifiedAccessConditions,
-		cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobStageBlockFromURLResponse, error)
-	URL() url.URL
-	Upload(ctx context.Context, body io.ReadSeeker, h azblob.BlobHTTPHeaders, metadata azblob.Metadata,
-		ac azblob.BlobAccessConditions, tier azblob.AccessTierType, blobTagsMap azblob.BlobTagsMap,
-		cpk azblob.ClientProvidedKeyOptions) (*azblob.BlockBlobUploadResponse, error)
+func (b blobClient) GetBlockList(ctx context.Context, listType azblob.BlockListType,
+	options azblob.BlockBlobGetBlockListOptions,
+) (azblob.BlockBlobGetBlockListResponse, error) {
+	return b.client.GetBlockList(ctx, listType, &options)
 }
 
-// blockBlobURL implements the 'blockBlobAPI' interface and encapsulates the Azure SDK in a unit testable interface.
-type blockBlobURL struct {
-	url azblob.BlockBlobURL
+func (b blobClient) StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker,
+	options azblob.BlockBlobStageBlockOptions,
+) (azblob.BlockBlobStageBlockResponse, error) {
+	return b.client.StageBlock(ctx, base64BlockID, readSeekNoopCloser{body}, &options)
 }
 
-func (b blockBlobURL) CommitBlockList(
-	ctx context.Context, base64BlockIDs []string, h azblob.BlobHTTPHeaders, metadata azblob.Metadata,
-	ac azblob.BlobAccessConditions, tier azblob.AccessTierType, blobTagsMap azblob.BlobTagsMap,
-	cpk azblob.ClientProvidedKeyOptions,
-) (*azblob.BlockBlobCommitBlockListResponse, error) {
-	return b.url.CommitBlockList(ctx, base64BlockIDs, h, metadata, ac, tier, blobTagsMap, cpk)
+func (b blobClient) StageBlockFromURL(ctx context.Context, base64BlockID, sourceURL string, length int64,
+	options azblob.BlockBlobStageBlockFromURLOptions,
+) (azblob.BlockBlobStageBlockFromURLResponse, error) {
+	return b.client.StageBlockFromURL(ctx, base64BlockID, sourceURL, length, &options)
 }
 
-func (b blockBlobURL) GetBlockList(ctx context.Context, listType azblob.BlockListType,
-	ac azblob.LeaseAccessConditions,
-) (*azblob.BlockList, error) {
-	return b.url.GetBlockList(ctx, listType, ac)
+func (b blobClient) URL() string {
+	return b.client.URL()
 }
 
-func (b blockBlobURL) StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeeker,
-	ac azblob.LeaseAccessConditions, transactionalMD5 []byte,
-	cpk azblob.ClientProvidedKeyOptions,
-) (*azblob.BlockBlobStageBlockResponse, error) {
-	return b.url.StageBlock(ctx, base64BlockID, body, ac, transactionalMD5, cpk)
-}
-
-func (b blockBlobURL) StageBlockFromURL(ctx context.Context, base64BlockID string, sourceURL url.URL,
-	offset, count int64, destinationAccessConditions azblob.LeaseAccessConditions,
-	sourceAccessConditions azblob.ModifiedAccessConditions,
-	cpk azblob.ClientProvidedKeyOptions,
-) (*azblob.BlockBlobStageBlockFromURLResponse, error) {
-	return b.url.StageBlockFromURL(ctx, base64BlockID, sourceURL, offset, count, destinationAccessConditions,
-		sourceAccessConditions, cpk)
-}
-
-func (b blockBlobURL) URL() url.URL {
-	return b.url.URL()
-}
-
-func (b blockBlobURL) Upload(ctx context.Context, body io.ReadSeeker, h azblob.BlobHTTPHeaders,
-	metadata azblob.Metadata, ac azblob.BlobAccessConditions, tier azblob.AccessTierType,
-	blobTagsMap azblob.BlobTagsMap, cpk azblob.ClientProvidedKeyOptions,
-) (*azblob.BlockBlobUploadResponse, error) {
-	return b.url.Upload(ctx, body, h, metadata, ac, tier, blobTagsMap, cpk)
+func (b blobClient) Upload(ctx context.Context, body io.ReadSeeker, options azblob.BlockBlobUploadOptions,
+) (azblob.BlockBlobUploadResponse, error) {
+	return b.client.Upload(ctx, readSeekNoopCloser{body}, &options)
 }

@@ -2,17 +2,17 @@ package objazure
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"testing"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/stretchr/testify/require"
-
 	"github.com/couchbase/tools-common/objstore/objerr"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type azureMockTokenRefreshError struct {
@@ -30,169 +30,20 @@ func (a *azureMockTokenRefreshError) Response() *http.Response {
 
 var _ adal.TokenRefreshError = (*azureMockTokenRefreshError)(nil)
 
-func TestAzureGetServicePrincipleTokenFromFileEnvNotSet(t *testing.T) {
-	os.Unsetenv("AZURE_AUTH_LOCATION")
-
-	actual, err := getServicePrincipleToken()
-
-	require.NoError(t, err)
-	require.Nil(t, actual)
-}
-
-func TestAzureGetResource(t *testing.T) {
-	type test struct {
-		name          string
-		env           map[string]string
-		expected      string
-		expectedError bool
-	}
-
-	tests := []*test{
-		{
-			name:     "UseDefaultResource",
-			expected: "https://storage.azure.com/",
-		},
-		{
-			name:     "UseAlternativeEnvironment",
-			env:      map[string]string{"AZURE_ENVIRONMENT": "AZUREUSGOVERNMENTCLOUD"},
-			expected: "https://storage.azure.com/",
-		},
-		{
-			name:     "StaticResource",
-			env:      map[string]string{"AZURE_STORAGE_RESOURCE": "resource"},
-			expected: "resource",
-		},
-		{
-			name:          "UnknownEnvironment",
-			env:           map[string]string{"AZURE_ENVIRONMENT": "unknown"},
-			expectedError: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			for key, val := range test.env {
-				err := os.Setenv(key, val)
-				require.NoError(t, err)
-				defer os.Unsetenv(key)
-			}
-
-			actual, err := getResource()
-			require.Equal(t, err != nil, test.expectedError)
-			require.Equal(t, test.expected, actual)
-		})
-	}
-}
-
-func TestAzureHandleTokenRefreshError(t *testing.T) {
-	type test struct {
-		name     string
-		err      error
-		expected string
-	}
-
-	tests := []*test{
-		{
-			name:     "UnknownError",
-			err:      errors.New("unknown error"),
-			expected: "unknown error",
-		},
-		{
-			name:     "TokenRefreshErrorNilResponse",
-			err:      &azureMockTokenRefreshError{msg: "token refresh error"},
-			expected: "token refresh error",
-		},
-		{
-			name: "TokenRefreshErrorNotBadRequest",
-			err: &azureMockTokenRefreshError{
-				msg:  "token refresh error",
-				resp: &http.Response{StatusCode: http.StatusBadGateway},
-			},
-			expected: "token refresh error",
-		},
-		{
-			name: "TokenRefreshErrorNoRegexMatch",
-			err: &azureMockTokenRefreshError{
-				msg:  "unknown error",
-				resp: &http.Response{StatusCode: http.StatusBadRequest},
-			},
-			expected: "unknown error",
-		},
-		{
-			name: "TokenRefreshErrorEmptyErrorCodes",
-			err: &azureMockTokenRefreshError{
-				msg:  `Response body: {"error_codes":[]}`,
-				resp: &http.Response{StatusCode: http.StatusBadRequest},
-			},
-			expected: `Response body: {"error_codes":[]}`,
-		},
-		{
-			name: "TokenRefreshErrorNonEmptyErrorCodes",
-			err: &azureMockTokenRefreshError{
-				msg:  `Response body: {"error_codes":[50001]}`,
-				resp: &http.Response{StatusCode: http.StatusBadRequest},
-			},
-			expected: "the resource is disabled or does not exist",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actual := handleTokenRefreshError(test.err)
-			require.Equal(t, test.expected, actual.Error())
-		})
-	}
-}
-
-func TestAzureTranslateTokenRefreshErrorCodes(t *testing.T) {
-	type test struct {
-		name     string
-		codes    []uint64
-		expected string
-	}
-
-	tests := []*test{
-		{
-			name:  "NotFound",
-			codes: []uint64{42},
-			expected: fmt.Sprintf("unknown error code(s) '[42]' consult the Azure Active Directory documentation " +
-				"for more information"),
-		},
-		{
-			name:     "Found",
-			codes:    []uint64{50001},
-			expected: "the resource is disabled or does not exist",
-		},
-		{
-			name:     "StableOutput",
-			codes:    []uint64{50001, 50010, 50034},
-			expected: "audience URI validation for the app failed since no token audiences were configured",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actual := translateTokenRefreshErrorCodes(test.codes)
-			require.Equal(t, test.expected, actual.Error())
-		})
-	}
-}
-
-func TestAzureGetCredentials(t *testing.T) {
+func TestAzureGetStaticCredentials(t *testing.T) {
 	type test struct {
 		name            string
 		accessKeyID     string
 		secretAccessKey string
 		env             map[string]string
-		expected        azblob.Credential
-		expectedError   error
+		expected        *azblob.SharedKeyCredential
 	}
 
 	enc := func(secret string) string {
 		return base64.RawStdEncoding.EncodeToString([]byte(secret))
 	}
 
-	must := func(account, secret string) azblob.Credential {
+	must := func(account, secret string) *azblob.SharedKeyCredential {
 		credentials, err := azblob.NewSharedKeyCredential(account, enc(secret))
 		require.NoError(t, err)
 
@@ -209,14 +60,12 @@ func TestAzureGetCredentials(t *testing.T) {
 			expected: must("account", "secret"),
 		},
 		{
-			name:          "StaticCredentialsMustSupplyBoth",
-			accessKeyID:   "account",
-			expectedError: objerr.ErrNoValidCredentialsFound,
+			name:        "StaticCredentialsMustSupplyBoth",
+			accessKeyID: "account",
 		},
 		{
 			name:            "StaticCredentialsMustSupplyBoth",
 			secretAccessKey: enc("secret"),
-			expectedError:   objerr.ErrNoValidCredentialsFound,
 		},
 		{
 			name: "StaticCredentialsViaEnv",
@@ -239,11 +88,9 @@ func TestAzureGetCredentials(t *testing.T) {
 			env: map[string]string{
 				"AZURE_STORAGE_CONNECTION_STRING": fmt.Sprintf("AccountNameaccount;AccountKey=%s", enc("secret")),
 			},
-			expectedError: objerr.ErrNoValidCredentialsFound,
 		},
 		{
-			name:          "NoValidCredentials",
-			expectedError: objerr.ErrNoValidCredentialsFound,
+			name: "NoValidCredentials",
 		},
 	}
 
@@ -255,12 +102,7 @@ func TestAzureGetCredentials(t *testing.T) {
 				defer os.Unsetenv(key)
 			}
 
-			actual, err := GetCredentials(test.accessKeyID, test.secretAccessKey)
-			if test.expectedError != nil {
-				require.ErrorIs(t, err, test.expectedError)
-				return
-			}
-
+			actual, err := getStaticCredentials(test.accessKeyID, test.secretAccessKey)
 			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
 		})
@@ -371,7 +213,7 @@ func TestAzureGetEndpoint(t *testing.T) {
 				defer os.Unsetenv(key)
 			}
 
-			actual, err := getEndpoint(test.endpoint, test.accessKeyID)
+			actual, err := getServiceURL(test.endpoint, test.accessKeyID)
 
 			if test.expectedError != nil {
 				require.ErrorIs(t, err, test.expectedError)
@@ -380,6 +222,41 @@ func TestAzureGetEndpoint(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestHandleCredsError(t *testing.T) {
+	type test struct {
+		name     string
+		err      error
+		expected error
+	}
+
+	tests := []*test{
+		{
+			name: "Nil",
+		},
+		{
+			name:     "UnknownError",
+			err:      assert.AnError,
+			expected: assert.AnError,
+		},
+		{
+			name:     "Unauthenticated",
+			err:      storageError(http.StatusUnauthorized),
+			expected: objerr.ErrUnauthenticated,
+		},
+		{
+			name:     "Unauthorized",
+			err:      storageError(http.StatusForbidden),
+			expected: objerr.ErrUnauthorized,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.ErrorIs(t, handleCredsError(test.err), test.expected)
 		})
 	}
 }

@@ -119,10 +119,15 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, ErrConnectionModeRequiresNonTLS
 	}
 
+	timeouts, err := envvar.GetHTTPTimeouts(TimeoutsEnvVar, newDefaultHTTPTimeouts())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get timeouts for REST HTTP client: %w", err)
+	}
+
 	authProvider := NewAuthProvider(resolved, options.Provider)
 
 	client := &Client{
-		client:         newHTTPClient(clientTimeout, newHTTPTransport(options.TLSConfig)),
+		client:         newHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, timeouts)),
 		authProvider:   authProvider,
 		connectionMode: options.ConnectionMode,
 		pollTimeout:    pollTimeout,

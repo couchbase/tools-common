@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -17,7 +18,7 @@ import (
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/system"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
 // NOTE: As apposed to AWS/GCP, Azure use the container/blob naming convention, however, for consistency the Azure
@@ -30,10 +31,10 @@ type Client struct {
 
 var _ objcli.Client = (*Client)(nil)
 
-// NewClient returns a new client which uses the given service URL, in general this should be the one created using the
-// 'azblob.NewServiceURL' function exposed by the SDK.
-func NewClient(url azblob.ServiceURL) *Client {
-	return &Client{storageAPI: serviceURL{url: url}}
+// NewClient returns a new client which uses the given service client, in general this should be the one created using
+// the 'azblob.NewServiceClient' function exposed by the SDK.
+func NewClient(client *azblob.ServiceClient) *Client {
+	return &Client{storageAPI: serviceClient{client: client}}
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -50,104 +51,93 @@ func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Ob
 		offset, length = br.ToOffsetLength(length)
 	}
 
-	blobURL := c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key)
+	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
+	if err != nil {
+		return nil, handleError(bucket, key, err)
+	}
 
-	resp, err := blobURL.Download(
-		context.Background(),
-		offset,
-		length,
-		azblob.BlobAccessConditions{},
-		false,
-		azblob.ClientProvidedKeyOptions{},
-	)
+	resp, err := blobClient.Download(context.Background(), azblob.BlobDownloadOptions{Offset: &offset, Count: &length})
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
 
 	attrs := objval.ObjectAttrs{
 		Key:          key,
-		Size:         resp.ContentLength(),
-		LastModified: aws.Time(resp.LastModified()),
+		Size:         *resp.ContentLength,
+		LastModified: resp.LastModified,
 	}
 
 	object := &objval.Object{
 		ObjectAttrs: attrs,
-		Body:        resp.Body(azblob.RetryReaderOptions{}),
+		Body:        resp.Body(&azblob.RetryReaderOptions{}),
 	}
 
 	return object, nil
 }
 
 func (c *Client) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, error) {
-	blobURL := c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key)
+	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
+	if err != nil {
+		return nil, handleError(bucket, key, err)
+	}
 
-	resp, err := blobURL.GetProperties(
-		context.Background(),
-		azblob.BlobAccessConditions{},
-		azblob.ClientProvidedKeyOptions{},
-	)
+	resp, err := blobClient.GetProperties(context.Background(), azblob.BlobGetPropertiesOptions{})
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
 
 	attrs := &objval.ObjectAttrs{
 		Key:          key,
-		ETag:         string(resp.ETag()),
-		Size:         resp.ContentLength(),
-		LastModified: aws.Time(resp.LastModified()),
+		ETag:         *resp.ETag,
+		Size:         *resp.ContentLength,
+		LastModified: resp.LastModified,
 	}
 
 	return attrs, nil
 }
 
 func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
-	var (
-		md5sum   = md5.New()
-		blockURL = c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key).ToBlockBlobAPI()
-	)
+	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
+	if err != nil {
+		return handleError(bucket, key, err)
+	}
 
-	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum), body)
+	md5sum := md5.New()
+
+	_, err = aws.CopySeekableBody(io.MultiWriter(md5sum), body)
 	if err != nil {
 		return fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
-	_, err = blockURL.Upload(
+	_, err = blobClient.Upload(
 		context.Background(),
 		body,
-		azblob.BlobHTTPHeaders{ContentMD5: md5sum.Sum(nil)},
-		azblob.Metadata{},
-		azblob.BlobAccessConditions{},
-		azblob.AccessTierNone,
-		azblob.BlobTagsMap{},
-		azblob.ClientProvidedKeyOptions{},
+		azblob.BlockBlobUploadOptions{TransactionalContentMD5: md5sum.Sum(nil)},
 	)
 
 	return handleError(bucket, key, err)
 }
 
 func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
-	attrs, err := c.GetObjectAttrs(bucket, key)
-
-	// As defined by the 'Client' interface, if the given object does not exist, we create it
-	if objerr.IsNotFoundError(err) || attrs.Size == 0 {
-		return c.PutObject(bucket, key, data)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to get object attributes: %w", err)
-	}
-
 	id, err := c.CreateMultipartUpload(bucket, key)
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	intermediate, err := c.UploadPart(bucket, id, key, 2, data)
+	parts, err := c.listParts(bucket, key, azblob.BlockListTypeCommitted)
+
+	// If the given object does not exist, we create it later in the function instead of failing as defined by the
+	// 'Client' interface
+	if err != nil && !objerr.IsNotFoundError(err) {
+		return fmt.Errorf("failed to get parts that are already committed to blob: %w", err)
+	}
+
+	newPart, err := c.UploadPart(bucket, id, key, objcli.NoPartNumber, data)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(bucket, id, key, objval.Part{ID: key, Number: 1, Size: attrs.Size}, intermediate)
+	err = c.CompleteMultipartUpload(bucket, id, key, append(parts, newPart)...)
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -156,22 +146,23 @@ func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 }
 
 func (c *Client) DeleteObjects(bucket string, keys ...string) error {
-	var (
-		containerURL = c.storageAPI.ToContainerAPI(bucket)
-		pool         = hofp.NewPool(hofp.Options{
-			Size:      system.NumWorkers(len(keys)),
-			LogPrefix: "(objazure)",
-		})
-	)
+	containerClient, err := c.storageAPI.ToContainerAPI(bucket)
+	if err != nil {
+		return err // Purposefully not wrapped
+	}
+
+	pool := hofp.NewPool(hofp.Options{
+		Size:      system.NumWorkers(len(keys)),
+		LogPrefix: "(objazure)",
+	})
 
 	del := func(key string) error {
-		blobURL := containerURL.ToBlobAPI(key)
+		blobClient, err := containerClient.ToBlobAPI(key)
+		if err != nil {
+			return err // Purposefully not wrapped
+		}
 
-		_, err := blobURL.Delete(
-			context.Background(),
-			azblob.DeleteSnapshotsOptionNone,
-			azblob.BlobAccessConditions{},
-		)
+		_, err = blobClient.Delete(context.Background(), azblob.BlobDeleteOptions{})
 		if err != nil && !isKeyNotFound(err) {
 			return handleError(bucket, key, err)
 		}
@@ -207,19 +198,69 @@ func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclu
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
+	containerClient, err := c.storageAPI.ToContainerAPI(bucket)
+	if err != nil {
+		return err // Purposefully not wrapped
+	}
+
+	if delimiter == "" {
+		return c.iterateObjectsFlat(containerClient, bucket, prefix, include, exclude, fn)
+	}
+
+	return c.iterateObjectsHierarchy(containerClient, bucket, prefix, delimiter, include, exclude, fn)
+}
+
+func (c *Client) iterateObjectsFlat(containerClient containerAPI, bucket, prefix string, include,
+	exclude []*regexp.Regexp, fn objcli.IterateFunc,
+) error {
+	options := azblob.ContainerListBlobsFlatOptions{Prefix: &prefix}
+
+	return c.iterateObjectsWithPager(
+		containerClient.GetListBlobsFlatPagerAPI(options),
+		bucket,
+		include,
+		exclude,
+		fn,
+	)
+}
+
+func (c *Client) iterateObjectsHierarchy(containerClient containerAPI, bucket, prefix, delimiter string, include,
+	exclude []*regexp.Regexp, fn objcli.IterateFunc,
+) error {
+	options := azblob.ContainerListBlobsHierarchyOptions{Prefix: &prefix}
+
+	return c.iterateObjectsWithPager(
+		containerClient.GetListBlobsHierarchyPagerAPI(delimiter, options),
+		bucket,
+		include,
+		exclude,
+		fn,
+	)
+}
+
+func (c *Client) iterateObjectsWithPager(pager listBlobsPagerAPI, bucket string, include,
+	exclude []*regexp.Regexp, fn objcli.IterateFunc,
+) error {
 	var (
-		containerURL = c.storageAPI.ToContainerAPI(bucket)
-		options      = azblob.ListBlobsSegmentOptions{Prefix: prefix}
-		objects      []*objval.ObjectAttrs
-		marker       azblob.Marker
-		err          error
+		ctx      = context.Background()
+		prefixes []*azblob.BlobPrefix
+		blobs    []*azblob.BlobItemInternal
+		objects  []*objval.ObjectAttrs
+		err      error
 	)
 
-	for marker.NotDone() {
-		objects, marker, err = c.listBlobs(containerURL, marker, delimiter, options)
+	for err == nil {
+		prefixes, blobs, err = pager.GetNextListBlobsSegment(ctx)
+
+		if errors.Is(err, errPagerNoMorePages) {
+			break
+		}
+
 		if err != nil {
 			return handleError(bucket, "", err)
 		}
+
+		objects = c.convertBlobsToObjectAttrs(prefixes, blobs)
 
 		err = c.iterateObjects(objects, include, exclude, fn)
 		if err != nil {
@@ -230,65 +271,23 @@ func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclu
 	return nil
 }
 
-// listBlobs lists blobs using either a flat or hierarchical listing depending on whether a delimiter is supplied.
-//
-// NOTE: The returned marker should be used for the next call to 'listBlobs' to retrieve the next page of items.
-func (c *Client) listBlobs(containerURL containerAPI, marker azblob.Marker, delimiter string,
-	options azblob.ListBlobsSegmentOptions,
-) ([]*objval.ObjectAttrs, azblob.Marker, error) {
-	if delimiter == "" {
-		return c.listBlobsFlat(containerURL, marker, options)
+func (c *Client) convertBlobsToObjectAttrs(prefixes []*azblob.BlobPrefix, blobs []*azblob.BlobItemInternal,
+) []*objval.ObjectAttrs {
+	converted := make([]*objval.ObjectAttrs, 0, len(prefixes)+len(blobs))
+
+	for _, p := range prefixes {
+		converted = append(converted, &objval.ObjectAttrs{Key: *p.Name})
 	}
 
-	return c.listBlobsHier(containerURL, marker, delimiter, options)
-}
-
-// listBlobsFlat performs a flat blob listing returning a page of objects.
-func (c *Client) listBlobsFlat(containerURL containerAPI, marker azblob.Marker,
-	options azblob.ListBlobsSegmentOptions,
-) ([]*objval.ObjectAttrs, azblob.Marker, error) {
-	resp, err := containerURL.ListBlobsFlatSegment(context.Background(), marker, options)
-	if err != nil {
-		return nil, azblob.Marker{}, err // Purposefully not wrapped
-	}
-
-	converted := make([]*objval.ObjectAttrs, 0, len(resp.Segment.BlobItems))
-
-	for _, b := range resp.Segment.BlobItems {
+	for _, b := range blobs {
 		converted = append(converted, &objval.ObjectAttrs{
-			Key:          b.Name,
+			Key:          *b.Name,
 			Size:         *b.Properties.ContentLength,
-			LastModified: &b.Properties.LastModified,
+			LastModified: b.Properties.LastModified,
 		})
 	}
 
-	return converted, resp.NextMarker, nil
-}
-
-// listBlobsHier performs a hierarchical blob listing returning a page of directory stubs/blobs.
-func (c *Client) listBlobsHier(containerURL containerAPI, marker azblob.Marker, delimiter string,
-	options azblob.ListBlobsSegmentOptions,
-) ([]*objval.ObjectAttrs, azblob.Marker, error) {
-	resp, err := containerURL.ListBlobsHierarchySegment(context.Background(), marker, delimiter, options)
-	if err != nil {
-		return nil, azblob.Marker{}, err // Purposefully not wrapped
-	}
-
-	converted := make([]*objval.ObjectAttrs, 0, len(resp.Segment.BlobItems))
-
-	for _, p := range resp.Segment.BlobPrefixes {
-		converted = append(converted, &objval.ObjectAttrs{Key: p.Name})
-	}
-
-	for _, b := range resp.Segment.BlobItems {
-		converted = append(converted, &objval.ObjectAttrs{
-			Key:          b.Name,
-			Size:         *b.Properties.ContentLength,
-			LastModified: &b.Properties.LastModified,
-		})
-	}
-
-	return converted, resp.NextMarker, nil
+	return converted
 }
 
 // iterateObjects iterates over the given segment (<=5000) of objects executing the given function for each object which
@@ -319,21 +318,33 @@ func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
 		return nil, objcli.ErrExpectedNoUploadID
 	}
 
-	blockURL := c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key).ToBlockBlobAPI()
+	return c.listParts(bucket, key, azblob.BlockListTypeUncommitted)
+}
 
-	resp, err := blockURL.GetBlockList(
+func (c *Client) listParts(bucket, key string, blockType azblob.BlockListType) ([]objval.Part, error) {
+	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
+	if err != nil {
+		return nil, handleError(bucket, key, err)
+	}
+
+	resp, err := blobClient.GetBlockList(
 		context.Background(),
-		azblob.BlockListUncommitted,
-		azblob.LeaseAccessConditions{},
+		blockType,
+		azblob.BlockBlobGetBlockListOptions{},
 	)
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
 
-	parts := make([]objval.Part, 0, len(resp.UncommittedBlocks))
+	// GetBlockList() will only return blocks of the required type/types so we can handle them in a general way
+	parts := make([]objval.Part, 0, len(resp.CommittedBlocks)+len(resp.UncommittedBlocks))
+
+	for _, block := range resp.CommittedBlocks {
+		parts = append(parts, objval.Part{ID: *block.Name, Size: *block.Size})
+	}
 
 	for _, block := range resp.UncommittedBlocks {
-		parts = append(parts, objval.Part{ID: block.Name, Size: int64(block.Size)})
+		parts = append(parts, objval.Part{ID: *block.Name, Size: *block.Size})
 	}
 
 	return parts, nil
@@ -350,23 +361,25 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	}
 
 	var (
-		md5sum   = md5.New()
-		blockID  = base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
-		blockURL = c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key).ToBlockBlobAPI()
+		md5sum  = md5.New()
+		blockID = base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 	)
+
+	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
+	if err != nil {
+		return objval.Part{}, handleError(bucket, key, err)
+	}
 
 	_, err = aws.CopySeekableBody(md5sum, body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
-	_, err = blockURL.StageBlock(
+	_, err = blobClient.StageBlock(
 		context.Background(),
 		blockID,
 		body,
-		azblob.LeaseAccessConditions{},
-		md5sum.Sum(nil),
-		azblob.ClientProvidedKeyOptions{},
+		azblob.BlockBlobStageBlockOptions{TransactionalContentMD5: md5sum.Sum(nil)},
 	)
 
 	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
@@ -386,22 +399,24 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 		offset, length = br.ToOffsetLength(length)
 	}
 
-	var (
-		blockID      = base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
-		containerURL = c.storageAPI.ToContainerAPI(bucket)
-		srcURL       = containerURL.ToBlobAPI(src).ToBlockBlobAPI()
-		dstURL       = containerURL.ToBlobAPI(dst).ToBlockBlobAPI()
-	)
+	blockID := base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 
-	_, err := dstURL.StageBlockFromURL(
+	srcClient, err := c.storageAPI.ToBlobAPI(bucket, src)
+	if err != nil {
+		return objval.Part{}, err
+	}
+
+	dstClient, err := c.storageAPI.ToBlobAPI(bucket, dst)
+	if err != nil {
+		return objval.Part{}, err
+	}
+
+	_, err = dstClient.StageBlockFromURL(
 		context.Background(),
 		blockID,
-		srcURL.URL(),
-		offset,
-		length,
-		azblob.LeaseAccessConditions{},
-		azblob.ModifiedAccessConditions{},
-		azblob.ClientProvidedKeyOptions{},
+		srcClient.URL(),
+		0, // Should be set to 0 (?) https://docs.microsoft.com/en-us/rest/api/storageservices/put-block-from-url
+		azblob.BlockBlobStageBlockFromURLOptions{Offset: &offset, Count: &length},
 	)
 	if err != nil {
 		return objval.Part{}, handleError(bucket, dst, err)
@@ -415,24 +430,21 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 		return objcli.ErrExpectedNoUploadID
 	}
 
-	var (
-		blockURL  = c.storageAPI.ToContainerAPI(bucket).ToBlobAPI(key).ToBlockBlobAPI()
-		converted = make([]string, 0, len(parts))
-	)
+	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
+	if err != nil {
+		return handleError(bucket, key, err)
+	}
+
+	converted := make([]string, 0, len(parts))
 
 	for _, part := range parts {
 		converted = append(converted, part.ID)
 	}
 
-	_, err := blockURL.CommitBlockList(
+	_, err = blobClient.CommitBlockList(
 		context.Background(),
 		converted,
-		azblob.BlobHTTPHeaders{},
-		azblob.Metadata{},
-		azblob.BlobAccessConditions{},
-		azblob.AccessTierNone,
-		azblob.BlobTagsMap{},
-		azblob.ClientProvidedKeyOptions{},
+		azblob.BlockBlobCommitBlockListOptions{},
 	)
 
 	return handleError(bucket, key, err)

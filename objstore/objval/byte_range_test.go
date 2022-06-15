@@ -3,7 +3,7 @@ package objval
 import (
 	"testing"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/stretchr/testify/require"
 )
 

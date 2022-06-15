@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,33 +22,32 @@ func TestHandleError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Not handled specifically but should not be <nil>
-	err = handleError("container1", "blob1", &mockError{inner: azblob.ServiceCodeBlobBeingRehydrated})
+	err = handleError("container1", "blob1",
+		&azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobBeingRehydrated})
 	require.Error(t, err)
 
-	err = handleError("container1", "blob1",
-		&mockError{resp: &http.Response{StatusCode: http.StatusUnauthorized}})
+	err = handleError("container1", "blob1", storageError(http.StatusUnauthorized))
 	require.ErrorIs(t, err, objerr.ErrUnauthenticated)
 
-	err = handleError("container1", "blob1",
-		&mockError{resp: &http.Response{StatusCode: http.StatusForbidden}})
+	err = handleError("container1", "blob1", storageError(http.StatusForbidden))
 	require.ErrorIs(t, err, objerr.ErrUnauthorized)
 
-	err = handleError("container1", "blob1", &mockError{inner: azblob.ServiceCodeBlobNotFound})
+	err = handleError("container1", "blob1", &azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "blob", notFound.Type)
 	require.Equal(t, "blob1", notFound.Name)
 
-	err = handleError("container1", "", &mockError{inner: azblob.ServiceCodeBlobNotFound})
+	err = handleError("container1", "", &azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "blob", notFound.Type)
 	require.Equal(t, "<empty blob name>", notFound.Name)
 
-	err = handleError("container1", "blob1", &mockError{inner: azblob.ServiceCodeContainerNotFound})
+	err = handleError("container1", "blob1", &azblob.StorageError{ErrorCode: azblob.StorageErrorCodeContainerNotFound})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "container", notFound.Type)
 	require.Equal(t, "container1", notFound.Name)
 
-	err = handleError("", "blob1", &mockError{inner: azblob.ServiceCodeContainerNotFound})
+	err = handleError("", "blob1", &azblob.StorageError{ErrorCode: azblob.StorageErrorCodeContainerNotFound})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "container", notFound.Type)
 	require.Equal(t, "<empty container name>", notFound.Name)
@@ -56,5 +55,5 @@ func TestHandleError(t *testing.T) {
 
 func TestIsKeyNotFound(t *testing.T) {
 	require.False(t, isKeyNotFound(assert.AnError))
-	require.True(t, isKeyNotFound(&mockError{inner: azblob.ServiceCodeBlobNotFound}))
+	require.True(t, isKeyNotFound(&azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound}))
 }
