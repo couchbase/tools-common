@@ -24,7 +24,7 @@ const (
 	DefaultTransportContinueTimeout = 0 * time.Second
 
 	// DefaultResponseHeaderTimeout is the default ResponseHeaderTimeout value for transport of the HTTP client.
-	DefaultResponseHeaderTimeout = 30 * time.Second
+	DefaultResponseHeaderTimeout = 0 * time.Second
 
 	// DefaultTLSHandshakeTimeout is the default TLSHandshakeTimeout value for transport of the HTTP client.
 	DefaultTLSHandshakeTimeout = 10 * time.Second
