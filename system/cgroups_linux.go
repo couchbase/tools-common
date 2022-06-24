@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,6 +19,8 @@ const (
 	cGroupVersion1 cGroupVersion = iota
 	cGroupVersion2
 )
+
+const defaultCPUPeriod uint64 = 100000
 
 // cGroupInfo  holds the information parsed from /proc/<pid>/cgroup.
 type cGroupInfo struct {
@@ -185,20 +188,12 @@ func getCGroupMemoryLimitFromFile(dir string, version cGroupVersion) (uint64, er
 		return 0, fmt.Errorf("unknown cgroup version %d", version)
 	}
 
-	f, err := os.Open(filepath.Join(dir, filename))
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-
-	buf := make([]byte, 128)
-
-	n, err := f.Read(buf)
+	buf, err := os.ReadFile(filepath.Join(dir, filename))
 	if err != nil {
 		return 0, err
 	}
 
-	contents := string(buf[:n])
+	contents := string(buf)
 	if strings.TrimSpace(contents) == "max" {
 		return 0, errNoLimitSpecified
 	}
@@ -206,29 +201,27 @@ func getCGroupMemoryLimitFromFile(dir string, version cGroupVersion) (uint64, er
 	return strconv.ParseUint(strings.TrimSpace(contents), 10, 64)
 }
 
-// getCGroupMemoryLimit finds the memory limit specified by the cgroup by reading the correct file in the VFS based on
-// the cgroup version that is detected. If there is no limit or no cgroup is detected then errNoLimitSpecified is
-// returned.
-func getCGroupMemoryLimit() (uint64, error) {
+// getCGroupMount reads /proc/self/mountinfo and finds the mount point of the cgroup system
+func getCGroupMount(system string) (string, cGroupVersion, error) {
 	file, err := os.Open("/proc/self/cgroup")
 	if err != nil {
-		return 0, fmt.Errorf("could not open /proc/self/cgroup: %w", err)
+		return "", 0, fmt.Errorf("could not open /proc/self/cgroup: %w", err)
 	}
 	defer file.Close()
 
 	info, err := readCGroupFile(file)
 	if err != nil {
-		return 0, err
+		return "", 0, err
 	}
 
-	mountPath, err := info.getMountPoint("memory")
+	mountPath, err := info.getMountPoint(system)
 	if err != nil {
-		return 0, errNoLimitSpecified
+		return "", 0, errNoLimitSpecified
 	}
 
 	file, err = os.Open("/proc/self/mountinfo")
 	if err != nil {
-		return 0, fmt.Errorf("could not open /proc/self/mountinf: %w", err)
+		return "", 0, fmt.Errorf("could not open /proc/self/mountinfo: %w", err)
 	}
 	defer file.Close()
 
@@ -241,10 +234,118 @@ func getCGroupMemoryLimit() (uint64, error) {
 		fs = "cgroup2"
 	}
 
-	path, err := readMountInfo(file, mountPath, fs, "memory")
+	path, err := readMountInfo(file, mountPath, fs, system)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return path, info.version, nil
+}
+
+// getCGroupMemoryLimit finds the memory limit specified by the cgroup by reading the correct file in the VFS based on
+// the cgroup version that is detected. If there is no limit or no cgroup is detected then errNoLimitSpecified is
+// returned.
+func getCGroupMemoryLimit() (uint64, error) {
+	path, version, err := getCGroupMount("memory")
 	if err != nil {
 		return 0, err
 	}
 
-	return getCGroupMemoryLimitFromFile(path, info.version)
+	return getCGroupMemoryLimitFromFile(path, version)
+}
+
+// readCGroup2CPULimit reads one or two space separated fields from reader where the first field is the maximum usage
+// and the optional second field is the period.
+func readCGroup2CPULimit(reader io.Reader) (float64, error) {
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return 0, err
+	}
+
+	// cgroup2 cpu.max has two fields with the last being optional - <max> <period>. Both are uints and dividing them
+	// gives the number of CPUs that can be used by the group. As an example:
+	// 200000 100000
+	// would be 2 CPUs
+	fields := strings.Split(string(buf), " ")
+	if len(fields) == 0 {
+		return 0, errNoLimitSpecified
+	}
+
+	if strings.TrimSpace(fields[0]) == "max" {
+		return 0, errNoLimitSpecified
+	}
+
+	if len(fields) > 2 {
+		return 0, errNoLimitSpecified
+	}
+
+	period := defaultCPUPeriod
+	if len(fields) == 2 {
+		period, err = strconv.ParseUint(strings.TrimSpace(fields[1]), 10, 64)
+		if err != nil {
+			return 0, errNoLimitSpecified
+		}
+	}
+
+	allowance, err := strconv.ParseUint(strings.TrimSpace(fields[0]), 10, 64)
+	if err != nil {
+		return 0, errNoLimitSpecified
+	}
+
+	return float64(allowance) / float64(period), nil
+}
+
+func getCGroup2CPULimitFromFile(dir string) (float64, error) {
+	file, err := os.Open(filepath.Join(dir, "cpu.max"))
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	return readCGroup2CPULimit(file)
+}
+
+func readUIntFromFile(filename string) (uint64, error) {
+	buf, err := os.ReadFile(filename)
+	if err != nil {
+		return 0, err
+	}
+
+	v, err := strconv.ParseUint(strings.TrimSpace(string(buf)), 10, 64)
+	if err != nil {
+		return 0, errNoLimitSpecified
+	}
+
+	return v, nil
+}
+
+func getCGroup1CPULimitFromFiles(dir string) (float64, error) {
+	period, err := readUIntFromFile(filepath.Join(dir, "cpu.cfs_period_us"))
+	if err != nil {
+		return 0, errNoLimitSpecified
+	}
+
+	quota, err := readUIntFromFile(filepath.Join(dir, "cpu.cfs_quota_us"))
+	if err != nil {
+		return 0, errNoLimitSpecified
+	}
+
+	return float64(quota) / float64(period), nil
+}
+
+// getCGroupCPULimit will find the CPU usage limit defined for the current cgroup if there is one.
+func getCGroupCPULimit() (float64, error) {
+	path, version, err := getCGroupMount("cpu,cpuacct")
+	if err != nil {
+		return 0, err
+	}
+
+	switch version {
+	case cGroupVersion1:
+		return getCGroup1CPULimitFromFiles(path)
+	case cGroupVersion2:
+		return getCGroup2CPULimitFromFile(path)
+	}
+
+	return 0, fmt.Errorf("unknown cgroup version %d", version)
 }

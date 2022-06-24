@@ -220,3 +220,33 @@ func TestCGroupReadMountInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestCGroupCPULimit(t *testing.T) {
+	tests := []struct {
+		name, file string
+		works      bool
+		result     float64
+	}{
+		{name: "1x-no-period", file: "100000", works: true, result: 1.0},
+		{name: "1x", file: "100000 100000", works: true, result: 1.0},
+		{name: "1x-different period", file: "2 2", works: true, result: 1.0},
+		{name: "1.5x", file: "150000 100000", works: true, result: 1.5},
+		{name: "2x", file: "200000 100000", works: true, result: 2.0},
+		{name: "ma", file: "ma", works: false},
+		{name: "no-limit", file: "max", works: false, result: 1.0},
+		{name: "floats", file: "1.234 5.678", works: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := strings.NewReader(test.file)
+			limit, err := readCGroup2CPULimit(r)
+			if test.works {
+				require.NoError(t, err)
+				require.Equal(t, limit, test.result)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
