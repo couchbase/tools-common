@@ -97,12 +97,19 @@ func readCGroupFile(r io.Reader) (*cGroupInfo, error) {
 
 var errNoLimitSpecified = errors.New("no cgroup limit specified")
 
-// readMountInfo - will look in r for mountPoint with filesystem type fs. Returns where mountPoint is mounted
+// readMountInfo - will look in r for mountPoint with filesystem type fs. When there are multiple results it will filter
+// to those lines whose filesystem options has "contains" as a substring. Returns where mountPoint is mounted.
 func readMountInfo(r io.Reader, mountPoint, fs, contains string) (string, error) {
+	type mountInfo struct {
+		point   string
+		options string
+	}
+
 	var (
-		err    error
-		line   string
-		reader = bufio.NewReader(r)
+		err          error
+		line         string
+		matchingInfo []mountInfo
+		reader       = bufio.NewReader(r)
 	)
 
 	// Read lines in the following format:
@@ -123,7 +130,7 @@ func readMountInfo(r io.Reader, mountPoint, fs, contains string) (string, error)
 	// from https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 
 	for line, err = reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
-		// 7 takes us up to just before the separator
+		// 7 takes us up to just before the separator (8)
 		split := strings.SplitN(strings.TrimSpace(line), " ", 7)
 		if len(split) < 7 {
 			return "", fmt.Errorf("invalid mountinfo file, less than seven fields")
@@ -143,8 +150,22 @@ func readMountInfo(r io.Reader, mountPoint, fs, contains string) (string, error)
 			continue
 		}
 
-		if postSeparator[0] == fs && strings.Contains(separatorSplit[1], contains) {
-			return split[4], nil
+		if postSeparator[0] == fs {
+			matchingInfo = append(matchingInfo, mountInfo{point: split[4], options: separatorSplit[1]})
+		}
+	}
+
+	if len(matchingInfo) == 0 {
+		return "", errNoLimitSpecified
+	}
+
+	if len(matchingInfo) == 1 {
+		return matchingInfo[0].point, nil
+	}
+
+	for _, info := range matchingInfo {
+		if strings.Contains(info.options, contains) {
+			return info.point, nil
 		}
 	}
 
@@ -177,8 +198,8 @@ func getCGroupMemoryLimitFromFile(dir string, version cGroupVersion) (uint64, er
 		return 0, err
 	}
 
-	contents := string(buf[0:n])
-	if contents == "max" {
+	contents := string(buf[:n])
+	if strings.TrimSpace(contents) == "max" {
 		return 0, errNoLimitSpecified
 	}
 

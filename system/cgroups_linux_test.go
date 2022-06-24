@@ -146,6 +146,31 @@ func TestCGroupReadMountInfo(t *testing.T) {
 1279 1661 0:69 /null /proc/timer_list rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755,inode64
 1280 1661 0:76 / /proc/scsi ro,relatime - tmpfs tmpfs ro,inode64
 `
+	//nolint:lll
+	fileGrouped := `479 478 0:146 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+480 478 0:147 / /dev rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+489 480 0:148 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+490 478 0:149 / /sys ro,nosuid,nodev,noexec,relatime - sysfs sysfs ro
+491 490 0:30 / /sys/fs/cgroup ro,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw
+492 480 0:145 / /dev/mqueue rw,nosuid,nodev,noexec,relatime - mqueue mqueue rw
+493 480 0:150 / /dev/shm rw,nosuid,nodev,noexec,relatime - tmpfs shm rw,size=65536k
+495 478 254:1 /docker/containers/b14e8e3d3cd9425240871ca233537b50595e05cd8a2f780e20a1e792cc753de2/resolv.conf /etc/resolv.conf rw,relatime - ext4 /dev/vda1 rw
+496 478 254:1 /docker/containers/b14e8e3d3cd9425240871ca233537b50595e05cd8a2f780e20a1e792cc753de2/hostname /etc/hostname rw,relatime - ext4 /dev/vda1 rw
+497 478 254:1 /docker/containers/b14e8e3d3cd9425240871ca233537b50595e05cd8a2f780e20a1e792cc753de2/hosts /etc/hosts rw,relatime - ext4 /dev/vda1 rw
+392 480 0:148 /0 /dev/console rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+393 479 0:146 /bus /proc/bus ro,nosuid,nodev,noexec,relatime - proc proc rw
+394 479 0:146 /fs /proc/fs ro,nosuid,nodev,noexec,relatime - proc proc rw
+395 479 0:146 /irq /proc/irq ro,nosuid,nodev,noexec,relatime - proc proc rw
+396 479 0:146 /sys /proc/sys ro,nosuid,nodev,noexec,relatime - proc proc rw
+397 479 0:146 /sysrq-trigger /proc/sysrq-trigger ro,nosuid,nodev,noexec,relatime - proc proc rw
+399 479 0:151 / /proc/acpi ro,relatime - tmpfs tmpfs ro
+400 479 0:147 /null /proc/kcore rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+401 479 0:147 /null /proc/keys rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+402 479 0:147 /null /proc/timer_list rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+403 479 0:147 /null /proc/sched_debug rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+404 490 0:152 / /sys/firmware ro,relatime - tmpfs tmpfs ro
+`
+
 	tests := []struct {
 		name, mountPoint, file, fs, contains string
 		found, errors                        bool
@@ -167,6 +192,13 @@ func TestCGroupReadMountInfo(t *testing.T) {
 			file:     "1495 1465 0:65 / /run/user/1000/gvfs rw,nosuid,nodev,relatime shared:828 - fuse.gvfsd-fuse gvfsd-fuse rw,user_id=1000,group_id=1000\n",
 			fs:       "fuse.gvfsd-fuse",
 			contains: "not-found",
+		},
+		{
+			name:       "valid-grouped",
+			file:       fileGrouped,
+			fs:         "cgroup2",
+			found:      true,
+			mountPoint: "/",
 		},
 	}
 
