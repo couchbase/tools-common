@@ -90,7 +90,7 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 
 // download the given byte range using multiple concurrent requests.
 func (m *MPDownloader) download(br *objval.ByteRange) error {
-	pool := hofp.NewPool(hofp.Options{Size: 1, LogPrefix: "(objutil)"})
+	pool := hofp.NewPool(hofp.Options{LogPrefix: "(objutil)"})
 
 	queue := func(br *objval.ByteRange) error {
 		return pool.Queue(func() error { return m.downloadChunk(br) })

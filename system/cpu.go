@@ -1,7 +1,6 @@
 package system
 
 import (
-	"runtime"
 	"sync"
 
 	"github.com/couchbase/tools-common/maths"
@@ -18,7 +17,7 @@ var (
 // multiple instances of cbbackupmgr can be run on a single machine e.g. when running info during a merge.
 func NumCPU() int {
 	numCPUOnce.Do(func() {
-		numCPU = maths.Max(1, int(float64(runtime.GOMAXPROCS(0))*0.75))
+		numCPU = maths.Max(1, int(getMaxProcsRespectingLimit()*0.75))
 	})
 
 	return numCPU
