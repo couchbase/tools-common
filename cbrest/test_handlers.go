@@ -3,12 +3,13 @@ package cbrest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/couchbase/tools-common/testutil"
 )
 
 // TestHandlers is a readbility wrapper around the endpoint handlers for a test cluster.
@@ -134,10 +135,7 @@ func NewTestHandlerWithValue(t *testing.T, status int, body []byte, value any) h
 		case string(ContentTypeJSON):
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&value))
 		case string(ContentTypeURLEncoded):
-			body, err := ioutil.ReadAll(request.Body)
-			require.NoError(t, err)
-
-			values, err := url.ParseQuery(string(body))
+			values, err := url.ParseQuery(string(testutil.ReadAll(t, request.Body)))
 			require.NoError(t, err)
 
 			p, ok := value.(*url.Values)

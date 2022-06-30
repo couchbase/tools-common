@@ -3,7 +3,7 @@ package system
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,7 +30,7 @@ func totalMemory() (uint64, error) {
 }
 
 func readMemInfo() (uint64, error) {
-	meminfo, err := ioutil.ReadFile("/proc/meminfo")
+	meminfo, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, fmt.Errorf("failed to read '/proc/meminfo': %w", err)
 	}

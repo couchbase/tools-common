@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -257,7 +256,7 @@ func getCGroupMemoryLimit() (uint64, error) {
 // readCGroup2CPULimit reads one or two space separated fields from reader where the first field is the maximum usage
 // and the optional second field is the period.
 func readCGroup2CPULimit(reader io.Reader) (float64, error) {
-	buf, err := ioutil.ReadAll(reader)
+	buf, err := io.ReadAll(reader)
 	if err != nil {
 		return 0, err
 	}
