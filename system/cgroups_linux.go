@@ -105,7 +105,7 @@ var errNoLimitSpecified = errors.New("no cgroup limit specified")
 func readMountInfo(r io.Reader, mountPoint, fs, contains string) (string, error) {
 	type mountInfo struct {
 		point   string
-		options string
+		options []string
 	}
 
 	var (
@@ -154,7 +154,7 @@ func readMountInfo(r io.Reader, mountPoint, fs, contains string) (string, error)
 		}
 
 		if postSeparator[0] == fs {
-			matchingInfo = append(matchingInfo, mountInfo{point: split[4], options: separatorSplit[1]})
+			matchingInfo = append(matchingInfo, mountInfo{point: split[4], options: postSeparator})
 		}
 	}
 
@@ -167,8 +167,10 @@ func readMountInfo(r io.Reader, mountPoint, fs, contains string) (string, error)
 	}
 
 	for _, info := range matchingInfo {
-		if strings.Contains(info.options, contains) {
-			return info.point, nil
+		for _, option := range info.options {
+			if option == contains || option == "rw,"+contains {
+				return info.point, nil
+			}
 		}
 	}
 
@@ -333,9 +335,29 @@ func getCGroup1CPULimitFromFiles(dir string) (float64, error) {
 	return float64(quota) / float64(period), nil
 }
 
+// getCPUCGroupMount will find the mount point of the CPU system
+func getCPUCGroupMount() (string, cGroupVersion, error) {
+	// Sometimes cpu is grouped with cpuacct and sometime not. Check cpu,cpuacct first and then fallback to cpu
+	path, version, err := getCGroupMount("cpu,cpuacct")
+	if err == nil {
+		return path, version, nil
+	}
+
+	if !errors.Is(err, errNoLimitSpecified) {
+		return "", 0, err
+	}
+
+	path, version, err = getCGroupMount("cpu")
+	if err != nil {
+		return "", 0, err
+	}
+
+	return path, version, err
+}
+
 // getCGroupCPULimit will find the CPU usage limit defined for the current cgroup if there is one.
 func getCGroupCPULimit() (float64, error) {
-	path, version, err := getCGroupMount("cpu,cpuacct")
+	path, version, err := getCPUCGroupMount()
 	if err != nil {
 		return 0, err
 	}
