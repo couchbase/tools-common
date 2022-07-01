@@ -171,6 +171,12 @@ func TestCGroupReadMountInfo(t *testing.T) {
 404 490 0:152 / /sys/firmware ro,relatime - tmpfs tmpfs ro
 `
 
+	//nolint:lll
+	fileCPUSeparate := `1145 1144 0:33 /docker/e9325e325e281d231e3f49adb785bb208bde64a7b21bc230861a8e7169fb99c8 /sys/fs/cgroup/cpuset ro,nosuid,nodev,noexec,relatime master:56 - cgroup cpuset rw,cpuset
+1146 1144 0:34 /docker/e9325e325e281d231e3f49adb785bb208bde64a7b21bc230861a8e7169fb99c8 /sys/fs/cgroup/cpu ro,nosuid,nodev,noexec,relatime master:57 - cgroup cpu rw,cpu
+1147 1144 0:35 /docker/e9325e325e281d231e3f49adb785bb208bde64a7b21bc230861a8e7169fb99c8 /sys/fs/cgroup/cpuacct ro,nosuid,nodev,noexec,relatime master:58 - cgroup cpuacct rw,cpuacct
+`
+
 	tests := []struct {
 		name, mountPoint, file, fs, contains string
 		found, errors                        bool
@@ -181,6 +187,21 @@ func TestCGroupReadMountInfo(t *testing.T) {
 		{name: "not-found-mount-point", file: file, fs: "cgroup", contains: "mem", mountPoint: "/foo/bar/baz"},
 		{name: "invalid-empty", file: "", fs: "cgroup"},
 		{name: "invalid-not-enough-fields", file: "660 963 0:57\n", errors: true},
+		{
+			name:       "valid-cpu-separate",
+			file:       fileCPUSeparate,
+			fs:         "cgroup",
+			contains:   "cpu",
+			mountPoint: "/docker/e9325e325e281d231e3f49adb785bb208bde64a7b21bc230861a8e7169fb99c8",
+			found:      true,
+		},
+		{
+			name:       "no-cpu,cpuacct-cpu-separate",
+			file:       fileCPUSeparate,
+			fs:         "cgroup",
+			contains:   "cpu,cpuacct",
+			mountPoint: "/docker/e9325e325e281d231e3f49adb785bb208bde64a7b21bc230861a8e7169fb99c8",
+		},
 		{
 			name:   "invalid-no-separator",
 			file:   "1661 1660 0:68 / /proc rw,nosuid,nodev,noexec,relatime  proc proc rw\n",
