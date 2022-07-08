@@ -257,42 +257,36 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
 	).Return(mbAPI, nil)
 
-	mbAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(
-		azblob.BlockBlobGetBlockListResponse{},
+	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(
+		azblob.BlobGetPropertiesResponse{},
 		&azblob.StorageError{ErrorCode: azblob.StorageErrorCodeBlobNotFound},
 	)
 
-	fn2 := func(options azblob.BlockBlobStageBlockOptions) bool {
+	fn1 := func(options azblob.BlockBlobUploadOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
 		return bytes.Equal(options.TransactionalContentMD5, expected[:])
 	}
 
-	mbAPI.On(
-		"StageBlock",
-		mock.Anything,
-		mock.Anything,
-		strings.NewReader("value"),
-		mock.MatchedBy(fn2),
-	).Return(azblob.BlockBlobStageBlockResponse{}, nil)
+	output := azblob.BlockBlobUploadResponse{}
 
 	mbAPI.On(
-		"CommitBlockList",
+		"Upload",
 		mock.Anything,
-		mock.MatchedBy(func(parts []string) bool { return len(parts) == 1 }),
-		mock.Anything,
-	).Return(azblob.BlockBlobCommitBlockListResponse{}, nil)
+		strings.NewReader("value"),
+		mock.MatchedBy(fn1),
+	).Return(output, nil)
 
 	client := &Client{storageAPI: msAPI}
 
 	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 3)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
 
 	mbAPI.AssertExpectations(t)
-	mbAPI.AssertNumberOfCalls(t, "StageBlock", 1)
-	mbAPI.AssertNumberOfCalls(t, "CommitBlockList", 1)
+	mbAPI.AssertNumberOfCalls(t, "GetProperties", 1)
+	mbAPI.AssertNumberOfCalls(t, "Upload", 1)
 }
 
 func TestClientAppendToObject(t *testing.T) {
@@ -307,19 +301,42 @@ func TestClientAppendToObject(t *testing.T) {
 		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
 	).Return(mbAPI, nil)
 
-	listOutput := azblob.BlockBlobGetBlockListResponse{}
-	listOutput.BlockList = azblob.BlockList{
-		CommittedBlocks: []*azblob.Block{
-			{
-				Name: aws.String("block1"),
-				Size: aws.Int64(64),
-			},
-		},
+	msAPI.On("CanGetSASToken").Return(true)
+
+	output := azblob.BlobGetPropertiesResponse{}
+
+	output.ContentLength = aws.Int64(42)
+	output.ETag = aws.String("etag")
+	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
+
+	mbAPI.On("GetProperties", mock.Anything, mock.Anything).Return(output, nil)
+	mbAPI.On("URL").Return("example.com")
+
+	fn1 := func(options azblob.BlobSASPermissions) bool {
+		return options.Read
 	}
 
-	mbAPI.On("GetBlockList", mock.Anything, mock.Anything, mock.Anything).Return(listOutput, nil)
+	mbAPI.On(
+		"GetSASToken",
+		mock.MatchedBy(fn1),
+		mock.Anything,
+		mock.Anything,
+	).Return(azblob.SASQueryParameters{}, nil)
 
-	fn2 := func(options azblob.BlockBlobStageBlockOptions) bool {
+	fn2 := func(options azblob.BlockBlobStageBlockFromURLOptions) bool {
+		return *options.Offset == 0 && *options.Count == azblob.CountToEnd
+	}
+
+	mbAPI.On(
+		"StageBlockFromURL",
+		mock.Anything,
+		mock.Anything,
+		mock.MatchedBy(func(url string) bool { return url == "/example.com" }),
+		mock.MatchedBy(func(length int64) bool { return length == 0 }),
+		mock.MatchedBy(fn2),
+	).Return(azblob.BlockBlobStageBlockFromURLResponse{}, nil)
+
+	fn3 := func(options azblob.BlockBlobStageBlockOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
 		return bytes.Equal(options.TransactionalContentMD5, expected[:])
@@ -330,7 +347,7 @@ func TestClientAppendToObject(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		strings.NewReader("value"),
-		mock.MatchedBy(fn2),
+		mock.MatchedBy(fn3),
 	).Return(azblob.BlockBlobStageBlockResponse{}, nil)
 
 	mbAPI.On(
@@ -345,10 +362,14 @@ func TestClientAppendToObject(t *testing.T) {
 	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
-	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 3)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 5)
+	msAPI.AssertNumberOfCalls(t, "CanGetSASToken", 1)
 
 	mbAPI.AssertExpectations(t)
-	mbAPI.AssertNumberOfCalls(t, "GetBlockList", 1)
+	mbAPI.AssertNumberOfCalls(t, "GetProperties", 1)
+	mbAPI.AssertNumberOfCalls(t, "URL", 1)
+	mbAPI.AssertNumberOfCalls(t, "GetSASToken", 1)
+	mbAPI.AssertNumberOfCalls(t, "StageBlockFromURL", 1)
 	mbAPI.AssertNumberOfCalls(t, "StageBlock", 1)
 	mbAPI.AssertNumberOfCalls(t, "CommitBlockList", 1)
 }
@@ -985,7 +1006,7 @@ func TestClientUploadPart(t *testing.T) {
 		mock.MatchedBy(func(blob string) bool { return blob == "blob" }),
 	).Return(mbAPI, nil)
 
-	fn1 := func(options azblob.BlockBlobStageBlockOptions) bool {
+	fn2 := func(options azblob.BlockBlobStageBlockOptions) bool {
 		expected := md5.Sum([]byte("value"))
 
 		return bytes.Equal(options.TransactionalContentMD5, expected[:])
@@ -996,7 +1017,7 @@ func TestClientUploadPart(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		strings.NewReader("value"),
-		mock.MatchedBy(fn1),
+		mock.MatchedBy(fn2),
 	).Return(azblob.BlockBlobStageBlockResponse{}, nil)
 
 	client := &Client{storageAPI: msAPI}
@@ -1058,6 +1079,8 @@ func TestClientUploadPartCopy(t *testing.T) {
 				mock.MatchedBy(func(blob string) bool { return blob == "dst" }),
 			).Return(mDstBlobAPI, nil)
 
+			msAPI.On("CanGetSASToken").Return(false)
+
 			msAPI.On(
 				"ToBlobAPI",
 				mock.MatchedBy(func(container string) bool { return container == "container" }),
@@ -1095,6 +1118,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 			msAPI.AssertExpectations(t)
 			msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
+			msAPI.AssertNumberOfCalls(t, "CanGetSASToken", 1)
 
 			mDstBlobAPI.AssertExpectations(t)
 			mDstBlobAPI.AssertNumberOfCalls(t, "StageBlockFromURL", 1)
@@ -1103,6 +1127,79 @@ func TestClientUploadPartCopy(t *testing.T) {
 			mSrcBlobAPI.AssertNumberOfCalls(t, "URL", 1)
 		})
 	}
+}
+
+func TestClientUploadPartCopyWithSASToken(t *testing.T) {
+	var (
+		msAPI       = &mockBlobStorageAPI{}
+		mSrcBlobAPI = &mockBlobAPI{}
+		mDstBlobAPI = &mockBlobAPI{}
+	)
+
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "dst" }),
+	).Return(mDstBlobAPI, nil)
+
+	msAPI.On("CanGetSASToken").Return(true)
+
+	msAPI.On(
+		"ToBlobAPI",
+		mock.MatchedBy(func(container string) bool { return container == "container" }),
+		mock.MatchedBy(func(blob string) bool { return blob == "src" }),
+	).Return(mSrcBlobAPI, nil)
+
+	mSrcBlobAPI.On("URL").Return("example.com")
+
+	fn0 := func(permissions azblob.BlobSASPermissions) bool {
+		return permissions.Read
+	}
+
+	mSrcBlobAPI.On(
+		"GetSASToken",
+		mock.MatchedBy(fn0),
+		mock.Anything,
+		mock.Anything,
+	).Return(azblob.SASQueryParameters{}, nil)
+
+	fn1 := func(blob string) bool {
+		_, err := base64.StdEncoding.DecodeString(blob)
+		return err == nil
+	}
+
+	fn2 := func(options azblob.BlockBlobStageBlockFromURLOptions) bool {
+		return *options.Offset == 0 && *options.Count == 0
+	}
+
+	mDstBlobAPI.On(
+		"StageBlockFromURL",
+		mock.Anything,
+		mock.MatchedBy(fn1),
+		mock.MatchedBy(func(s string) bool { return "/example.com" == s }),
+		mock.MatchedBy(func(length int64) bool { return length == 0 }),
+		mock.MatchedBy(fn2),
+	).Return(azblob.BlockBlobStageBlockFromURLResponse{}, nil)
+
+	client := &Client{storageAPI: msAPI}
+
+	part, err := client.UploadPartCopy("container", objcli.NoUploadID, "dst", "src", 42, nil)
+	require.NoError(t, err)
+	require.NotZero(t, part.ID)
+
+	_, err = base64.StdEncoding.DecodeString(part.ID)
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
+	msAPI.AssertNumberOfCalls(t, "CanGetSASToken", 1)
+
+	mDstBlobAPI.AssertExpectations(t)
+	mDstBlobAPI.AssertNumberOfCalls(t, "StageBlockFromURL", 1)
+
+	mSrcBlobAPI.AssertExpectations(t)
+	mSrcBlobAPI.AssertNumberOfCalls(t, "URL", 1)
+	mSrcBlobAPI.AssertNumberOfCalls(t, "GetSASToken", 1)
 }
 
 func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {

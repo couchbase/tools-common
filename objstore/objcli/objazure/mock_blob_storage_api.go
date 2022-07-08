@@ -9,6 +9,20 @@ type mockBlobStorageAPI struct {
 	mock.Mock
 }
 
+// CanGetSASToken provides a mock function with given fields:
+func (_m *mockBlobStorageAPI) CanGetSASToken() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // ToBlobAPI provides a mock function with given fields: container, blob
 func (_m *mockBlobStorageAPI) ToBlobAPI(container, blob string) (blobAPI, error) {
 	ret := _m.Called(container, blob)

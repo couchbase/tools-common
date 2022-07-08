@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
@@ -119,25 +120,33 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 }
 
 func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
+	attrs, err := c.GetObjectAttrs(bucket, key)
+
+	// As defined by the 'Client' interface, if the given object does not exist, we create it
+	if objerr.IsNotFoundError(err) || attrs != nil && attrs.Size == 0 {
+		return c.PutObject(bucket, key, data)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to get object attributes: %w", err)
+	}
+
 	id, err := c.CreateMultipartUpload(bucket, key)
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	parts, err := c.listParts(bucket, key, azblob.BlockListTypeCommitted)
-
-	// If the given object does not exist, we create it later in the function instead of failing as defined by the
-	// 'Client' interface
-	if err != nil && !objerr.IsNotFoundError(err) {
-		return fmt.Errorf("failed to get parts that are already committed to blob: %w", err)
+	existing, err := c.UploadPartCopy(bucket, id, key, key, objcli.NoPartNumber, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get existing object part: %w", err)
 	}
 
-	newPart, err := c.UploadPart(bucket, id, key, objcli.NoPartNumber, data)
+	intermediate, err := c.UploadPart(bucket, id, key, objcli.NoPartNumber, data)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(bucket, id, key, append(parts, newPart)...)
+	err = c.CompleteMultipartUpload(bucket, id, key, existing, intermediate)
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -401,21 +410,21 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 
 	blockID := base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 
-	srcClient, err := c.storageAPI.ToBlobAPI(bucket, src)
+	srcURL, err := c.getUploadPartCopySrcURL(bucket, src)
 	if err != nil {
-		return objval.Part{}, err
+		return objval.Part{}, fmt.Errorf("failed to get the source part URL: %w", err)
 	}
 
 	dstClient, err := c.storageAPI.ToBlobAPI(bucket, dst)
 	if err != nil {
-		return objval.Part{}, err
+		return objval.Part{}, handleError(bucket, dst, err)
 	}
 
 	_, err = dstClient.StageBlockFromURL(
 		context.Background(),
 		blockID,
-		srcClient.URL(),
-		0, // Should be set to 0 (?) https://docs.microsoft.com/en-us/rest/api/storageservices/put-block-from-url
+		srcURL,
+		0, // Should be set to 0 (https://docs.microsoft.com/en-us/rest/api/storageservices/put-block-from-url)
 		azblob.BlockBlobStageBlockFromURLOptions{Offset: &offset, Count: &length},
 	)
 	if err != nil {
@@ -423,6 +432,38 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 	}
 
 	return objval.Part{ID: blockID, Number: number, Size: length}, nil
+}
+
+func (c *Client) getUploadPartCopySrcURL(bucket, src string) (string, error) {
+	srcClient, err := c.storageAPI.ToBlobAPI(bucket, src)
+	if err != nil {
+		return "", handleError(bucket, src, err)
+	}
+
+	// We only need a SAS token when the service client is using shared key (static) credentials and, conveniently, the
+	// SDK only allows creating SAS tokens if this type of credentials is used. Therefore, we know that if we cannot
+	// create a SAS token, we don't need it and can return here.
+	if !c.storageAPI.CanGetSASToken() {
+		return srcClient.URL(), nil
+	}
+
+	srcBlobParts, err := azblob.NewBlobURLParts(srcClient.URL())
+	if err != nil {
+		return "", fmt.Errorf("failed to create new blob URL parts: %w", err)
+	}
+
+	var (
+		permissions = azblob.BlobSASPermissions{Read: true}
+		start       = time.Now().UTC()
+		expiry      = start.Add(48 * time.Hour)
+	)
+
+	srcBlobParts.SAS, err = srcClient.GetSASToken(permissions, start, expiry)
+	if err != nil {
+		return "", fmt.Errorf("failed to get SAS token: %w", err)
+	}
+
+	return srcBlobParts.URL(), nil
 }
 
 func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {

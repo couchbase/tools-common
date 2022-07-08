@@ -3,6 +3,7 @@ package objazure
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
@@ -18,6 +19,7 @@ func (r readSeekNoopCloser) Close() error { return nil }
 type blobStorageAPI interface {
 	ToContainerAPI(container string) (containerAPI, error)
 	ToBlobAPI(container, blob string) (blobAPI, error)
+	CanGetSASToken() bool
 }
 
 var _ blobStorageAPI = (*serviceClient)(nil)
@@ -48,6 +50,10 @@ func (s serviceClient) ToBlobAPI(container, blob string) (blobAPI, error) {
 	}
 
 	return blobClient, nil
+}
+
+func (s serviceClient) CanGetSASToken() bool {
+	return s.client.CanGetAccountSASToken()
 }
 
 // containerAPI is a container level interface which allows interactions with an Azure blob storage container.
@@ -168,6 +174,8 @@ type blobAPI interface {
 	URL() string
 	Upload(ctx context.Context, body io.ReadSeeker, options azblob.BlockBlobUploadOptions,
 	) (azblob.BlockBlobUploadResponse, error)
+	GetSASToken(permissions azblob.BlobSASPermissions, start, expiry time.Time) (
+		azblob.SASQueryParameters, error)
 }
 
 var _ blobAPI = (*blobClient)(nil)
@@ -223,4 +231,10 @@ func (b blobClient) URL() string {
 func (b blobClient) Upload(ctx context.Context, body io.ReadSeeker, options azblob.BlockBlobUploadOptions,
 ) (azblob.BlockBlobUploadResponse, error) {
 	return b.client.Upload(ctx, readSeekNoopCloser{body}, &options)
+}
+
+func (b blobClient) GetSASToken(permissions azblob.BlobSASPermissions, start, expiry time.Time) (
+	azblob.SASQueryParameters, error,
+) {
+	return b.client.GetSASToken(permissions, start, expiry)
 }
