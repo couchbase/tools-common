@@ -33,6 +33,8 @@ type ReadAtSeeker interface {
 
 // UploadOptions encapsulates the options available when using the 'Upload' function to upload data to a remote cloud.
 type UploadOptions struct {
+	Options
+
 	// Client is the client used to perform the operation.
 	//
 	// NOTE: This attribute is required.
@@ -52,9 +54,6 @@ type UploadOptions struct {
 	//
 	// NOTE: This attribute is required.
 	Body ReadAtSeeker
-
-	// PartSize indicates what size should be used for individual parts when being uploaded using a multipart upload.
-	PartSize int64
 
 	// MPUThreshold is a threshold at which point objects which broken down into multipart uploads.
 	MPUThreshold int64

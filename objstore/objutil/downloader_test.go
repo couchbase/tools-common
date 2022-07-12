@@ -34,7 +34,7 @@ func TestNewMPDownloader(t *testing.T) {
 		Key:       "key",
 		ByteRange: &objval.ByteRange{Start: 64, End: 128},
 		Writer:    file,
-		PartSize:  1024,
+		Options:   Options{PartSize: 1024},
 	}
 
 	downloader := NewMPDownloader(options)

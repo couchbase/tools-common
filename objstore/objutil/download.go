@@ -10,6 +10,8 @@ import (
 // DownloadOptions encapsulates the options available when using the 'Download' function to download data from a remote
 // cloud.
 type DownloadOptions struct {
+	Options
+
 	// Client is the client used to perform the operation.
 	//
 	// NOTE: This attribute is required.
@@ -35,9 +37,6 @@ type DownloadOptions struct {
 	//
 	// NOTE: The given write must be thread safe.
 	Writer io.WriterAt
-
-	// PartSize indicates what size should be used for individual parts when being downloaded.
-	PartSize int64
 }
 
 // Download an object from a remote cloud by breaking it up and downloading it in multiple chunks concurrently.

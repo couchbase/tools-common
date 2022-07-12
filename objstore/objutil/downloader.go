@@ -12,6 +12,8 @@ import (
 
 // MPDownloaderOptions encapsulates the options available when creating a 'MPDownloader'.
 type MPDownloaderOptions struct {
+	Options
+
 	// Client is the client used to perform the operation.
 	//
 	// NOTE: This attribute is required.
@@ -37,9 +39,6 @@ type MPDownloaderOptions struct {
 	//
 	// NOTE: The given write must be thread safe.
 	Writer io.WriterAt
-
-	// PartSize indicates what size should be used for individual parts when being downloaded.
-	PartSize int64
 }
 
 // defaults populates the options with sensible defaults.
