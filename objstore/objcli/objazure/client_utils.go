@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
@@ -71,21 +70,20 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 	return client, nil
 }
 
-// getServiceClientWithStaticCredentials attempts to create an Azure Service Client with a token credential. In case it
-// fails to find a token credential, we fail with ErrNoValidCredentialsFound as there are no more credential types we
-// support and can try to find.
+// getServiceClientWithStaticCredentials attempts to create an Azure Service Client with a token credential. To achieve
+// this we use the Default Azure SDK credential, which tries the following authentication methods:
+//   a) Service principal (1. with secret, 2. with certificate, 3. username and password)
+//   b) Managed identity
+//   c) CLI
+// Despite the credential trying all of these methods, we do not support authentication using Service principal with
+// username and password, and using CLI.
 func getServiceClientWithTokenCredential(serviceURL string, options *azblob.ClientOptions) (*azblob.ServiceClient,
 	error,
 ) {
-	credential, err := getTokenCredential()
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token credential: %w", handleCredsError(err))
-	}
-
-	// If we reach this point with no valid credentials found, we fail since we exhausted all potential credentials
-	// sources and will not be able to authenticate
-	if credential == nil {
-		return nil, objerr.ErrNoValidCredentialsFound
+		// We return this error here because this is the last source of credentials that we check
+		return nil, objerr.ErrNoCredentialsFound
 	}
 
 	client, err := azblob.NewServiceClient(serviceURL, credential, options)
@@ -186,34 +184,6 @@ func getStaticCredentialsFromEnv() (*azblob.SharedKeyCredential, error) {
 	}
 
 	return nil, nil
-}
-
-// getTokenCredential attempts to create token credential using the environment, currently we try the following
-// methods:
-//   a) Service principal with secret
-//   b) Service principal with certificate
-//   c) Username and password
-//   d) Managed identity
-func getTokenCredential() (azcore.TokenCredential, error) {
-	servicePrincipalCredential, err := azidentity.NewEnvironmentCredential(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get principal token credential: %w", err)
-	}
-
-	managedIdentityCredential, err := azidentity.NewManagedIdentityCredential(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get managed identity credential: %w", err)
-	}
-
-	credential, err := azidentity.NewChainedTokenCredential([]azcore.TokenCredential{
-		servicePrincipalCredential,
-		managedIdentityCredential,
-	}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create chained token credential: %w", err)
-	}
-
-	return credential, nil
 }
 
 // handleCredsError converts the given error (returned from fetching the credentials) into a more user friendly error

@@ -2,5 +2,9 @@ package objerr
 
 import "errors"
 
-// ErrNoValidCredentialsFound returned if we've search all the available authentication methods and come up empty.
-var ErrNoValidCredentialsFound = errors.New("no valid credentials found")
+// ErrNoValidCredentialsFound is returned if we have checked all of the supported authentication methods and could not
+// create any credentials.
+//
+// NOTE: This error specifically means that we couldn't find/create any credentials, if a credential is found and ends
+// up being invalid, a different error will be returned.
+var ErrNoCredentialsFound = errors.New("could not find credentials for the supported authentication methods")
