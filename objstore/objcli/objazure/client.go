@@ -42,7 +42,7 @@ func (c *Client) Provider() objval.Provider {
 	return objval.ProviderAzure
 }
 
-func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
+func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
 	if err := br.Valid(false); err != nil {
 		return nil, err // Purposefully not wrapped
 	}
@@ -57,7 +57,7 @@ func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Ob
 		return nil, handleError(bucket, key, err)
 	}
 
-	resp, err := blobClient.Download(context.Background(), azblob.BlobDownloadOptions{Offset: &offset, Count: &length})
+	resp, err := blobClient.Download(ctx, azblob.BlobDownloadOptions{Offset: &offset, Count: &length})
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
@@ -76,13 +76,13 @@ func (c *Client) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Ob
 	return object, nil
 }
 
-func (c *Client) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, error) {
+func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
 	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
 
-	resp, err := blobClient.GetProperties(context.Background(), azblob.BlobGetPropertiesOptions{})
+	resp, err := blobClient.GetProperties(ctx, azblob.BlobGetPropertiesOptions{})
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
@@ -97,7 +97,7 @@ func (c *Client) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, error)
 	return attrs, nil
 }
 
-func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
+func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
 	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
 	if err != nil {
 		return handleError(bucket, key, err)
@@ -111,7 +111,7 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 	}
 
 	_, err = blobClient.Upload(
-		context.Background(),
+		ctx,
 		body,
 		azblob.BlockBlobUploadOptions{TransactionalContentMD5: md5sum.Sum(nil)},
 	)
@@ -119,34 +119,34 @@ func (c *Client) PutObject(bucket, key string, body io.ReadSeeker) error {
 	return handleError(bucket, key, err)
 }
 
-func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
-	attrs, err := c.GetObjectAttrs(bucket, key)
+func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
+	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
 	if objerr.IsNotFoundError(err) || attrs != nil && attrs.Size == 0 {
-		return c.PutObject(bucket, key, data)
+		return c.PutObject(ctx, bucket, key, data)
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
-	id, err := c.CreateMultipartUpload(bucket, key)
+	id, err := c.CreateMultipartUpload(ctx, bucket, key)
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	existing, err := c.UploadPartCopy(bucket, id, key, key, objcli.NoPartNumber, nil)
+	existing, err := c.UploadPartCopy(ctx, bucket, id, key, key, objcli.NoPartNumber, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get existing object part: %w", err)
 	}
 
-	intermediate, err := c.UploadPart(bucket, id, key, objcli.NoPartNumber, data)
+	intermediate, err := c.UploadPart(ctx, bucket, id, key, objcli.NoPartNumber, data)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(bucket, id, key, existing, intermediate)
+	err = c.CompleteMultipartUpload(ctx, bucket, id, key, existing, intermediate)
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -154,7 +154,7 @@ func (c *Client) AppendToObject(bucket, key string, data io.ReadSeeker) error {
 	return nil
 }
 
-func (c *Client) DeleteObjects(bucket string, keys ...string) error {
+func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
 	containerClient, err := c.storageAPI.ToContainerAPI(bucket)
 	if err != nil {
 		return err // Purposefully not wrapped
@@ -171,7 +171,7 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 			return err // Purposefully not wrapped
 		}
 
-		_, err = blobClient.Delete(context.Background(), azblob.BlobDeleteOptions{})
+		_, err = blobClient.Delete(ctx, azblob.BlobDeleteOptions{})
 		if err != nil && !isKeyNotFound(err) {
 			return handleError(bucket, key, err)
 		}
@@ -192,16 +192,16 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	return pool.Stop()
 }
 
-func (c *Client) DeleteDirectory(bucket, prefix string) error {
+func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
 	fn := func(attrs *objval.ObjectAttrs) error {
-		return c.DeleteObjects(bucket, attrs.Key)
+		return c.DeleteObjects(ctx, bucket, attrs.Key)
 	}
 
-	return c.IterateObjects(bucket, prefix, "", nil, nil, fn)
+	return c.IterateObjects(ctx, bucket, prefix, "", nil, nil, fn)
 }
 
-func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc,
+func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
+	exclude []*regexp.Regexp, fn objcli.IterateFunc,
 ) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
@@ -213,18 +213,19 @@ func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclu
 	}
 
 	if delimiter == "" {
-		return c.iterateObjectsFlat(containerClient, bucket, prefix, include, exclude, fn)
+		return c.iterateObjectsFlat(ctx, containerClient, bucket, prefix, include, exclude, fn)
 	}
 
-	return c.iterateObjectsHierarchy(containerClient, bucket, prefix, delimiter, include, exclude, fn)
+	return c.iterateObjectsHierarchy(ctx, containerClient, bucket, prefix, delimiter, include, exclude, fn)
 }
 
-func (c *Client) iterateObjectsFlat(containerClient containerAPI, bucket, prefix string, include,
+func (c *Client) iterateObjectsFlat(ctx context.Context, containerClient containerAPI, bucket, prefix string, include,
 	exclude []*regexp.Regexp, fn objcli.IterateFunc,
 ) error {
 	options := azblob.ContainerListBlobsFlatOptions{Prefix: &prefix}
 
 	return c.iterateObjectsWithPager(
+		ctx,
 		containerClient.GetListBlobsFlatPagerAPI(options),
 		bucket,
 		include,
@@ -233,12 +234,13 @@ func (c *Client) iterateObjectsFlat(containerClient containerAPI, bucket, prefix
 	)
 }
 
-func (c *Client) iterateObjectsHierarchy(containerClient containerAPI, bucket, prefix, delimiter string, include,
-	exclude []*regexp.Regexp, fn objcli.IterateFunc,
+func (c *Client) iterateObjectsHierarchy(ctx context.Context, containerClient containerAPI, bucket, prefix,
+	delimiter string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc,
 ) error {
 	options := azblob.ContainerListBlobsHierarchyOptions{Prefix: &prefix}
 
 	return c.iterateObjectsWithPager(
+		ctx,
 		containerClient.GetListBlobsHierarchyPagerAPI(delimiter, options),
 		bucket,
 		include,
@@ -247,11 +249,10 @@ func (c *Client) iterateObjectsHierarchy(containerClient containerAPI, bucket, p
 	)
 }
 
-func (c *Client) iterateObjectsWithPager(pager listBlobsPagerAPI, bucket string, include,
+func (c *Client) iterateObjectsWithPager(ctx context.Context, pager listBlobsPagerAPI, bucket string, include,
 	exclude []*regexp.Regexp, fn objcli.IterateFunc,
 ) error {
 	var (
-		ctx      = context.Background()
 		prefixes []*azblob.BlobPrefix
 		blobs    []*azblob.BlobItemInternal
 		objects  []*objval.ObjectAttrs
@@ -318,26 +319,28 @@ func (c *Client) iterateObjects(objects []*objval.ObjectAttrs, include, exclude 
 	return nil
 }
 
-func (c *Client) CreateMultipartUpload(bucket, key string) (string, error) {
+func (c *Client) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
 	return objcli.NoUploadID, nil
 }
 
-func (c *Client) ListParts(bucket, id, key string) ([]objval.Part, error) {
+func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
 	if id != objcli.NoUploadID {
 		return nil, objcli.ErrExpectedNoUploadID
 	}
 
-	return c.listParts(bucket, key, azblob.BlockListTypeUncommitted)
+	return c.listParts(ctx, bucket, key, azblob.BlockListTypeUncommitted)
 }
 
-func (c *Client) listParts(bucket, key string, blockType azblob.BlockListType) ([]objval.Part, error) {
+func (c *Client) listParts(
+	ctx context.Context, bucket, key string, blockType azblob.BlockListType,
+) ([]objval.Part, error) {
 	blobClient, err := c.storageAPI.ToBlobAPI(bucket, key)
 	if err != nil {
 		return nil, handleError(bucket, key, err)
 	}
 
 	resp, err := blobClient.GetBlockList(
-		context.Background(),
+		ctx,
 		blockType,
 		azblob.BlockBlobGetBlockListOptions{},
 	)
@@ -359,7 +362,9 @@ func (c *Client) listParts(bucket, key string, blockType azblob.BlockListType) (
 	return parts, nil
 }
 
-func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
+func (c *Client) UploadPart(
+	ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker,
+) (objval.Part, error) {
 	if id != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
 	}
@@ -385,7 +390,7 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	}
 
 	_, err = blobClient.StageBlock(
-		context.Background(),
+		ctx,
 		blockID,
 		body,
 		azblob.BlockBlobStageBlockOptions{TransactionalContentMD5: md5sum.Sum(nil)},
@@ -394,7 +399,9 @@ func (c *Client) UploadPart(bucket, id, key string, number int, body io.ReadSeek
 	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
 }
 
-func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *objval.ByteRange) (objval.Part, error) {
+func (c *Client) UploadPartCopy(
+	ctx context.Context, bucket, id, dst, src string, number int, br *objval.ByteRange,
+) (objval.Part, error) {
 	if id != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
 	}
@@ -421,7 +428,7 @@ func (c *Client) UploadPartCopy(bucket, id, dst, src string, number int, br *obj
 	}
 
 	_, err = dstClient.StageBlockFromURL(
-		context.Background(),
+		ctx,
 		blockID,
 		srcURL,
 		0, // Should be set to 0 (https://docs.microsoft.com/en-us/rest/api/storageservices/put-block-from-url)
@@ -466,7 +473,7 @@ func (c *Client) getUploadPartCopySrcURL(bucket, src string) (string, error) {
 	return srcBlobParts.URL(), nil
 }
 
-func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
+func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key string, parts ...objval.Part) error {
 	if id != objcli.NoUploadID {
 		return objcli.ErrExpectedNoUploadID
 	}
@@ -483,7 +490,7 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 	}
 
 	_, err = blobClient.CommitBlockList(
-		context.Background(),
+		ctx,
 		converted,
 		azblob.BlockBlobCommitBlockListOptions{},
 	)
@@ -491,7 +498,7 @@ func (c *Client) CompleteMultipartUpload(bucket, id, key string, parts ...objval
 	return handleError(bucket, key, err)
 }
 
-func (c *Client) AbortMultipartUpload(_, id, _ string) error {
+func (c *Client) AbortMultipartUpload(ctx context.Context, _, id, _ string) error {
 	if id != objcli.NoUploadID {
 		return objcli.ErrExpectedNoUploadID
 	}

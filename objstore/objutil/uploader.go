@@ -1,6 +1,7 @@
 package objutil
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,8 @@ type OnPartCompleteFunc func(metadata any, part objval.Part) error
 
 // MPUploaderOptions encapsulates the options available when creating a 'MPUploader'.
 type MPUploaderOptions struct {
+	Options
+
 	// Client is the client used to perform the operation.
 	//
 	// NOTE: This attribute is required.
@@ -73,6 +76,10 @@ type MPUploaderOptions struct {
 func (m *MPUploaderOptions) defaults() {
 	if m.OnPartComplete == nil {
 		m.OnPartComplete = func(_ any, _ objval.Part) error { return nil }
+	}
+
+	if m.Options.Context == nil {
+		m.Options.Context = context.Background()
 	}
 }
 
@@ -122,7 +129,7 @@ func (m *MPUploader) createMPU() error {
 
 	var err error
 
-	m.opts.ID, err = m.opts.Client.CreateMultipartUpload(m.opts.Bucket, m.opts.Key)
+	m.opts.ID, err = m.opts.Client.CreateMultipartUpload(m.opts.Options.Context, m.opts.Bucket, m.opts.Key)
 
 	return err
 }
@@ -162,7 +169,7 @@ func (m *MPUploader) UploadWithMeta(metadata any, body io.ReadSeeker) error {
 
 // upload a new part with the given number/body.
 func (m *MPUploader) upload(number int, metadata any, body io.ReadSeeker) error {
-	part, err := m.opts.Client.UploadPart(m.opts.Bucket, m.opts.ID, m.opts.Key, number, body)
+	part, err := m.opts.Client.UploadPart(m.opts.Options.Context, m.opts.Bucket, m.opts.ID, m.opts.Key, number, body)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
@@ -201,7 +208,7 @@ func (m *MPUploader) Abort() error {
 		return fmt.Errorf("failed to stop worker pool: %w", err)
 	}
 
-	return m.opts.Client.AbortMultipartUpload(m.opts.Bucket, m.opts.ID, m.opts.Key)
+	return m.opts.Client.AbortMultipartUpload(m.opts.Options.Context, m.opts.Bucket, m.opts.ID, m.opts.Key)
 }
 
 // Commit the multipart upload and stop the worker pool.
@@ -217,5 +224,6 @@ func (m *MPUploader) Commit() error {
 		func(i, j int) bool { return m.opts.Parts[i].Number < m.opts.Parts[j].Number },
 	)
 
-	return m.opts.Client.CompleteMultipartUpload(m.opts.Bucket, m.opts.ID, m.opts.Key, m.opts.Parts...)
+	return m.opts.Client.CompleteMultipartUpload(m.opts.Options.Context, m.opts.Bucket, m.opts.ID, m.opts.Key,
+		m.opts.Parts...)
 }

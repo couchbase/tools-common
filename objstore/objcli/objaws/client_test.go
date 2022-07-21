@@ -2,6 +2,7 @@ package objaws
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -59,11 +60,11 @@ func TestClientGetObject(t *testing.T) {
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("GetObject", mock.MatchedBy(fn)).Return(output, nil)
+	api.On("GetObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	object, err := client.GetObject("bucket", "key", nil)
+	object, err := client.GetObject(context.Background(), "bucket", "key", nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []byte("value"), testutil.ReadAll(t, object.Body))
@@ -80,7 +81,7 @@ func TestClientGetObject(t *testing.T) {
 	require.Equal(t, expected, object)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "GetObject", 1)
+	api.AssertNumberOfCalls(t, "GetObjectWithContext", 1)
 }
 
 func TestClientGetObjectWithByteRange(t *testing.T) {
@@ -96,21 +97,21 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("GetObject", mock.MatchedBy(fn)).Return(output, nil)
+	api.On("GetObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	_, err := client.GetObject("bucket", "key", &objval.ByteRange{Start: 64, End: 128})
+	_, err := client.GetObject(context.Background(), "bucket", "key", &objval.ByteRange{Start: 64, End: 128})
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "GetObject", 1)
+	api.AssertNumberOfCalls(t, "GetObjectWithContext", 1)
 }
 
 func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.GetObject("bucket", "key", &objval.ByteRange{Start: 128, End: 64})
+	_, err := client.GetObject(context.Background(), "bucket", "key", &objval.ByteRange{Start: 128, End: 64})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -135,11 +136,11 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObject", mock.MatchedBy(fn)).Return(output, nil)
+	api.On("HeadObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	attrs, err := client.GetObjectAttrs("bucket", "key")
+	attrs, err := client.GetObjectAttrs(context.Background(), "bucket", "key")
 	require.NoError(t, err)
 
 	expected := &objval.ObjectAttrs{
@@ -152,7 +153,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	require.Equal(t, expected, attrs)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObject", 1)
+	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
 }
 
 func TestClientPutObject(t *testing.T) {
@@ -168,14 +169,14 @@ func TestClientPutObject(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObject", mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.PutObject("bucket", "key", strings.NewReader("value")))
+	require.NoError(t, client.PutObject(context.Background(), "bucket", "key", strings.NewReader("value")))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "PutObject", 1)
+	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
 }
 
 func TestClientAppendToObjectNotFound(t *testing.T) {
@@ -190,7 +191,8 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 		return bucket && key
 	}
 
-	api.On("HeadObject", mock.MatchedBy(fn1)).Return(nil, &mockError{s3.ErrCodeNoSuchKey})
+	api.On("HeadObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1)).
+		Return(nil, &mockError{s3.ErrCodeNoSuchKey})
 
 	fn2 := func(input *s3.PutObjectInput) bool {
 		var (
@@ -202,16 +204,16 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObject", mock.MatchedBy(fn2)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn2)).Return(&s3.PutObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject("bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObject", 1)
-	api.AssertNumberOfCalls(t, "PutObject", 1)
+	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
 }
 
 func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
@@ -232,7 +234,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObject", mock.MatchedBy(fn1)).Return(output1, nil)
+	api.On("HeadObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1)).Return(output1, nil)
 
 	fn2 := func(input *s3.GetObjectInput) bool {
 		var (
@@ -250,7 +252,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("GetObject", mock.MatchedBy(fn2)).Return(output2, nil)
+	api.On("GetObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn2)).Return(output2, nil)
 
 	fn3 := func(input *s3.PutObjectInput) bool {
 		var (
@@ -262,17 +264,17 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObject", mock.MatchedBy(fn3)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn3)).Return(&s3.PutObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject("bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObject", 1)
-	api.AssertNumberOfCalls(t, "GetObject", 1)
-	api.AssertNumberOfCalls(t, "PutObject", 1)
+	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "GetObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
 }
 
 func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
@@ -293,7 +295,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObject", mock.MatchedBy(fn1)).Return(output1, nil)
+	api.On("HeadObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1)).Return(output1, nil)
 
 	fn2 := func(input *s3.CreateMultipartUploadInput) bool {
 		var (
@@ -308,7 +310,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		UploadId: aws.String("id"),
 	}
 
-	api.On("CreateMultipartUpload", mock.MatchedBy(fn2)).Return(output2, nil)
+	api.On("CreateMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn2)).Return(output2, nil)
 
 	fn3 := func(input *s3.UploadPartCopyInput) bool {
 		var (
@@ -327,7 +329,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		CopyPartResult: &s3.CopyPartResult{ETag: aws.String("etag1")},
 	}
 
-	api.On("UploadPartCopy", mock.MatchedBy(fn3)).Return(output3, nil)
+	api.On("UploadPartCopyWithContext", testutil.MockMatchContext, mock.MatchedBy(fn3)).Return(output3, nil)
 
 	fn4 := func(input *s3.UploadPartInput) bool {
 		var (
@@ -345,7 +347,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		ETag: aws.String("etag2"),
 	}
 
-	api.On("UploadPart", mock.MatchedBy(fn4)).Return(output4, nil)
+	api.On("UploadPartWithContext", testutil.MockMatchContext, mock.MatchedBy(fn4)).Return(output4, nil)
 
 	fn5 := func(input *s3.CompleteMultipartUploadInput) bool {
 		var (
@@ -361,19 +363,19 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		return bucket && key && id && parts
 	}
 
-	api.On("CompleteMultipartUpload", mock.MatchedBy(fn5)).Return(nil, nil)
+	api.On("CompleteMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn5)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject("bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObject", 1)
-	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
-	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
-	api.AssertNumberOfCalls(t, "UploadPart", 1)
-	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "CreateMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "UploadPartCopyWithContext", 1)
+	api.AssertNumberOfCalls(t, "UploadPartWithContext", 1)
+	api.AssertNumberOfCalls(t, "CompleteMultipartUploadWithContext", 1)
 }
 
 func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing.T) {
@@ -394,7 +396,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObject", mock.MatchedBy(fn1)).Return(output1, nil)
+	api.On("HeadObjectWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1)).Return(output1, nil)
 
 	fn2 := func(input *s3.CreateMultipartUploadInput) bool {
 		var (
@@ -409,7 +411,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		UploadId: aws.String("id"),
 	}
 
-	api.On("CreateMultipartUpload", mock.MatchedBy(fn2)).Return(output2, nil)
+	api.On("CreateMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn2)).Return(output2, nil)
 
 	fn3 := func(input *s3.UploadPartCopyInput) bool {
 		var (
@@ -424,7 +426,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		return bucket && src && rnge && key && number && id
 	}
 
-	api.On("UploadPartCopy", mock.MatchedBy(fn3)).Return(nil, assert.AnError)
+	api.On("UploadPartCopyWithContext", testutil.MockMatchContext, mock.MatchedBy(fn3)).Return(nil, assert.AnError)
 
 	fn4 := func(input *s3.AbortMultipartUploadInput) bool {
 		var (
@@ -436,18 +438,18 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		return bucket && key && id
 	}
 
-	api.On("AbortMultipartUpload", mock.MatchedBy(fn4)).Return(nil, nil)
+	api.On("AbortMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn4)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject("bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObject", 1)
-	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
-	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
-	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "CreateMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "UploadPartCopyWithContext", 1)
+	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
 }
 
 func TestClientDeleteObjectsSinglePage(t *testing.T) {
@@ -467,14 +469,15 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjects", mock.MatchedBy(fn)).Return(&s3.DeleteObjectsOutput{}, nil)
+	api.On("DeleteObjectsWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.DeleteObjects("bucket", "key1", "key2", "key3"))
+	require.NoError(t, client.DeleteObjects(context.Background(), "bucket", "key1", "key2", "key3"))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
+	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
 }
 
 func TestClientDeleteObjectsMultiplePages(t *testing.T) {
@@ -490,7 +493,8 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjects", mock.MatchedBy(fn1)).Return(&s3.DeleteObjectsOutput{}, nil)
+	api.On("DeleteObjectsWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	fn2 := func(input *s3.DeleteObjectsInput) bool {
 		var (
@@ -502,7 +506,8 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjects", mock.MatchedBy(fn2)).Return(&s3.DeleteObjectsOutput{}, nil)
+	api.On("DeleteObjectsWithContext", testutil.MockMatchContext, mock.MatchedBy(fn2)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -512,10 +517,10 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 		keys = append(keys, fmt.Sprintf("key%d", i))
 	}
 
-	require.NoError(t, client.DeleteObjects("bucket", keys...))
+	require.NoError(t, client.DeleteObjects(context.Background(), "bucket", keys...))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjects", 2)
+	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 2)
 }
 
 func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
@@ -525,14 +530,14 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 		Errors: []*s3.Error{{Code: aws.String(s3.ErrCodeNoSuchKey), Message: aws.String("")}},
 	}
 
-	api.On("DeleteObjects", mock.Anything).Return(output, nil)
+	api.On("DeleteObjectsWithContext", testutil.MockMatchContext, mock.Anything).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.DeleteObjects("bucket", "key"))
+	require.NoError(t, client.DeleteObjects(context.Background(), "bucket", "key"))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
+	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
 }
 
 func TestClientDeleteDirectory(t *testing.T) {
@@ -571,7 +576,8 @@ func TestClientDeleteDirectory(t *testing.T) {
 		return true
 	}
 
-	api.On("ListObjectsV2Pages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+	api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
+		Return(nil)
 
 	fn := func(input *s3.DeleteObjectsInput) bool {
 		var (
@@ -586,16 +592,17 @@ func TestClientDeleteDirectory(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjects", mock.MatchedBy(fn)).Return(&s3.DeleteObjectsOutput{}, nil)
+	api.On("DeleteObjectsWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
-	require.NoError(t, client.DeleteDirectory("bucket", "prefix"))
+	require.NoError(t, client.DeleteDirectory(context.Background(), "bucket", "prefix"))
 
 	wg.Wait()
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
-	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
 }
 
 func TestClientIterateObjects(t *testing.T) {
@@ -611,20 +618,21 @@ func TestClientIterateObjects(t *testing.T) {
 		return bucket && prefix && delimiter
 	}
 
-	api.On("ListObjectsV2Pages", mock.MatchedBy(fn), mock.Anything).Return(nil)
+	api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn), mock.Anything).Return(nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, nil))
+	require.NoError(t, client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", nil, nil, nil))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
 }
 
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	client := &Client{}
 
-	err := client.IterateObjects("bucket", "prefix", "delimiter", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
+	err := client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", []*regexp.Regexp{},
+		[]*regexp.Regexp{}, nil)
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
@@ -660,7 +668,8 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 		return true
 	}
 
-	api.On("ListObjectsV2Pages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+	api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
+		Return(nil)
 
 	var (
 		client  = &Client{serviceAPI: api}
@@ -678,12 +687,12 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(t, client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, fn))
+	require.NoError(t, client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", nil, nil, fn))
 	require.Equal(t, 1, dirs)
 	require.Equal(t, 1, objects)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
 }
 
 func TestClientIterateObjectsPropagateUserError(t *testing.T) {
@@ -711,17 +720,27 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 		return true
 	}
 
-	api.On("ListObjectsV2Pages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+	api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
+		Return(nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.IterateObjects("bucket", "prefix", "delimiter", nil, nil, func(attrs *objval.ObjectAttrs) error {
-		return assert.AnError
-	})
+	err := client.IterateObjects(
+		context.Background(),
+		"bucket",
+		"prefix",
+		"delimiter",
+		nil,
+		nil,
+		func(attrs *objval.ObjectAttrs) error {
+			return assert.AnError
+		},
+	)
+
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
 }
 
 func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
@@ -865,7 +884,8 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				return true
 			}
 
-			api.On("ListObjectsV2Pages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+			api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
+				Return(nil)
 
 			client := &Client{serviceAPI: api}
 
@@ -873,12 +893,13 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 			fn := func(attrs *objval.ObjectAttrs) error { all = append(all, attrs); return nil }
 
-			err := client.IterateObjects("bucket", "prefix", "delimiter", test.include, test.exclude, fn)
+			err := client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", test.include,
+				test.exclude, fn)
 			require.NoError(t, err)
 			require.Equal(t, test.all, all)
 
 			api.AssertExpectations(t)
-			api.AssertNumberOfCalls(t, "ListObjectsV2Pages", 1)
+			api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
 		})
 	}
 }
@@ -899,16 +920,17 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 		UploadId: aws.String("id"),
 	}
 
-	api.On("CreateMultipartUpload", mock.MatchedBy(fn), mock.Anything).Return(output, nil)
+	api.On("CreateMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn), mock.Anything).
+		Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	id, err := client.CreateMultipartUpload("bucket", "key")
+	id, err := client.CreateMultipartUpload(context.Background(), "bucket", "key")
 	require.NoError(t, err)
 	require.Equal(t, "id", id)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "CreateMultipartUploadWithContext", 1)
 }
 
 func TestClientListParts(t *testing.T) {
@@ -941,18 +963,18 @@ func TestClientListParts(t *testing.T) {
 		return true
 	}
 
-	api.On("ListPartsPages", mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+	api.On("ListPartsPagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
 
 	client := &Client{serviceAPI: api}
 
-	parts, err := client.ListParts("bucket", "id", "key")
+	parts, err := client.ListParts(context.Background(), "bucket", "id", "key")
 	require.NoError(t, err)
 
 	expected := []objval.Part{{ID: "etag1", Size: 64}, {ID: "etag2", Size: 128}}
 	require.Equal(t, expected, parts)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListPartsPages", 1)
+	api.AssertNumberOfCalls(t, "ListPartsPagesWithContext", 1)
 }
 
 func TestClientListPartsUploadNotFound(t *testing.T) {
@@ -968,15 +990,16 @@ func TestClientListPartsUploadNotFound(t *testing.T) {
 		return bucket && id && key
 	}
 
-	api.On("ListPartsPages", mock.MatchedBy(fn1), mock.Anything).Return(&mockError{inner: s3.ErrCodeNoSuchUpload})
+	api.On("ListPartsPagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.Anything).
+		Return(&mockError{inner: s3.ErrCodeNoSuchUpload})
 
 	client := &Client{serviceAPI: api}
 
-	_, err := client.ListParts("bucket", "id", "key")
+	_, err := client.ListParts(context.Background(), "bucket", "id", "key")
 	require.True(t, objerr.IsNotFoundError(err))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListPartsPages", 1)
+	api.AssertNumberOfCalls(t, "ListPartsPagesWithContext", 1)
 }
 
 func TestClientUploadPart(t *testing.T) {
@@ -998,16 +1021,16 @@ func TestClientUploadPart(t *testing.T) {
 		ETag: aws.String("etag"),
 	}
 
-	api.On("UploadPart", mock.MatchedBy(fn)).Return(output, nil)
+	api.On("UploadPartWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	part, err := client.UploadPart("bucket", "id", "key", 1, strings.NewReader("value"))
+	part, err := client.UploadPart(context.Background(), "bucket", "id", "key", 1, strings.NewReader("value"))
 	require.NoError(t, err)
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 5}, part)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "UploadPart", 1)
+	api.AssertNumberOfCalls(t, "UploadPartWithContext", 1)
 }
 
 func TestClientUploadPartCopy(t *testing.T) {
@@ -1030,22 +1053,24 @@ func TestClientUploadPartCopy(t *testing.T) {
 		CopyPartResult: &s3.CopyPartResult{ETag: aws.String("etag")},
 	}
 
-	api.On("UploadPartCopy", mock.MatchedBy(fn)).Return(output, nil)
+	api.On("UploadPartCopyWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
-	part, err := client.UploadPartCopy("bucket", "id", "key1", "key2", 1, &objval.ByteRange{Start: 64, End: 128})
+	part, err := client.UploadPartCopy(context.Background(), "bucket", "id", "key1", "key2", 1,
+		&objval.ByteRange{Start: 64, End: 128})
 	require.NoError(t, err)
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 65}, part)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
+	api.AssertNumberOfCalls(t, "UploadPartCopyWithContext", 1)
 }
 
 func TestClientUploadPartCopyInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy("bucket", "id", "dst", "src", 1, &objval.ByteRange{Start: 128, End: 64})
+	_, err := client.UploadPartCopy(context.Background(), "bucket", "id", "dst", "src", 1,
+		&objval.ByteRange{Start: 128, End: 64})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -1069,11 +1094,11 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 		return bucket && key && id && parts
 	}
 
-	api.On("CompleteMultipartUpload", mock.MatchedBy(fn)).Return(nil, nil)
+	api.On("CompleteMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.CompleteMultipartUpload(
+	require.NoError(t, client.CompleteMultipartUpload(context.Background(),
 		"bucket",
 		"id",
 		"key",
@@ -1082,7 +1107,7 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 	))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "CompleteMultipartUploadWithContext", 1)
 }
 
 func TestClientAbortMultipartUpload(t *testing.T) {
@@ -1098,14 +1123,14 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 		return bucket && key && id
 	}
 
-	api.On("AbortMultipartUpload", mock.MatchedBy(fn)).Return(nil, nil)
+	api.On("AbortMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.AbortMultipartUpload("bucket", "id", "key"))
+	require.NoError(t, client.AbortMultipartUpload(context.Background(), "bucket", "id", "key"))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
 }
 
 func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
@@ -1121,12 +1146,13 @@ func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
 		return bucket && key && id
 	}
 
-	api.On("AbortMultipartUpload", mock.MatchedBy(fn)).Return(nil, &mockError{inner: s3.ErrCodeNoSuchUpload})
+	api.On("AbortMultipartUploadWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).
+		Return(nil, &mockError{inner: s3.ErrCodeNoSuchUpload})
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.AbortMultipartUpload("bucket", "id", "key"))
+	require.NoError(t, client.AbortMultipartUpload(context.Background(), "bucket", "id", "key"))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
 }

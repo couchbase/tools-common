@@ -3,6 +3,7 @@
 package objutil
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -63,6 +64,10 @@ type UploadOptions struct {
 func (u *UploadOptions) defaults() {
 	u.PartSize = maths.Max(u.PartSize, MinPartSize)
 	u.MPUThreshold = maths.Max(u.MPUThreshold, MPUThreshold)
+
+	if u.Options.Context == nil {
+		u.Options.Context = context.Background()
+	}
 }
 
 // Upload an object to a remote cloud breaking it down into a multipart upload if the body is over a given size.
@@ -77,7 +82,7 @@ func Upload(opts UploadOptions) error {
 
 	// Under the threshold, upload using a single request
 	if length <= opts.MPUThreshold {
-		return opts.Client.PutObject(opts.Bucket, opts.Key, opts.Body)
+		return opts.Client.PutObject(opts.Context, opts.Bucket, opts.Key, opts.Body)
 	}
 
 	return upload(opts)
@@ -86,9 +91,10 @@ func Upload(opts UploadOptions) error {
 // upload an object to a remote cloud by breaking it down into individual chunks and uploading them concurrently.
 func upload(opts UploadOptions) error {
 	mpu, err := NewMPUploader(MPUploaderOptions{
-		Client: opts.Client,
-		Bucket: opts.Bucket,
-		Key:    opts.Key,
+		Client:  opts.Client,
+		Bucket:  opts.Bucket,
+		Key:     opts.Key,
+		Options: opts.Options,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create uploader: %w", err)

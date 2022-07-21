@@ -2,6 +2,7 @@ package objcli
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"path"
@@ -48,7 +49,7 @@ func (t *TestClient) Provider() objval.Provider {
 	return t.provider
 }
 
-func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
+func (t *TestClient) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -68,7 +69,7 @@ func (t *TestClient) GetObject(bucket, key string, br *objval.ByteRange) (*objva
 	}, nil
 }
 
-func (t *TestClient) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, error) {
+func (t *TestClient) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -80,7 +81,7 @@ func (t *TestClient) GetObjectAttrs(bucket, key string) (*objval.ObjectAttrs, er
 	return &object.ObjectAttrs, nil
 }
 
-func (t *TestClient) PutObject(bucket, key string, body io.ReadSeeker) error {
+func (t *TestClient) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -89,7 +90,7 @@ func (t *TestClient) PutObject(bucket, key string, body io.ReadSeeker) error {
 	return nil
 }
 
-func (t *TestClient) AppendToObject(bucket, key string, data io.ReadSeeker) error {
+func (t *TestClient) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -103,7 +104,7 @@ func (t *TestClient) AppendToObject(bucket, key string, data io.ReadSeeker) erro
 	return nil
 }
 
-func (t *TestClient) DeleteObjects(bucket string, keys ...string) error {
+func (t *TestClient) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -116,7 +117,7 @@ func (t *TestClient) DeleteObjects(bucket string, keys ...string) error {
 	return nil
 }
 
-func (t *TestClient) DeleteDirectory(bucket, prefix string) error {
+func (t *TestClient) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -133,8 +134,8 @@ func (t *TestClient) DeleteDirectory(bucket, prefix string) error {
 	return nil
 }
 
-func (t *TestClient) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
-	fn IterateFunc,
+func (t *TestClient) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
+	exclude []*regexp.Regexp, fn IterateFunc,
 ) error {
 	if include != nil && exclude != nil {
 		return ErrIncludeAndExcludeAreMutuallyExclusive
@@ -173,11 +174,11 @@ func (t *TestClient) IterateObjects(bucket, prefix, delimiter string, include, e
 	return nil
 }
 
-func (t *TestClient) CreateMultipartUpload(bucket, key string) (string, error) {
+func (t *TestClient) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
 	return uuid.NewString(), nil
 }
 
-func (t *TestClient) ListParts(bucket, id, key string) ([]objval.Part, error) {
+func (t *TestClient) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
 	var (
 		prefix = partPrefix(id, key)
 		parts  = make([]objval.Part, 0)
@@ -191,7 +192,7 @@ func (t *TestClient) ListParts(bucket, id, key string) ([]objval.Part, error) {
 		return nil
 	}
 
-	err := t.IterateObjects(bucket, prefix, "/", nil, nil, fn)
+	err := t.IterateObjects(ctx, bucket, prefix, "/", nil, nil, fn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to iterate objects: %w", err)
 	}
@@ -199,7 +200,9 @@ func (t *TestClient) ListParts(bucket, id, key string) ([]objval.Part, error) {
 	return parts, nil
 }
 
-func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
+func (t *TestClient) UploadPart(
+	ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker,
+) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -215,7 +218,7 @@ func (t *TestClient) UploadPart(bucket, id, key string, number int, body io.Read
 	return part, nil
 }
 
-func (t *TestClient) UploadPartCopy(bucket, id, dst, src string, number int,
+func (t *TestClient) UploadPartCopy(ctx context.Context, bucket, id, dst, src string, number int,
 	br *objval.ByteRange,
 ) (objval.Part, error) {
 	t.lock.Lock()
@@ -238,7 +241,7 @@ func (t *TestClient) UploadPartCopy(bucket, id, dst, src string, number int,
 	return part, nil
 }
 
-func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...objval.Part) error {
+func (t *TestClient) CompleteMultipartUpload(ctx context.Context, bucket, id, key string, parts ...objval.Part) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -258,7 +261,7 @@ func (t *TestClient) CompleteMultipartUpload(bucket, id, key string, parts ...ob
 	return t.deleteKeysLocked(bucket, partPrefix(id, key), nil, nil)
 }
 
-func (t *TestClient) AbortMultipartUpload(bucket, id, key string) error {
+func (t *TestClient) AbortMultipartUpload(ctx context.Context, bucket, id, key string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

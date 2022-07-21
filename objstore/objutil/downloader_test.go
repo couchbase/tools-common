@@ -2,6 +2,7 @@ package objutil
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,8 @@ func TestNewMPDownloader(t *testing.T) {
 
 	// Should be updated, the given value is too small
 	options.PartSize = MinPartSize
+
+	options.Context = context.Background()
 
 	require.Equal(t, options, downloader.opts)
 }
@@ -84,7 +87,7 @@ func TestMPDownloaderDownload(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))
+			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)
@@ -110,7 +113,7 @@ func TestMPDownloaderDownload(t *testing.T) {
 func TestMPDownloaderByteRangeUseRemote(t *testing.T) {
 	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
-	require.NoError(t, client.PutObject("bucket", "key", strings.NewReader("value")))
+	require.NoError(t, client.PutObject(context.Background(), "bucket", "key", strings.NewReader("value")))
 
 	var (
 		expected   = &objval.ByteRange{End: 4}
@@ -178,7 +181,7 @@ func TestMPDownloaderInternalDownload(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))
+			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)
@@ -246,7 +249,7 @@ func TestMPDownloaderDownloadChunk(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject("bucket", "key", bytes.NewReader(test.data)))
+			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)

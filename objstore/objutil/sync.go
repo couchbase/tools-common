@@ -175,7 +175,7 @@ func uploadFile(source, destination *CloudOrFileURL, opts SyncOptions) error {
 		Key:          destination.Path,
 		Body:         file,
 		MPUThreshold: opts.MPUThreshold,
-		Options:      Options{PartSize: opts.PartSize},
+		Options:      opts.Options,
 	})
 }
 
@@ -207,13 +207,15 @@ func download(source, destination *CloudOrFileURL, opts SyncOptions) error {
 		return downloadFile(&newSource, newDestination, opts)
 	}
 
-	err := opts.Client.IterateObjects(source.Bucket, source.Path, "", nil, nil, func(attrs *objval.ObjectAttrs) error {
+	queue := func(attrs *objval.ObjectAttrs) error {
 		if attrs.IsDir() {
 			return nil
 		}
 
 		return pool.Queue(func() error { return dl(attrs.Key) })
-	})
+	}
+
+	err := opts.Client.IterateObjects(opts.Options.Context, source.Bucket, source.Path, "", nil, nil, queue)
 	if err != nil {
 		return fmt.Errorf("could not iterate objects: %w", err)
 	}
@@ -243,12 +245,10 @@ func downloadFile(source, destination *CloudOrFileURL, opts SyncOptions) error {
 	defer file.Close()
 
 	return Download(DownloadOptions{
-		Client: opts.Client,
-		Bucket: source.Bucket,
-		Key:    source.Path,
-		Writer: file,
-		Options: Options{
-			PartSize: opts.PartSize,
-		},
+		Client:  opts.Client,
+		Bucket:  source.Bucket,
+		Key:     source.Path,
+		Writer:  file,
+		Options: opts.Options,
 	})
 }

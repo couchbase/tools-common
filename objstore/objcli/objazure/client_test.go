@@ -2,6 +2,7 @@ package objazure
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
@@ -86,7 +87,7 @@ func TestClientGetObject(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	object, err := client.GetObject("container", "blob", nil)
+	object, err := client.GetObject(context.Background(), "container", "blob", nil)
 	require.NoError(t, err)
 
 	expected := &objval.Object{
@@ -135,7 +136,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	object, err := client.GetObject("container", "blob", &objval.ByteRange{Start: 64, End: 128})
+	object, err := client.GetObject(context.Background(), "container", "blob", &objval.ByteRange{Start: 64, End: 128})
 	require.NoError(t, err)
 
 	expected := &objval.Object{
@@ -159,7 +160,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.GetObject("bucket", "blob", &objval.ByteRange{Start: 128, End: 64})
+	_, err := client.GetObject(context.Background(), "bucket", "blob", &objval.ByteRange{Start: 128, End: 64})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -188,7 +189,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	attrs, err := client.GetObjectAttrs("container", "blob")
+	attrs, err := client.GetObjectAttrs(context.Background(), "container", "blob")
 	require.NoError(t, err)
 
 	expected := &objval.ObjectAttrs{
@@ -236,7 +237,7 @@ func TestClientPutObject(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.PutObject("container", "blob", strings.NewReader("value")))
+	require.NoError(t, client.PutObject(context.Background(), "container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
@@ -279,7 +280,7 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
+	require.NoError(t, client.AppendToObject(context.Background(), "container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 2)
@@ -359,7 +360,7 @@ func TestClientAppendToObject(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.AppendToObject("container", "blob", strings.NewReader("value")))
+	require.NoError(t, client.AppendToObject(context.Background(), "container", "blob", strings.NewReader("value")))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 5)
@@ -392,7 +393,7 @@ func TestClientDeleteObjects(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.DeleteObjects("container", "blob1", "blob2"))
+	require.NoError(t, client.DeleteObjects(context.Background(), "container", "blob1", "blob2"))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
@@ -423,7 +424,7 @@ func TestClientDeleteObjectsKeyNotFound(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.DeleteObjects("container", "blob"))
+	require.NoError(t, client.DeleteObjects(context.Background(), "container", "blob"))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
@@ -486,7 +487,7 @@ func TestClientDeleteDirectory(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	err := client.DeleteDirectory("container", "")
+	err := client.DeleteDirectory(context.Background(), "container", "")
 	require.NoError(t, err)
 
 	msAPI.AssertExpectations(t)
@@ -536,7 +537,7 @@ func TestClientIterateObjects(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	require.NoError(t, client.IterateObjects("container", "prefix", "", nil, nil, nil))
+	require.NoError(t, client.IterateObjects(context.Background(), "container", "prefix", "", nil, nil, nil))
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToContainerAPI", 1)
@@ -603,7 +604,7 @@ func TestClientIterateObjectsWithoutDelimiter(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(t, client.IterateObjects("container", "prefix", "", nil, nil, fn))
+	require.NoError(t, client.IterateObjects(context.Background(), "container", "prefix", "", nil, nil, fn))
 	require.Zero(t, dirs)
 	require.Equal(t, 1, objects)
 
@@ -679,7 +680,7 @@ func TestClientIterateObjectsWithDelimiter(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(t, client.IterateObjects("container", "prefix", "delimiter", nil, nil, fn))
+	require.NoError(t, client.IterateObjects(context.Background(), "container", "prefix", "delimiter", nil, nil, fn))
 	require.Equal(t, 1, dirs)
 	require.Equal(t, 1, objects)
 
@@ -696,7 +697,8 @@ func TestClientIterateObjectsWithDelimiter(t *testing.T) {
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	client := &Client{}
 
-	err := client.IterateObjects("bucket", "prefix", "delimiter", []*regexp.Regexp{}, []*regexp.Regexp{}, nil)
+	err := client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", []*regexp.Regexp{},
+		[]*regexp.Regexp{}, nil)
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
@@ -737,9 +739,18 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	err := client.IterateObjects("container", "prefix", "delimiter", nil, nil, func(attrs *objval.ObjectAttrs) error {
-		return assert.AnError
-	})
+	err := client.IterateObjects(
+		context.Background(),
+		"container",
+		"prefix",
+		"delimiter",
+		nil,
+		nil,
+		func(attrs *objval.ObjectAttrs) error {
+			return assert.AnError
+		},
+	)
+
 	require.ErrorIs(t, err, assert.AnError)
 
 	msAPI.AssertExpectations(t)
@@ -910,10 +921,18 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 			var all []*objval.ObjectAttrs
 
-			err := client.IterateObjects("container", "", "", test.include, test.exclude, func(attrs *objval.ObjectAttrs) error {
-				all = append(all, attrs)
-				return nil
-			})
+			err := client.IterateObjects(
+				context.Background(),
+				"container",
+				"",
+				"",
+				test.include,
+				test.exclude,
+				func(attrs *objval.ObjectAttrs) error {
+					all = append(all, attrs)
+					return nil
+				},
+			)
 			require.NoError(t, err)
 			require.Equal(t, test.all, all)
 
@@ -932,7 +951,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 func TestClientCreateMultipartUpload(t *testing.T) {
 	client := &Client{}
 
-	id, err := client.CreateMultipartUpload("container", "blob")
+	id, err := client.CreateMultipartUpload(context.Background(), "container", "blob")
 	require.NoError(t, err)
 	require.Equal(t, objcli.NoUploadID, id)
 }
@@ -940,7 +959,7 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 func TestClientUploadPartWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPart("container", "id", "blob", 42, nil)
+	_, err := client.UploadPart(context.Background(), "container", "id", "blob", 42, nil)
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -974,7 +993,7 @@ func TestClientListParts(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	parts, err := client.ListParts("container", objcli.NoUploadID, "blob")
+	parts, err := client.ListParts(context.Background(), "container", objcli.NoUploadID, "blob")
 	require.NoError(t, err)
 
 	expected := []objval.Part{{ID: "block3", Size: 256}, {ID: "block4", Size: 512}}
@@ -990,7 +1009,7 @@ func TestClientListParts(t *testing.T) {
 func TestClientListPartsWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.ListParts("container", "id", "blob")
+	_, err := client.ListParts(context.Background(), "container", "id", "blob")
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -1022,7 +1041,8 @@ func TestClientUploadPart(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	part, err := client.UploadPart("container", objcli.NoUploadID, "blob", 42, strings.NewReader("value"))
+	part, err := client.UploadPart(context.Background(), "container", objcli.NoUploadID, "blob", 42,
+		strings.NewReader("value"))
 	require.NoError(t, err)
 	require.NotZero(t, part.ID)
 
@@ -1109,7 +1129,8 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 			client := &Client{storageAPI: msAPI}
 
-			part, err := client.UploadPartCopy("container", objcli.NoUploadID, "dst", "src", 42, test.br)
+			part, err := client.UploadPartCopy(context.Background(), "container", objcli.NoUploadID, "dst", "src", 42,
+				test.br)
 			require.NoError(t, err)
 			require.NotZero(t, part.ID)
 
@@ -1183,7 +1204,7 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 
 	client := &Client{storageAPI: msAPI}
 
-	part, err := client.UploadPartCopy("container", objcli.NoUploadID, "dst", "src", 42, nil)
+	part, err := client.UploadPartCopy(context.Background(), "container", objcli.NoUploadID, "dst", "src", 42, nil)
 	require.NoError(t, err)
 	require.NotZero(t, part.ID)
 
@@ -1205,7 +1226,7 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(
+	_, err := client.UploadPartCopy(context.Background(),
 		"bucket",
 		objcli.NoUploadID,
 		"dst",
@@ -1222,14 +1243,14 @@ func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {
 func TestClientUploadPartCopyWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy("bucket", "id", "dst", "src", 42, nil)
+	_, err := client.UploadPartCopy(context.Background(), "bucket", "id", "dst", "src", 42, nil)
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
 func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.CompleteMultipartUpload("bucket", "id", "blob", objval.Part{})
+	err := client.CompleteMultipartUpload(context.Background(), "bucket", "id", "blob", objval.Part{})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -1269,7 +1290,10 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
 	}
 
-	require.NoError(t, client.CompleteMultipartUpload("container", objcli.NoUploadID, "blob", parts...))
+	require.NoError(
+		t,
+		client.CompleteMultipartUpload(context.Background(), "container", objcli.NoUploadID, "blob", parts...),
+	)
 
 	msAPI.AssertExpectations(t)
 	msAPI.AssertNumberOfCalls(t, "ToBlobAPI", 1)
@@ -1281,12 +1305,12 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 func TestClientAbortMultipartUpload(t *testing.T) {
 	client := &Client{}
 
-	require.NoError(t, client.AbortMultipartUpload("container", objcli.NoUploadID, "blob"))
+	require.NoError(t, client.AbortMultipartUpload(context.Background(), "container", objcli.NoUploadID, "blob"))
 }
 
 func TestClientAbortMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.AbortMultipartUpload("container", "id", "blob")
+	err := client.AbortMultipartUpload(context.Background(), "container", "id", "blob")
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
