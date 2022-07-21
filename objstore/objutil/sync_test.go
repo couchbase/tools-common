@@ -75,8 +75,6 @@ func TestDownloadDirectory(t *testing.T) {
 		objcli.TestUploadRAW(t, client, filepath.Join("foo", "bar", file.path), []byte(file.contents))
 	}
 
-	fmt.Printf("%+v\n", client.Buckets)
-
 	var (
 		src         = "s3://bucket/foo/bar"
 		srcTrailing = src + "/"
