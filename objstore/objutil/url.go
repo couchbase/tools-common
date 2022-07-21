@@ -28,13 +28,13 @@ func (e *ErrInvalidCloudPath) Error() string {
 
 // CloudOrFileURL represents a cloud storage url (eg s3://bucket/path/to/file.txt) or a local path.
 type CloudOrFileURL struct {
-	Provider objval.CloudProvider
+	Provider objval.Provider
 	Bucket   string
 	Path     string
 }
 
 func (u *CloudOrFileURL) String() string {
-	if u.Provider == objval.CloudProviderNone {
+	if u.Provider == objval.ProviderNone {
 		return fmt.Sprintf("file://%s", u.Path)
 	}
 
@@ -74,24 +74,24 @@ func parseFileURL(argument string) (*CloudOrFileURL, error) {
 
 	return &CloudOrFileURL{
 		Path:     respectTrailingSeparator(argument, absPath, string(os.PathSeparator)),
-		Provider: objval.CloudProviderNone,
+		Provider: objval.ProviderNone,
 	}, nil
 }
 
 // parseCloudURL parses argument into a CloudOrFileURL, making sure it has a valid cloud scheme.
 func parseCloudURL(argument, prefix string) (*CloudOrFileURL, error) {
 	var (
-		provider  objval.CloudProvider
+		provider  objval.Provider
 		supported = []string{"file://", "s3://", "az://", "gs://"}
 	)
 
 	switch prefix {
 	case "az://":
-		provider = objval.CloudProviderAzure
+		provider = objval.ProviderAzure
 	case "gs://":
-		provider = objval.CloudProviderGCP
+		provider = objval.ProviderGCP
 	case "s3://":
-		provider = objval.CloudProviderAWS
+		provider = objval.ProviderAWS
 	default:
 		return nil, fmt.Errorf("cloud prefix provided for an unsupported cloud provider, expected [%s]",
 			strings.Join(supported, ", "))

@@ -15,6 +15,10 @@ func TestProviderString(t *testing.T) {
 
 	tests := []*test{
 		{
+			name:     "none",
+			provider: ProviderNone,
+		},
+		{
 			name:     "AWS",
 			provider: ProviderAWS,
 			expected: "AWS",

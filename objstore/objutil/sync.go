@@ -85,7 +85,7 @@ func Sync(opts SyncOptions) error {
 
 // isCloudProvider checks if u's provider is not None.
 func isCloudProvider(u *CloudOrFileURL) bool {
-	return u.Provider != objval.CloudProviderNone
+	return u.Provider != objval.ProviderNone
 }
 
 // parseURLs parses Source and Destination into CloudOrFileURLs.

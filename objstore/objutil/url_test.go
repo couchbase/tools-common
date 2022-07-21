@@ -17,7 +17,7 @@ func TestParseCloudOrFileURL(t *testing.T) {
 		input            string
 		expectedBucket   string
 		expectedPath     string
-		expectedProvider objval.CloudProvider
+		expectedProvider objval.Provider
 		expectedError    bool
 	}
 
@@ -50,20 +50,20 @@ func TestParseCloudOrFileURL(t *testing.T) {
 			input:            "s3://bucket/archive",
 			expectedBucket:   "bucket",
 			expectedPath:     "archive",
-			expectedProvider: objval.CloudProviderAWS,
+			expectedProvider: objval.ProviderAWS,
 		},
 		{
 			name:             "s3-bucket-no-archive-path",
 			input:            "s3://bucket",
 			expectedBucket:   "bucket",
-			expectedProvider: objval.CloudProviderAWS,
+			expectedProvider: objval.ProviderAWS,
 		},
 		{
 			name:             "s3-bucket-should-be-cleaned-archive-path",
 			input:            "s3://bucket//archive",
 			expectedBucket:   "bucket",
 			expectedPath:     "archive",
-			expectedProvider: objval.CloudProviderAWS,
+			expectedProvider: objval.ProviderAWS,
 		},
 		{
 			name:          "s3-no-bucket",
@@ -75,20 +75,20 @@ func TestParseCloudOrFileURL(t *testing.T) {
 			input:            "az://container/archive",
 			expectedBucket:   "container",
 			expectedPath:     "archive",
-			expectedProvider: objval.CloudProviderAzure,
+			expectedProvider: objval.ProviderAzure,
 		},
 		{
 			name:             "az-container-no-archive-path",
 			input:            "az://container",
 			expectedBucket:   "container",
-			expectedProvider: objval.CloudProviderAzure,
+			expectedProvider: objval.ProviderAzure,
 		},
 		{
 			name:             "az-container-should-be-cleaned-archive-path",
 			input:            "az://container//archive",
 			expectedBucket:   "container",
 			expectedPath:     "archive",
-			expectedProvider: objval.CloudProviderAzure,
+			expectedProvider: objval.ProviderAzure,
 		},
 		{
 			name:          "az-no-container",
@@ -100,20 +100,20 @@ func TestParseCloudOrFileURL(t *testing.T) {
 			input:            "gs://bucket/archive",
 			expectedBucket:   "bucket",
 			expectedPath:     "archive",
-			expectedProvider: objval.CloudProviderGCP,
+			expectedProvider: objval.ProviderGCP,
 		},
 		{
 			name:             "gs-bucket-no-archive-path",
 			input:            "gs://bucket",
 			expectedBucket:   "bucket",
-			expectedProvider: objval.CloudProviderGCP,
+			expectedProvider: objval.ProviderGCP,
 		},
 		{
 			name:             "gs-bucket-should-be-cleaned-archive-path",
 			input:            "gs://bucket//archive",
 			expectedBucket:   "bucket",
 			expectedPath:     "archive",
-			expectedProvider: objval.CloudProviderGCP,
+			expectedProvider: objval.ProviderGCP,
 		},
 		{
 			name:          "gs-no-bucket",
