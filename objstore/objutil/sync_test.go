@@ -72,7 +72,7 @@ func TestDownloadDirectory(t *testing.T) {
 	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 	for _, file := range files {
-		objcli.UploadRAW(t, client, filepath.Join("foo", "bar", file.path), []byte(file.contents))
+		objcli.TestUploadRAW(t, client, filepath.Join("foo", "bar", file.path), []byte(file.contents))
 	}
 
 	fmt.Printf("%+v\n", client.Buckets)
