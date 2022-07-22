@@ -93,9 +93,12 @@ func (p *Pool) Queue(fn func() error) error {
 		return err
 	}
 
-	p.hofs <- fn
-
-	return nil
+	select {
+	case p.hofs <- fn:
+		return nil
+	case <-p.ctx.Done():
+		return p.getErr()
+	}
 }
 
 // Stop the worker pool gracefully executing any remaining functions. Subsequent calls to 'Stop' will only return the

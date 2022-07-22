@@ -4,7 +4,9 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/couchbase/tools-common/system"
@@ -117,4 +119,19 @@ func TestPoolSetErr(t *testing.T) {
 	require.True(t, pool.setErr(first))
 	require.False(t, pool.setErr(second))
 	require.ErrorIs(t, pool.Stop(), first)
+}
+
+// Checks that we don't deadlock when queuing functions that immediately fail
+// https://issues.couchbase.com/browse/MB-53064
+func TestNoDeadlockWhenStillQueuingAfterWorkFails(t *testing.T) {
+	var (
+		pool = NewPool(Options{Size: 2})
+		fn   = func() error { time.Sleep(time.Millisecond); return assert.AnError }
+	)
+
+	for i := 0; i < 100; i++ {
+		_ = pool.Queue(fn)
+	}
+
+	require.ErrorIs(t, pool.Stop(), assert.AnError)
 }
