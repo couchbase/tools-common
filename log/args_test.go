@@ -97,12 +97,12 @@ func TestMaskArguments(t *testing.T) {
 func TestMaskCBMArguments(t *testing.T) {
 	require.Equal(t,
 		[]string{
-			"-p", "*****", "--password", "*****", "--obj-access-key-id", "*****",
+			"-p", "*****", "--password", "*****", "--p", "*****", "--obj-access-key-id", "*****",
 			"--obj-secret-access-key", "*****", "--obj-refresh-token", "*****", "--km-secret-access-key", "*****",
 			"--passphrase", "*****",
 		},
 		MaskCBMArguments([]string{
-			"-p", "pass", "--password", "pass", "--obj-access-key-id", "keyid",
+			"-p", "pass", "--password", "pass", "--p", "pass", "--obj-access-key-id", "keyid",
 			"--obj-secret-access-key", "secret", "--obj-refresh-token", "token", "--km-secret-access-key", "secret",
 			"--passphrase", "pass",
 		}))
@@ -155,11 +155,11 @@ func TestMaskAndTagCBMArguments(t *testing.T) {
 		"-p ***** --password ***** --obj-access-key-id ***** --obj-secret-access-key ***** --obj-refresh-token ***** "+
 			"--km-secret-access-key ***** --passphrase ***** -u <ud>username</ud> --username <ud>username</ud> -k "+
 			"<ud>key</ud> --key <ud>key</ud> --filter-keys <ud>filter</ud> --filter-values <ud>vals</ud> --km-key-url "+
-			"<ud>url</ud>",
+			"<ud>url</ud> --k <ud>key</ud> --u <ud>username</ud>",
 		MaskAndUserTagCBMArguments([]string{
 			"-p", "pass", "--password", "pass", "--obj-access-key-id", "keyid",
 			"--obj-secret-access-key", "secret", "--obj-refresh-token", "token", "--km-secret-access-key", "secret",
 			"--passphrase", "pass", "-u", "username", "--username", "username", "-k", "key", "--key", "key", "--filter-keys",
-			"filter", "--filter-values", "vals", "--km-key-url", "url",
+			"filter", "--filter-values", "vals", "--km-key-url", "url", "--k", "key", "--u", "username",
 		}))
 }
