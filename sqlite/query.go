@@ -61,11 +61,16 @@ func QueryRows(db Queryable, query Query, callback RowCallback) error {
 		containedRows = true
 	}
 
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+
 	if !containedRows {
 		return ErrQueryReturnedNoRows
 	}
 
-	return rows.Err()
+	return nil
 }
 
 // handleError adds more context to an error where necessary. If the provided error is of an unknown/unhandled type, it
