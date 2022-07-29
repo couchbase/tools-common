@@ -1,12 +1,17 @@
 package hofp
 
 import (
+	"context"
+
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/system"
 )
 
 // Options encapsulates the available options which can be used when creating a worker pool.
 type Options struct {
+	// Context used by the worker pool, if omitted a background context will be used.
+	Context context.Context
+
 	// Size dictates the number of goroutines created to process incoming functions. Defaults to the number of vCPUs.
 	Size int
 
@@ -20,6 +25,10 @@ type Options struct {
 }
 
 func (o *Options) defaults() {
+	if o.Context == nil {
+		o.Context = context.Background()
+	}
+
 	if o.Size == 0 {
 		o.Size = system.NumCPU()
 	}

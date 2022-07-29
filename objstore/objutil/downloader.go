@@ -1,6 +1,7 @@
 package objutil
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -93,7 +94,7 @@ func (m *MPDownloader) download(br *objval.ByteRange) error {
 	pool := hofp.NewPool(hofp.Options{LogPrefix: "(objutil)"})
 
 	queue := func(br *objval.ByteRange) error {
-		return pool.Queue(func() error { return m.downloadChunk(br) })
+		return pool.Queue(func(_ context.Context) error { return m.downloadChunk(br) })
 	}
 
 	for s, e := br.Start, m.opts.PartSize-1; s <= br.End; s, e = s+m.opts.PartSize, e+m.opts.PartSize {

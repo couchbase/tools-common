@@ -1,6 +1,7 @@
 package objutil
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -154,7 +155,7 @@ func (m *MPUploader) UploadWithMeta(metadata interface{}, body io.ReadSeeker) er
 	m.number++
 
 	queue := func(number int, body io.ReadSeeker) error {
-		return m.pool.Queue(func() error { return m.upload(number, metadata, body) })
+		return m.pool.Queue(func(_ context.Context) error { return m.upload(number, metadata, body) })
 	}
 
 	return queue(m.number, body)

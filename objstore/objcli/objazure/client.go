@@ -157,13 +157,13 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 		LogPrefix: "(objazure)",
 	})
 
-	del := func(key string) error {
+	del := func(ctx context.Context, key string) error {
 		blobClient, err := containerClient.ToBlobAPI(key)
 		if err != nil {
 			return err // Purposefully not wrapped
 		}
 
-		_, err = blobClient.Delete(context.Background(), azblob.BlobDeleteOptions{})
+		_, err = blobClient.Delete(ctx, azblob.BlobDeleteOptions{})
 		if err != nil && !isKeyNotFound(err) {
 			return handleError(bucket, key, err)
 		}
@@ -172,7 +172,7 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	}
 
 	queue := func(key string) error {
-		return pool.Queue(func() error { return del(key) })
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
 	}
 
 	for _, key := range keys {

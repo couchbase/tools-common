@@ -3,6 +3,7 @@
 package elutil
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -66,8 +67,8 @@ func NewService(options ServiceOptions) (*Service, error) {
 //
 // NOTE: To "receive" these logged errors, a 'Logger' implementation should be provided to 'log.SetLogger'.
 func (s *Service) Report(event Event) {
-	s.pool.Queue(func() error { //nolint:errcheck
-		err := s.report(event)
+	s.pool.Queue(func(ctx context.Context) error { //nolint:errcheck
+		err := s.report(ctx, event)
 		if err == nil {
 			return nil
 		}
@@ -79,7 +80,7 @@ func (s *Service) Report(event Event) {
 }
 
 // report the given event synchronously.
-func (s *Service) report(event Event) error {
+func (s *Service) report(ctx context.Context, event Event) error {
 	encoded, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to encode event: %w", err)
@@ -89,7 +90,7 @@ func (s *Service) report(event Event) error {
 		return ErrTooLarge
 	}
 
-	return s.client.PostEvent(encoded)
+	return s.client.PostEvent(ctx, encoded)
 }
 
 // Close gracefully stops the service, reporting any buffered events then closes the internal pool/client.

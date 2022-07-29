@@ -155,12 +155,12 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 		LogPrefix: "(objgcp)",
 	})
 
-	del := func(key string) error {
+	del := func(ctx context.Context, key string) error {
 		var (
 			// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
 			// prefix in GCP, always retry.
 			handle = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
-			err    = handle.Delete(context.Background())
+			err    = handle.Delete(ctx)
 		)
 
 		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
@@ -171,7 +171,7 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	}
 
 	queue := func(key string) error {
-		return pool.Queue(func() error { return del(key) })
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
 	}
 
 	for _, key := range keys {
@@ -192,7 +192,8 @@ func (c *Client) DeleteDirectory(bucket, prefix string) error {
 }
 
 func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc) error {
+	fn objcli.IterateFunc,
+) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}

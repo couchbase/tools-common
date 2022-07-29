@@ -1,6 +1,7 @@
 package elutil
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -42,6 +43,6 @@ func TestClientPostEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
-	require.NoError(t, client.PostEvent([]byte(`{"key":"value"}`)))
+	require.NoError(t, client.PostEvent(context.Background(), []byte(`{"key":"value"}`)))
 	require.Equal(t, json.RawMessage(`{"key":"value"}`), actual)
 }

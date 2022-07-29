@@ -2,6 +2,7 @@ package objaws
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"path"
@@ -199,7 +200,7 @@ func (c *Client) DeleteObjects(bucket string, keys ...string) error {
 	}
 
 	queue := func(start, end int) error {
-		return pool.Queue(func() error { return del(start, end) })
+		return pool.Queue(func(_ context.Context) error { return del(start, end) })
 	}
 
 	for start, end := 0, PageSize; start < len(keys); start, end = start+PageSize, end+PageSize {
@@ -265,7 +266,8 @@ func (c *Client) deleteObjects(bucket string, keys ...string) error {
 }
 
 func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc) error {
+	fn objcli.IterateFunc,
+) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
@@ -294,7 +296,8 @@ func (c *Client) IterateObjects(bucket, prefix, delimiter string, include, exclu
 // handlePage iterates over common prefixes/objects in the given page executing the given function for each object which
 // has not been explicitly ignored by the user.
 func (c *Client) handlePage(page *s3.ListObjectsV2Output, include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc) error {
+	fn objcli.IterateFunc,
+) error {
 	converted := make([]*objval.ObjectAttrs, 0, len(page.CommonPrefixes)+len(page.Contents))
 
 	for _, cp := range page.CommonPrefixes {
