@@ -123,10 +123,12 @@ func TestPoolSetErr(t *testing.T) {
 }
 
 func TestWorkerTeardown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	var (
-		ctx, cancel = context.WithCancel(context.Background())
-		pool        = NewPool(Options{Context: ctx})
-		count       uint64
+		pool  = NewPool(Options{Context: ctx, Size: 5})
+		count uint64
 	)
 
 	fn := func(ctx context.Context) error {
@@ -143,6 +145,8 @@ func TestWorkerTeardown(t *testing.T) {
 		require.NoError(t, pool.Queue(fn))
 	}
 
+	// Give the scheduler time to start processing all the queued functions
+	time.Sleep(250 * time.Millisecond)
 	cancel()
 
 	require.ErrorIs(t, pool.Stop(), ctx.Err())
