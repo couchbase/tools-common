@@ -44,11 +44,7 @@ type MPDownloaderOptions struct {
 
 // defaults populates the options with sensible defaults.
 func (m *MPDownloaderOptions) defaults() {
-	m.PartSize = maths.Max(m.PartSize, MinPartSize)
-
-	if m.Options.Context == nil {
-		m.Options.Context = context.Background()
-	}
+	m.Options.defaults()
 }
 
 // MPDownloader is a multipart downloader which downloads an object from a remote cloud by performing multiple requests
@@ -94,10 +90,13 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 
 // download the given byte range using multiple concurrent requests.
 func (m *MPDownloader) download(br *objval.ByteRange) error {
-	pool := hofp.NewPool(hofp.Options{LogPrefix: "(objutil)"})
+	pool := hofp.NewPool(hofp.Options{
+		Context:   m.opts.Context,
+		LogPrefix: "(objutil)",
+	})
 
 	queue := func(br *objval.ByteRange) error {
-		return pool.Queue(func() error { return m.downloadChunk(br) })
+		return pool.Queue(func(ctx context.Context) error { return m.downloadChunk(ctx, br) })
 	}
 
 	for s, e := br.Start, m.opts.PartSize-1; s <= br.End; s, e = s+m.opts.PartSize, e+m.opts.PartSize {
@@ -116,8 +115,8 @@ func (m *MPDownloader) download(br *objval.ByteRange) error {
 }
 
 // downloadChunk downloads the given byte range and writes it to the underlying write.
-func (m *MPDownloader) downloadChunk(br *objval.ByteRange) error {
-	object, err := m.opts.Client.GetObject(m.opts.Options.Context, m.opts.Bucket, m.opts.Key, br)
+func (m *MPDownloader) downloadChunk(ctx context.Context, br *objval.ByteRange) error {
+	object, err := m.opts.Client.GetObject(ctx, m.opts.Bucket, m.opts.Key, br)
 	if err != nil {
 		return fmt.Errorf("failed to get object range: %w", err)
 	}

@@ -1,6 +1,7 @@
 package elutil
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -32,7 +33,7 @@ func NewClient(options ServiceOptions) (*Client, error) {
 }
 
 // PostEvent posts the given encoded event to the local 'ns_server' instance.
-func (c *Client) PostEvent(event []byte) error {
+func (c *Client) PostEvent(ctx context.Context, event []byte) error {
 	request := &cbrest.Request{
 		ContentType:        cbrest.ContentTypeJSON,
 		Body:               event,
@@ -46,7 +47,7 @@ func (c *Client) PostEvent(event []byte) error {
 		NoRetryOnStatusCodes: []int{http.StatusRequestEntityTooLarge},
 	}
 
-	_, err := c.Execute(request)
+	_, err := c.ExecuteWithContext(ctx, request)
 
 	return err
 }

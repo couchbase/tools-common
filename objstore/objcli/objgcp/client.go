@@ -152,11 +152,12 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 
 func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
 	pool := hofp.NewPool(hofp.Options{
+		Context:   ctx,
 		Size:      system.NumWorkers(len(keys)),
 		LogPrefix: "(objgcp)",
 	})
 
-	del := func(key string) error {
+	del := func(ctx context.Context, key string) error {
 		var (
 			// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
 			// prefix in GCP, always retry.
@@ -172,7 +173,7 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 	}
 
 	queue := func(key string) error {
-		return pool.Queue(func() error { return del(key) })
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
 	}
 
 	for _, key := range keys {

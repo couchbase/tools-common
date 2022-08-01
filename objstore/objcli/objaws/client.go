@@ -197,16 +197,17 @@ func (c *Client) copyAndAppend(
 
 func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
 	pool := hofp.NewPool(hofp.Options{
+		Context:   ctx,
 		Size:      system.NumWorkers(len(keys)),
 		LogPrefix: "(objaws)",
 	})
 
-	del := func(start, end int) error {
+	del := func(ctx context.Context, start, end int) error {
 		return c.deleteObjects(ctx, bucket, keys[start:maths.Min(end, len(keys))]...)
 	}
 
 	queue := func(start, end int) error {
-		return pool.Queue(func() error { return del(start, end) })
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, start, end) })
 	}
 
 	for start, end := 0, PageSize; start < len(keys); start, end = start+PageSize, end+PageSize {

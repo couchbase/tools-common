@@ -1,5 +1,5 @@
 // Package hofp exposes a generic higher order function pool which abstracts aways the logic/error handling required to
-// perform tasks concurrently by wrapping complex tasks into a common 'func() error' interface.
+// perform tasks concurrently by wrapping complex tasks into a common 'func(context.Context) error' interface.
 package hofp
 
 import (
@@ -9,6 +9,10 @@ import (
 	"github.com/couchbase/tools-common/log"
 )
 
+// Function is a higher order function to be executed by the worker pool, where possible, the function should honor the
+// cancellation of the given context and return as quickly/cleanly as possible.
+type Function func(ctx context.Context) error
+
 // Pool is a generic higher order function worker pool which executes the provided functions concurrently using a
 // configurable number of workers.
 //
@@ -17,7 +21,7 @@ import (
 type Pool struct {
 	opts Options
 
-	hofs chan func() error
+	hofs chan Function
 	err  error
 
 	wg      sync.WaitGroup
@@ -33,11 +37,11 @@ func NewPool(opts Options) *Pool {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(opts.Context)
 
 	pool := &Pool{
 		opts:   opts,
-		hofs:   make(chan func() error, opts.Size*opts.BufferMultiplier),
+		hofs:   make(chan Function, opts.Size*opts.BufferMultiplier),
 		ctx:    ctx,
 		cancel: cancel,
 	}
@@ -64,7 +68,7 @@ func (p *Pool) work() {
 				return
 			}
 
-			err := fn()
+			err := fn(p.ctx)
 
 			if err == nil {
 				continue
@@ -87,18 +91,19 @@ func (p *Pool) Size() int {
 }
 
 // Queue a function for execution by the worker pool, returns an error if the worker pool has encountered an error and
-// is tearing down.
-func (p *Pool) Queue(fn func() error) error {
+// is tearing down. This return value should be used to prematurely stop queuing work, or to initiate teardown of the
+// wrapping workload.
+func (p *Pool) Queue(fn Function) error {
 	if err := p.getErr(); err != nil {
 		return err
 	}
 
 	select {
 	case p.hofs <- fn:
-		return nil
 	case <-p.ctx.Done():
-		return p.getErr()
 	}
+
+	return p.getErr()
 }
 
 // Stop the worker pool gracefully executing any remaining functions. Subsequent calls to 'Stop' will only return the

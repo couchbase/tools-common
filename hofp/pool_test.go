@@ -1,6 +1,7 @@
 package hofp
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
 	"testing"
@@ -28,7 +29,7 @@ func TestPoolWork(t *testing.T) {
 		pool     = NewPool(Options{Size: 1})
 	)
 
-	require.NoError(t, pool.Queue(func() error { executed = true; return nil }))
+	require.NoError(t, pool.Queue(func(_ context.Context) error { executed = true; return nil }))
 	require.NoError(t, pool.Stop())
 	require.True(t, executed)
 }
@@ -40,7 +41,7 @@ func TestPoolWorkWithError(t *testing.T) {
 		pool     = NewPool(Options{Size: 1})
 	)
 
-	require.NoError(t, pool.Queue(func() error { executed = true; return err }))
+	require.NoError(t, pool.Queue(func(_ context.Context) error { executed = true; return err }))
 	require.ErrorIs(t, pool.Stop(), err)
 	require.True(t, executed)
 
@@ -62,7 +63,7 @@ func TestPoolQueue(t *testing.T) {
 	require.Equal(t, system.NumCPU(), pool.Size())
 
 	for i := 0; i < 42; i++ {
-		require.NoError(t, pool.Queue(func() error { atomic.AddUint64(&executed, 1); return nil }))
+		require.NoError(t, pool.Queue(func(_ context.Context) error { atomic.AddUint64(&executed, 1); return nil }))
 	}
 
 	require.NoError(t, pool.Stop())
@@ -77,7 +78,7 @@ func TestPoolQueueAfterTearDown(t *testing.T) {
 	)
 
 	require.True(t, pool.setErr(err))
-	require.ErrorIs(t, pool.Queue(func() error { executed = true; return nil }), err)
+	require.ErrorIs(t, pool.Queue(func(_ context.Context) error { executed = true; return nil }), err)
 	require.ErrorIs(t, pool.Stop(), err)
 	require.False(t, executed)
 }
@@ -121,12 +122,39 @@ func TestPoolSetErr(t *testing.T) {
 	require.ErrorIs(t, pool.Stop(), first)
 }
 
+func TestWorkerTeardown(t *testing.T) {
+	var (
+		ctx, cancel = context.WithCancel(context.Background())
+		pool        = NewPool(Options{Context: ctx})
+		count       uint64
+	)
+
+	fn := func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			atomic.AddUint64(&count, 1)
+			return ctx.Err()
+		case <-time.After(time.Second):
+			return assert.AnError
+		}
+	}
+
+	for i := 0; i < 5; i++ {
+		require.NoError(t, pool.Queue(fn))
+	}
+
+	cancel()
+
+	require.ErrorIs(t, pool.Stop(), ctx.Err())
+	require.Equal(t, uint64(5), count)
+}
+
 // Checks that we don't deadlock when queuing functions that immediately fail
 // https://issues.couchbase.com/browse/MB-53064
 func TestNoDeadlockWhenStillQueuingAfterWorkFails(t *testing.T) {
 	var (
 		pool = NewPool(Options{Size: 2})
-		fn   = func() error { time.Sleep(time.Millisecond); return assert.AnError }
+		fn   = func(_ context.Context) error { time.Sleep(time.Millisecond); return assert.AnError }
 	)
 
 	for i := 0; i < 100; i++ {

@@ -161,11 +161,12 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 	}
 
 	pool := hofp.NewPool(hofp.Options{
+		Context:   ctx,
 		Size:      system.NumWorkers(len(keys)),
 		LogPrefix: "(objazure)",
 	})
 
-	del := func(key string) error {
+	del := func(ctx context.Context, key string) error {
 		blobClient, err := containerClient.ToBlobAPI(key)
 		if err != nil {
 			return err // Purposefully not wrapped
@@ -180,7 +181,7 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 	}
 
 	queue := func(key string) error {
-		return pool.Queue(func() error { return del(key) })
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
 	}
 
 	for _, key := range keys {

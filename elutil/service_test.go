@@ -1,6 +1,7 @@
 package elutil
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -70,7 +71,7 @@ func TestServiceReportTooBig(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = service.report(Event{
+	err = service.report(context.Background(), Event{
 		EventID:         42,
 		ExtraAttributes: map[string]any{"key": strings.Repeat("value", 650)},
 	})

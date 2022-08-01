@@ -74,12 +74,10 @@ type MPUploaderOptions struct {
 
 // defaults populates the options with sensible defaults.
 func (m *MPUploaderOptions) defaults() {
+	m.Options.defaults()
+
 	if m.OnPartComplete == nil {
 		m.OnPartComplete = func(_ any, _ objval.Part) error { return nil }
-	}
-
-	if m.Options.Context == nil {
-		m.Options.Context = context.Background()
 	}
 }
 
@@ -161,15 +159,15 @@ func (m *MPUploader) UploadWithMeta(metadata any, body io.ReadSeeker) error {
 	m.number++
 
 	queue := func(number int, body io.ReadSeeker) error {
-		return m.pool.Queue(func() error { return m.upload(number, metadata, body) })
+		return m.pool.Queue(func(ctx context.Context) error { return m.upload(ctx, number, metadata, body) })
 	}
 
 	return queue(m.number, body)
 }
 
 // upload a new part with the given number/body.
-func (m *MPUploader) upload(number int, metadata any, body io.ReadSeeker) error {
-	part, err := m.opts.Client.UploadPart(m.opts.Options.Context, m.opts.Bucket, m.opts.ID, m.opts.Key, number, body)
+func (m *MPUploader) upload(ctx context.Context, number int, metadata any, body io.ReadSeeker) error {
+	part, err := m.opts.Client.UploadPart(ctx, m.opts.Bucket, m.opts.ID, m.opts.Key, number, body)
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}

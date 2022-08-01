@@ -264,7 +264,7 @@ func TestMPDownloaderDownloadChunk(t *testing.T) {
 
 			downloader := NewMPDownloader(options)
 
-			require.NoError(t, downloader.downloadChunk(test.br))
+			require.NoError(t, downloader.downloadChunk(context.Background(), test.br))
 
 			data, err := os.ReadFile(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)
