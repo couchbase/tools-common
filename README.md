@@ -13,7 +13,7 @@ installed, and CGO to be enabled (`CGO_ENABLED=1`). See the latest
 
 Running the unit testing requires a number of dependencies:
 - GCC (Latest version available via package manager)
-- Go (1.18+)
+- Go (1.19+)
 - Make (Latest version available via package manager)
 
 Once the required dependencies have been installed, testing can be done using the repository `Makefile`. Running `make

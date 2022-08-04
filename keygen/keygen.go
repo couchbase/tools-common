@@ -20,30 +20,31 @@ type KeyGenerator []keyGenerator
 // NewKeyGenerator parses a key generator using the provided expression, field and generator delimiters.
 //
 // The following examples assume the default field/generator delimiters used by 'cbimport' using the document below:
-// {
-//   "key": "value1",
-//   "nested": {"key": "value2"},
-//   "nested": {"with.dot": "value3"},
-// }
+//
+//	{
+//	  "key": "value1",
+//	  "nested": {"key": "value2"},
+//	  "nested": {"with.dot": "value3"},
+//	}
 //
 // Supported generators:
-// 1) MONO_INCR
-//   1a) '#MONO_INCR#' -> '0', '1' ...
-//   1b) '#MONO_INCR[100]#' -> '100', '101' ...
-// 2) UUID
-//   2a) '#UUID#' -> '67a7f0a4-99a5-4607-b275-c3b436250ad2', '130fff70-4c66-4788-9194-5271f18cb0e1' ...
-// 3) Static Text
-//   3a) 'example' -> 'example'
-// 4) Field
-//   4a) '%key%' -> 'value1'
-//   4b) '%nested.key%' -> 'value2'
-//   4c) '%nested.`with.dot`%' -> 'value3'
+//  1. MONO_INCR
+//     a. '#MONO_INCR#' -> '0', '1' ...
+//     b. '#MONO_INCR[100]#' -> '100', '101' ...
+//  2. UUID
+//     a. '#UUID#' -> '67a7f0a4-99a5-4607-b275-c3b436250ad2', '130fff70-4c66-4788-9194-5271f18cb0e1' ...
+//  3. Static Text
+//     a. 'example' -> 'example'
+//  4. Field
+//     a. '%key%' -> 'value1'
+//     b. '%nested.key%' -> 'value2'
+//     c. '%nested.`with.dot`%' -> 'value3'
 //
 // These generators are useful on their own, however, the real power comes from being able to combine them into more
 // complex expressions, for example:
-// 1) 'key::#MONO_INCR#' -> 'key::1', 'key::2' ...
-// 3) 'user-#UUID#' -> 'user-e0837e46-0d48-45e3-92e7-28031170d23d', 'user-f9a8f39a-b63a-44fc-8455-c493a6cedf60' ...
-// 3) 'key::#UUID#::#MONO_INCR[50]#%key%' -> key::d9c64d00-9c9a-4191-acf3-d882793eccf5::1::value1 ...
+// 1. 'key::#MONO_INCR#' -> 'key::1', 'key::2' ...
+// 3. 'user-#UUID#' -> 'user-e0837e46-0d48-45e3-92e7-28031170d23d', 'user-f9a8f39a-b63a-44fc-8455-c493a6cedf60' ...
+// 3. 'key::#UUID#::#MONO_INCR[50]#%key%' -> key::d9c64d00-9c9a-4191-acf3-d882793eccf5::1::value1 ...
 func NewKeyGenerator(exp string, fDel, gDel rune) (KeyGenerator, error) {
 	if err := validateDelimiters(fDel, gDel); err != nil {
 		return nil, err

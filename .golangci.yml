@@ -1,43 +1,38 @@
 issues:
   max-issues-per-linter: 0 # Unlimited
-  max-same-issues: 0 # Unlimited
-linters:
+  max-same-issues: 0 # Unlimited 
+linters: # TODO (MB-52626): Re-enable linters that were broken by Go 1.18.
   fast: false
   enable:
     - asciicheck
-    # - bodyclose
+    - bodyclose
     - deadcode
     - dogsled
     - godox
     - gofmt
     - gofumpt
     - goimports
-    # - gosimple
+    - gosimple
     - ineffassign
     - lll
     - misspell
     - nakedret
     - nestif
-    # - nolintlint
+    - nolintlint
     - prealloc
     - revive
     # - rowserrcheck
     # - sqlclosecheck
-    # - staticcheck
+    - staticcheck
     # - structcheck
     - unconvert
-    # - unparam
+    - unparam
     - varcheck
     # - wastedassign
     - whitespace
     - wsl
-  disable:
-    - gosimple
-    - staticcheck
-    - structcheck
-    - unused
 run:
-  go: 1.18
+  go: 1.19
 linters-settings:
   lll:
     line-length: 120

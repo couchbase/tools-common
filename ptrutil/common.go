@@ -13,9 +13,9 @@ func ToPtr[V any](v V) *V {
 //
 // NOTE: This is a simple convenience function meant to replace the
 //
-// if x == nil {
-//     x = y
-// }
+//	if x == nil {
+//	    x = y
+//	}
 //
 // code construction which takes 3 lines whilst calling this function takes one.
 func SetPtrIfNil[V any](p **V, otherP *V) {

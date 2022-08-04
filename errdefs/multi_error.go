@@ -65,14 +65,15 @@ func (m *MultiError) Errors() []error {
 // ErrOrNil returns this MultiError if it has at least one error, or nil otherwise.
 // The intended use case is the following:
 //
-//  return foo, errs.ErrOrNil()
+//	return foo, errs.ErrOrNil()
 //
 // instead of:
 //
-//  if len(errs.Errors()) > 0 {
-//  	return nil, errs
-//  }
-//  return foo, nil
+//	if len(errs.Errors()) > 0 {
+//		return nil, errs
+//	}
+//
+//	return foo, nil
 func (m *MultiError) ErrOrNil() error {
 	if len(m.errs) > 0 {
 		return m

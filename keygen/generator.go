@@ -30,8 +30,8 @@ func (u *uuidGenerator) next(_ []byte) (string, error) {
 }
 
 // parseGenerator parses a 'keyGenerator' from the provided expression, currently this will be either:
-// 1) A monotonically incrementing number generator
-// 2) A V4 UUID generator
+// 1. A monotonically incrementing number generator
+// 2. A V4 UUID generator
 func parseGenerator(exp string, off int, fDel, gDel rune) (keyGenerator, int, error) {
 	var (
 		idx      int

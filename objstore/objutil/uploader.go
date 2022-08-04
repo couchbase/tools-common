@@ -64,9 +64,9 @@ type MPUploaderOptions struct {
 	// OnPartComplete is a callback which is run after successfully uploading each part.
 	//
 	// This function:
-	// 1) Should not block, since it will block other parts from uploading
-	// 2) Will not be called concurrently by multiple goroutines
-	// 3) Will be called "out-of-order", parts may be completed in any arbitrary order
+	// 1. Should not block, since it will block other parts from uploading
+	// 2. Will not be called concurrently by multiple goroutines
+	// 3. Will be called "out-of-order", parts may be completed in any arbitrary order
 	//
 	// This callback may be used to track parts and persist them to disk to allow robust multipart uploads.
 	OnPartComplete OnPartCompleteFunc

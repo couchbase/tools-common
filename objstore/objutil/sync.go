@@ -38,13 +38,11 @@ type SyncOptions struct {
 //
 // Example:
 //
-//   c := s3.New(session.New())
-//   cli := objaws.NewClient(c)
-//   Sync(SyncOptions {
-//     Client: cli,
-//     Source: "/tmp/data/directory",
-//     Destination: "s3://bucket-name/sub/path/",
-//   })
+//	err = Sync(SyncOptions {
+//	  Client: objaws.NewClient(s3.New(session.New())),
+//	  Source: "/tmp/data/directory",
+//	  Destination: "s3://bucket-name/sub/path/",
+//	})
 //
 // NOTE: When the filepath has a trailing slash the contents of the directory are up/downloaded, whereas without it the
 // directory itself is up/downloaded. As an example given a file test.txt in /tmp/data/ then running Sync with

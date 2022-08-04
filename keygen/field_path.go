@@ -18,17 +18,17 @@ type FieldPath []string
 // nested objects in the document.
 //
 // The syntax rules are as follows:
-// 1) Nested fields are separated using a '.' character
-// 2) '`' characters may be used to represent an exact string
-// 3) You may escape '`' characters by "doubling up" '``' represents a single '`'
-// 4) Keys that contain a '.' character but are not nested should be enclosed in '`'
+// 1. Nested fields are separated using a '.' character
+// 2. '`' characters may be used to represent an exact string
+// 3. You may escape '`' characters by "doubling up" '“' represents a single '`'
+// 4. Keys that contain a '.' character but are not nested should be enclosed in '`'
 //
 // Examples:
-// 1) 'key' -> ['key']
-// 2) 'nested.key' -> ['nested', 'key']
-// 3) '`not.a.nested`.key' -> ['not.a.nested', 'key']
-// 4) '```.key`' -> ['`.key']
-// 5) '```.key```' -> ['`.key`']
+// 1. 'key' -> ['key']
+// 2. 'nested.key' -> ['nested', 'key']
+// 3. '`not.a.nested`.key' -> ['not.a.nested', 'key']
+// 4. '```.key`' -> ['`.key']
+// 5. '```.key```' -> ['`.key`']
 func NewFieldPath(path string) (FieldPath, error) {
 	if path[0] == Period {
 		return nil, &FieldPathError{"cannot find nested object of field without name"}

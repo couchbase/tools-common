@@ -30,10 +30,10 @@ import (
 
 // NOTE: Naming conventions for requests/responses in this file, are as follows:
 //
-// 1) cbrest.Request should be stored as 'request'
-// 2) cbrest.Response should be stored 'response'
-// 3) http.Request should be stored as 'req'
-// 4) http.Response should be stored as 'resp'
+// 1. cbrest.Request should be stored as 'request'
+// 2. cbrest.Response should be stored 'response'
+// 3. http.Request should be stored as 'req'
+// 4. http.Response should be stored as 'resp'
 //
 // This is done in an effort to differentiate requests/responses from different modules.
 
@@ -533,8 +533,8 @@ func (c *Client) ExecuteStream(request *Request) (<-chan StreamingResponse, erro
 // can be used to read updates from a streaming endpoint.
 //
 // The returned channel will be close when either:
-// 1) The remote connection closes the socket, in this case no error will be returned
-// 2) The given context is cancelled, again no error will be returned
+// 1. The remote connection closes the socket, in this case no error will be returned
+// 2. The given context is cancelled, again no error will be returned
 func (c *Client) ExecuteStreamWithContext(ctx context.Context, request *Request) (<-chan StreamingResponse, error) {
 	if request.Timeout != -1 && request.Timeout != 0 {
 		return nil, ErrStreamWithTimeout

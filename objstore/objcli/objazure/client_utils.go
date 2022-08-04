@@ -72,9 +72,11 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 
 // getServiceClientWithStaticCredentials attempts to create an Azure Service Client with a token credential. To achieve
 // this we use the Default Azure SDK credential, which tries the following authentication methods:
-//   a) Service principal (1. with secret, 2. with certificate, 3. username and password)
-//   b) Managed identity
-//   c) CLI
+//
+//	a. Service principal (1. with secret, 2. with certificate, 3. username and password)
+//	b. Managed identity
+//	c. CLI
+//
 // Despite the credential trying all of these methods, we do not support authentication using Service principal with
 // username and password, and using CLI.
 func getServiceClientWithTokenCredential(serviceURL string, options *azblob.ClientOptions) (*azblob.ServiceClient,
