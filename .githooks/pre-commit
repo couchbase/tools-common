@@ -22,16 +22,61 @@ if [[ ${staged_go_files} == "" ]]; then
     exit 0
 fi
 
+# Get the config value that decides whether we write formatting changes; write and stage; or write, stage and commit
+# them.
+config=`git config couchbase.tools.format.behaviour`
+
+# All configs other than error will rewrite the files formatted and with their imports sorted
+flags="-w"
+if [[ $config == "error" ]]; then
+  flags=""
+fi
+
 # run gofmt with the simplify flag (this is one of the checks the build bot runs)
-gofmt -s -w ${staged_go_files}
+gofmt_files=`gofmt -l -s $flags ${staged_go_files}`
 
 # run gofumpt with the extra rules flag
-gofumpt -s -w --extra ${staged_go_files}
+gofumpt_files=`gofumpt -l $flags --extra ${staged_go_files}`
 
 # run goimports to ensure that imports are sorted correctly
-env GOOS="darwin" goimports -w -local "github.com/couchbase/tools-common" ${staged_go_files}
-env GOOS="linux" goimports -w -local "github.com/couchbase/tools-common" ${staged_go_files}
-env GOOS="windows" goimports -w -local "github.com/couchbase/tools-common" ${staged_go_files}
+darwin_import_files=`env GOOS="darwin" goimports $flags -l -local "github.com/couchbase/tools-common" ${staged_go_files}`
+linux_import_files=`env GOOS="linux" goimports $flags -l -local "github.com/couchbase/tools-common" ${staged_go_files}`
+windows_import_files=`env GOOS="windows" goimports $flags -l -local "github.com/couchbase/tools-common" ${staged_go_files}`
 
-# we are safe to re-add any files that were modified
-git add ${staged_go_files}
+# concatenate all the files with invalid formatting
+touched_files=`echo -e "$gofmt_files\n$gofumpt_files\n$darwin_import_files\n$linux_import_files\n$windows_import_files" | sort | uniq`
+
+if [[ $touched_files == "" ]]; then
+    exit 0
+fi
+
+case $config in
+    (error)
+        echo "The following files had formatting or import errors: "
+        echo
+        echo $touched_files
+        echo
+        echo "Please fix, review changes, add and commit again"
+        exit 1
+        ;;
+    (fix)
+        echo "The follow files had formatting or import errors"
+        echo
+        echo $touched_files
+        echo
+        echo "Please review changes, add and commit again"
+        exit 1
+        ;;
+    (stage)
+        git add ${staged_go_files}
+        echo "The follow files had formatting or import errors"
+        echo
+        echo $touched_files
+        echo
+        echo "Please review changes and commit again"
+        exit 1
+        ;;
+    (commit|*)
+        git add ${staged_go_files}
+        ;;
+esac

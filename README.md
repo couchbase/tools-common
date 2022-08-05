@@ -66,6 +66,23 @@ your first commit. However, this can also be done manually by downloading the
 [commit-msg](http://review.couchbase.org/tools/hooks/commit-msg) script, marking it as executable and placing it into
 the `.githooks` directory.
 
+### Formatting
+We automatically apply formatting on any staged Go files before committing. This may not be what you want if you ever
+have some hunks in a file staged but not others, as it will cause all of them to be committed. This behaviour can be
+configured using:
+
+```sh
+git config couchbase.tools.format.behaviour BEHAVIOUR
+```
+
+Where BEHAVIOUR is one of the following:
+
+1. error: echo what files have incorrect formatting and quit
+2. fix: echo what files have incorrect formatting, fix them and quit
+3. stage: echo what files have incorrect formatting, fix and stage them and quit
+4. commit/no config value/invalid config value: fix the files with incorrect formatting, stage them and allow the commit
+to proceed.
+
 ## Coding style
 
 In this section we will cover notes on the exact coding style to use for this codebase. Most of the style rules are
