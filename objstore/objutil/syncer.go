@@ -3,6 +3,7 @@ package objutil
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,8 +11,10 @@ import (
 
 	"github.com/couchbase/tools-common/fsutil"
 	"github.com/couchbase/tools-common/hofp"
+	"github.com/couchbase/tools-common/ioiface"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/objstore/objval"
+	"github.com/couchbase/tools-common/ratelimit"
 )
 
 // Syncer exposes the ability to sync files and directories to/from a remote cloud provider.
@@ -96,12 +99,17 @@ func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFil
 	}
 	defer file.Close()
 
+	var reader ioiface.ReadAtSeeker = file
+	if s.opts.Limiter != nil {
+		reader = ratelimit.NewRateLimitedReader(ctx, reader, s.opts.Limiter)
+	}
+
 	opts := UploadOptions{
 		Options:      s.opts.Options.WithContext(ctx),
 		Client:       s.opts.Client,
 		Bucket:       destination.Bucket,
 		Key:          destination.Path,
-		Body:         file,
+		Body:         reader,
 		MPUThreshold: s.opts.MPUThreshold,
 	}
 
@@ -176,12 +184,17 @@ func (s *Syncer) downloadFile(ctx context.Context, source, destination *CloudOrF
 	}
 	defer file.Close()
 
+	var writer io.WriterAt = file
+	if s.opts.Limiter != nil {
+		writer = ratelimit.NewRateLimitedWriter(ctx, writer, s.opts.Limiter)
+	}
+
 	opts := DownloadOptions{
 		Options: s.opts.Options.WithContext(ctx),
 		Client:  s.opts.Client,
 		Bucket:  source.Bucket,
 		Key:     source.Path,
-		Writer:  file,
+		Writer:  writer,
 	}
 
 	return Download(opts)

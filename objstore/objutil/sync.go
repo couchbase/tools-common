@@ -3,6 +3,8 @@ package objutil
 import (
 	"fmt"
 
+	"golang.org/x/time/rate"
+
 	"github.com/couchbase/tools-common/fsutil"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objval"
@@ -11,6 +13,9 @@ import (
 // SyncOptions encapsulates all the options available when syncing a directory/object to/from a remote cloud.
 type SyncOptions struct {
 	Options
+
+	// Limiter will rate limit the reads/writes for upload/download.
+	Limiter *rate.Limiter
 
 	// Client is the client used to perform the operation. If not passed then a default client will be created using the
 	// scheme

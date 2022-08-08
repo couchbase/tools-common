@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 
 	"github.com/couchbase/tools-common/fsutil"
 	"github.com/couchbase/tools-common/objstore/objcli"
@@ -15,6 +17,14 @@ import (
 )
 
 type fileDesc struct{ path, contents string }
+
+const (
+	fileBytes = 4
+	// We want to read one file every 50ms
+	fileInterval = time.Millisecond * 50
+	interval     = fileInterval / fileBytes
+	leeway       = fileInterval / 5
+)
 
 var files = []fileDesc{
 	{path: "test.txt", contents: "1234"},
@@ -124,4 +134,52 @@ func TestUploadFile(t *testing.T) {
 		Source:      src,
 		Destination: "s3://bucket/test.txt",
 	}))
+}
+
+func TestDownloadRateLimited(t *testing.T) {
+	var (
+		tmp     = t.TempDir()
+		client  = objcli.NewTestClient(t, objval.ProviderAWS)
+		limiter = rate.NewLimiter(rate.Every(interval), fileBytes)
+	)
+
+	for _, file := range files {
+		objcli.TestUploadRAW(t, client, filepath.Join("foo", "bar", file.path), []byte(file.contents))
+	}
+
+	start := time.Now()
+
+	require.NoError(t, Sync(SyncOptions{
+		Limiter:     limiter,
+		Client:      client,
+		Source:      "s3://bucket/foo/bar",
+		Destination: tmp,
+	}))
+
+	require.WithinDuration(t, start.Add(time.Duration(len(files)-1)*fileInterval), time.Now(), leeway)
+}
+
+func TestUploadRateLimited(t *testing.T) {
+	var (
+		tmp     = t.TempDir()
+		client  = objcli.NewTestClient(t, objval.ProviderAWS)
+		limiter = rate.NewLimiter(rate.Every(interval), fileBytes)
+	)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(tmp, "bar", "1", "2", "3"), 0o777))
+
+	for _, file := range files {
+		require.NoError(t, fsutil.WriteFile(filepath.Join(tmp, "bar", file.path), []byte(file.contents), 0o666))
+	}
+
+	start := time.Now()
+
+	require.NoError(t, Sync(SyncOptions{
+		Limiter:     limiter,
+		Client:      client,
+		Source:      tmp,
+		Destination: "s3://bucket/foo/bar",
+	}))
+
+	require.WithinDuration(t, start.Add(time.Duration(len(files)-1)*fileInterval), time.Now(), leeway)
 }
