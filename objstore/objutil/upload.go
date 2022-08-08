@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/couchbase/tools-common/ioiface"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objcli/objaws"
@@ -23,13 +24,6 @@ const (
 	// NOTE: Multipart uploads generally require at least three requests, hence the choice of 'MinPartSize * 3'.
 	MPUThreshold = MinPartSize * 3
 )
-
-// ReadAtSeeker is a composition of the reader/seeker/reader at interfaces.
-type ReadAtSeeker interface {
-	io.Reader
-	io.Seeker
-	io.ReaderAt
-}
 
 // UploadOptions encapsulates the options available when using the 'Upload' function to upload data to a remote cloud.
 type UploadOptions struct {
@@ -53,7 +47,7 @@ type UploadOptions struct {
 	// Body is the content which should be used for the body of the object.
 	//
 	// NOTE: This attribute is required.
-	Body ReadAtSeeker
+	Body ioiface.ReadAtSeeker
 
 	// MPUThreshold is a threshold at which point objects which broken down into multipart uploads.
 	MPUThreshold int64

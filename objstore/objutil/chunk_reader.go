@@ -6,17 +6,18 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 
+	"github.com/couchbase/tools-common/ioiface"
 	"github.com/couchbase/tools-common/maths"
 )
 
 // ChunkReader allows data from an 'io.Reader' in chunks of a given size.
 type ChunkReader struct {
 	size   int64
-	reader ReadAtSeeker
+	reader ioiface.ReadAtSeeker
 }
 
 // NewChunkReader creates a new chunk reader which will read chunks of the given size from the provided reader.
-func NewChunkReader(reader ReadAtSeeker, chunkSize int64) ChunkReader {
+func NewChunkReader(reader ioiface.ReadAtSeeker, chunkSize int64) ChunkReader {
 	return ChunkReader{size: chunkSize, reader: reader}
 }
 
