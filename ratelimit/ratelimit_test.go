@@ -17,7 +17,7 @@ const (
 	// We want 32 tokens every 50ms
 	bufInterval = 50 * time.Millisecond
 	interval    = bufInterval / bufSize
-	leeway      = bufInterval / 5
+	leeway      = bufInterval / 10
 )
 
 func testReadWriter(
@@ -31,7 +31,7 @@ func testReadWriter(
 		n, err := method(buf, 0)
 		require.NoError(t, err)
 		require.Equal(t, len(buf), n)
-		require.WithinDuration(t, start, time.Now(), leeway)
+		require.Greater(t, time.Now(), start)
 	})
 
 	for i := 1; i <= 5; i++ {
@@ -41,7 +41,7 @@ func testReadWriter(
 			n, err := method(buf, int64(i*len(buf)))
 			require.NoError(t, err)
 			require.Equal(t, len(buf), n)
-			require.WithinDuration(t, start.Add(bufInterval), time.Now(), leeway)
+			require.Greater(t, time.Now(), start.Add(bufInterval-leeway))
 		})
 	}
 
@@ -55,7 +55,7 @@ func testReadWriter(
 
 		require.NoError(t, err)
 		require.Equal(t, len(buf)*count, n)
-		require.WithinDuration(t, start.Add(bufInterval*time.Duration(count)), time.Now(), leeway)
+		require.Greater(t, time.Now(), start.Add(bufInterval*time.Duration(count)-leeway))
 	})
 
 	t.Run("RespectsContextCancel", func(t *testing.T) {

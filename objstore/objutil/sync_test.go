@@ -23,7 +23,7 @@ const (
 	// We want to read one file every 50ms
 	fileInterval = time.Millisecond * 50
 	interval     = fileInterval / fileBytes
-	leeway       = fileInterval / 5
+	leeway       = fileInterval / 10
 )
 
 var files = []fileDesc{
@@ -156,7 +156,7 @@ func TestDownloadRateLimited(t *testing.T) {
 		Destination: tmp,
 	}))
 
-	require.WithinDuration(t, start.Add(time.Duration(len(files)-1)*fileInterval), time.Now(), leeway)
+	require.Greater(t, time.Now(), start.Add(time.Duration(len(files)-1)*fileInterval-leeway))
 }
 
 func TestUploadRateLimited(t *testing.T) {
@@ -181,5 +181,5 @@ func TestUploadRateLimited(t *testing.T) {
 		Destination: "s3://bucket/foo/bar",
 	}))
 
-	require.WithinDuration(t, start.Add(time.Duration(len(files)-1)*fileInterval), time.Now(), leeway)
+	require.Greater(t, time.Now(), start.Add(time.Duration(len(files)-1)*fileInterval-leeway))
 }
