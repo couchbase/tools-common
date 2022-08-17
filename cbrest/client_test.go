@@ -47,6 +47,24 @@ func newTestClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
 	})
 }
 
+// newTestClient returns a client which is boostrapped against the provided cluster.
+//
+// NOTE: Returns an error because some tests expect bootstrapping to fail.
+func newTestLightClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
+	pool := x509.NewCertPool()
+
+	if cluster.Certificate() != nil {
+		pool.AddCert(cluster.Certificate())
+	}
+
+	return NewLightClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		DisableCCP:       disableCCP,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		TLSConfig:        &tls.Config{RootCAs: pool},
+	})
+}
+
 func TestNewClientWithTransportDefaults(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
@@ -132,6 +150,49 @@ func TestNewClient(t *testing.T) {
 		},
 	}
 
+	require.Equal(t, expected, client.authProvider)
+}
+
+func TestNewLightClient(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{&TestNode{}, &TestNode{}}})
+	defer cluster.Close()
+
+	client, err := newTestLightClient(cluster, true)
+	require.NoError(t, err)
+
+	// Don't compare the time attribute from the config manager
+	client.authProvider.manager.last = nil
+	client.authProvider.manager.signal = nil
+	client.authProvider.manager.cond = nil
+
+	expected := &AuthProvider{
+		resolved: &connstr.ResolvedConnectionString{
+			Addresses: []connstr.Address{{
+				Host: cluster.Address(),
+				Port: cluster.Port(),
+			}, {
+				Host: cluster.Address(),
+				Port: cluster.Port(),
+			}},
+		},
+		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		manager: &ClusterConfigManager{
+			config: &ClusterConfig{
+				Nodes: Nodes{{
+					Hostname:           cluster.Address(),
+					Services:           &Services{Management: cluster.Port()},
+					AlternateAddresses: AlternateAddresses{},
+				}, {
+					Hostname:           cluster.Address(),
+					Services:           &Services{Management: cluster.Port()},
+					AlternateAddresses: AlternateAddresses{},
+				}},
+			},
+			maxAge: DefaultCCMaxAge,
+		},
+	}
+
+	require.Equal(t, &cbvalue.ClusterInfo{Enterprise: false, UniformVBuckets: false}, client.clusterInfo)
 	require.Equal(t, expected, client.authProvider)
 }
 

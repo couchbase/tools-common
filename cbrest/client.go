@@ -80,6 +80,61 @@ type Client struct {
 // the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
 // goroutine.
 func NewClient(options ClientOptions) (*Client, error) {
+	client, err := returnBootstrappedClient(options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
+	client.clusterInfo, err = client.GetClusterInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster information: %w", err)
+	}
+
+	client.logConnectionInfo()
+
+	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
+	// having the cluster uuid to determine whether it's safe to use a given cluster config.
+	if !(options.ConnectionMode.ThisNodeOnly() || options.DisableCCP) {
+		client.beginCCP()
+	}
+
+	return client, nil
+}
+
+// NewLightClient creates a new REST client which will connection to the provided cluster using the given credentials.
+// It does not populate the ClusterInfo completely and leaves that to the calling function.
+// Also updates the authProvider with the bootstrapped node's host configuration for the rest of the nodes.
+//
+// NOTE: The returned client may (depending on the provided options) acquire resources which must be cleaned up using
+// the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
+// goroutine.
+func NewLightClient(options ClientOptions) (*Client, error) {
+	client, err := returnBootstrappedClient(options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the cluster hostnames in authProvider to contain all node hostnames
+	client.authProvider.UpdateResolvedAddress()
+
+	client.logConnectionInfo()
+
+	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
+	// having the cluster uuid to determine whether it's safe to use a given cluster config.
+	if !(options.ConnectionMode.ThisNodeOnly() || options.DisableCCP) {
+		client.beginCCP()
+	}
+
+	return client, nil
+}
+
+// returnBootstrappedClient returns a configured and bootstrapped client from the ClientOptions it is provided.
+//
+// The returned client may (depending on the provided options) acquire resources which must be cleaned up using
+// the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
+// goroutine.
+func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 	clientTimeout, ok := envvar.GetDurationBC("CB_REST_CLIENT_TIMEOUT_SECS")
 	if !ok {
 		clientTimeout = DefaultClientTimeout
@@ -126,6 +181,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 
 	authProvider := NewAuthProvider(resolved, options.Provider)
 
+	// Added nil ClusterInfo so that it can be populated later if needed.
 	client := &Client{
 		client:         newHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, timeouts)),
 		authProvider:   authProvider,
@@ -133,25 +189,12 @@ func NewClient(options ClientOptions) (*Client, error) {
 		pollTimeout:    pollTimeout,
 		requestRetries: requestRetries,
 		reqResLogLevel: options.ReqResLogLevel,
+		clusterInfo:    &cbvalue.ClusterInfo{},
 	}
 
 	err = client.bootstrap()
 	if err != nil {
 		return nil, fmt.Errorf("failed to bootstrap client: %w", err)
-	}
-
-	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
-	client.clusterInfo, err = client.GetClusterInfo()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster information: %w", err)
-	}
-
-	client.logConnectionInfo()
-
-	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
-	// having the cluster uuid to determine whether it's safe to use a given cluster config.
-	if !(options.ConnectionMode.ThisNodeOnly() || options.DisableCCP) {
-		client.beginCCP()
 	}
 
 	return client, nil
@@ -416,6 +459,11 @@ func (c *Client) logConnectionInfo() {
 	}
 
 	log.Infof("(REST) Successfully connected to cluster | %s", data)
+}
+
+// GetTerseClusterInfo returns the terse cluster info as a response body, unmarshalled.
+func (c *Client) GetTerseClusterInfo(host string) ([]byte, error) {
+	return c.get(host, "/pools/default/terseClusterInfo")
 }
 
 // EnterpriseCluster returns a boolean indicating whether this is an enterprise cluster.
@@ -924,6 +972,13 @@ type ClusterMetadata struct {
 	DeveloperPreview bool   `json:"isDeveloperPreview"`
 }
 
+// SetClusterMetaData sets the cluster Enterprise, UUID and DeveloperPreview fields for populating NewLightClient
+func (c *Client) SetClusterMetadata(clusterMetadata ClusterMetadata) {
+	c.clusterInfo.Enterprise = clusterMetadata.Enterprise
+	c.clusterInfo.UUID = clusterMetadata.UUID
+	c.clusterInfo.DeveloperPreview = clusterMetadata.DeveloperPreview
+}
+
 // GetClusterMetaData extracts some common metadata from the cluster.
 func (c *Client) GetClusterMetaData() (*ClusterMetadata, error) {
 	request := &Request{
@@ -953,6 +1008,11 @@ func (c *Client) GetClusterMetaData() (*ClusterMetadata, error) {
 	}
 
 	return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+}
+
+// SetClusterVersion is for LightClient to set cluster version in calling function
+func (c *Client) SetClusterVersion(version cbvalue.ClusterVersion) {
+	c.clusterInfo.Version = version
 }
 
 // GetClusterVersion extracts version information from the cluster nodes.
@@ -1001,6 +1061,11 @@ func (c *Client) GetClusterVersion() (cbvalue.ClusterVersion, error) {
 	}
 
 	return clusterVersion, nil
+}
+
+func (c *Client) SetMaxVBuckets(maxVBuckets uint16, uniformVBuckets bool) {
+	c.clusterInfo.MaxVBuckets = maxVBuckets
+	c.clusterInfo.UniformVBuckets = uniformVBuckets
 }
 
 // GetMaxVBuckets uses the bucket vBucket maps to determine the maximum number of vBuckets on the target cluster.

@@ -154,3 +154,18 @@ func (a *AuthProvider) shouldUseAltAddr(host string, nodes Nodes) bool {
 
 	return false
 }
+
+// updateResolvedAddress updates the resolved connection string for AuthProvider to contain all node addresses.
+func (a *AuthProvider) UpdateResolvedAddress() {
+	port := a.resolved.Addresses[0].Port
+	addresses := make([]connstr.Address, 0, len(a.manager.config.Nodes))
+
+	for _, node := range a.manager.config.Nodes {
+		addresses = append(addresses, connstr.Address{
+			Host: node.Hostname,
+			Port: port,
+		})
+	}
+
+	a.resolved.Addresses = addresses
+}
