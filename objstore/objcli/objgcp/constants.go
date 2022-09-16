@@ -8,7 +8,10 @@ const (
 	MaxComposable = 32
 
 	// ChunkSize is the size used for a "resumable" upload in the GCP SDK, required to enable request retries.
-	ChunkSize = 5 * 1024 * 1024
+	//
+	// NOTE: Use 8MiB here to reduce the likelihood of triggering resumable uploads in the multipart upload golden path
+	// in 'cbbackupmgr', see MB-53720 for more information.
+	ChunkSize = 8 * 1024 * 1024
 
 	// ChunkRetryDeadline is the timeout for uploading a single chunk to GCP, this matches the timeout used in
 	// 'cbbackupmgr' for the object storage HTTP client timeout.
