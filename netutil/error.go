@@ -15,6 +15,7 @@ var TemporaryErrorMessages = []string{
 	"connection refused",                          // src/syscall/zerrors_linux_amd64.go
 	"connection reset",                            // src/syscall/zerrors_linux_amd64.go
 	"connection timed out",                        // src/syscall/zerrors_linux_amd64.go
+	"http2: timeout awaiting response headers",    // src/net/http/h2_bundle.go
 	"http: ContentLength=",                        // src/net/http/transfer.go
 	"i/o timeout",                                 // src/net/net.go
 	"net/http: TLS handshake timeout",             // src/net/http/transport.go
