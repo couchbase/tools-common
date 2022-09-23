@@ -3,9 +3,11 @@ package restutil
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -234,5 +236,17 @@ func TestDecodeJSONRequestBody(t *testing.T) {
 		require.True(t, DecodeJSONRequestBody(io.NopCloser(bytes.NewReader([]byte(`{"x":1}`))), &dest,
 			httptest.NewRecorder()))
 		require.Equal(t, map[string]int{"x": 1}, dest)
+	})
+
+	t.Run("validJSONTooLarge", func(t *testing.T) {
+		var (
+			dest map[string]int
+			body = bytes.NewReader([]byte(fmt.Sprintf(`{"x":"%s"}`, strings.Repeat("a", MaxRequestBodySize))))
+		)
+
+		require.False(
+			t,
+			DecodeJSONRequestBody(io.NopCloser(body), &dest, httptest.NewRecorder()),
+		)
 	})
 }

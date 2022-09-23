@@ -7,6 +7,9 @@ import (
 	"net/http"
 )
 
+// MaxRequestBodySize is a maximum of data that will be read from a request body in bytes.
+const MaxRequestBodySize = 10 * 1024 * 1024
+
 // ErrLogFn is a callback function used to log errors occurred in the functions of this package.
 type ErrLogFn func(err error)
 
@@ -73,15 +76,18 @@ func MarshalAndSend(status int, data interface{}, w http.ResponseWriter, errLog 
 func DecodeJSONRequestBody(body io.ReadCloser, dest interface{}, w http.ResponseWriter) bool {
 	defer body.Close()
 
-	if err := json.NewDecoder(body).Decode(dest); err != nil {
-		HandleErrorWithExtras(ErrorResponse{
-			Status: http.StatusBadRequest,
-			Msg:    "invalid request body",
-			Extras: err.Error(),
-		}, w, nil)
-
-		return false
+	err := json.NewDecoder(io.LimitReader(body, MaxRequestBodySize)).Decode(dest)
+	if err == nil {
+		return true
 	}
 
-	return true
+	r := ErrorResponse{
+		Status: http.StatusBadRequest,
+		Msg:    "invalid request body",
+		Extras: err.Error(),
+	}
+
+	HandleErrorWithExtras(r, w, nil)
+
+	return false
 }
