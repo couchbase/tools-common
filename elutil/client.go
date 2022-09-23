@@ -22,7 +22,7 @@ type Client struct {
 // the auth provider/tls config provided.
 func NewClient(options ServiceOptions) (*Client, error) {
 	client, err := cbrest.NewClient(cbrest.ClientOptions{
-		ConnectionString: fmt.Sprintf("http://127.0.0.1:%d", options.ManagementPort),
+		ConnectionString: fmt.Sprintf("http://localhost:%d", options.ManagementPort),
 		Provider:         options.Provider,
 		TLSConfig:        options.TLSConfig,
 		ReqResLogLevel:   options.ReqResLogLevel,
