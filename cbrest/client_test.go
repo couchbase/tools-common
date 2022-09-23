@@ -111,7 +111,7 @@ func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
 
 func TestNewClientWithLoopbackWithTLS(t *testing.T) {
 	_, err := NewClient(ClientOptions{
-		ConnectionString: "https://127.0.0.1:8091",
+		ConnectionString: "https://localhost:8091",
 		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		ConnectionMode:   ConnectionModeLoopback,
 	})
@@ -1441,7 +1441,7 @@ func TestGetServiceHostServiceConnectionMode(t *testing.T) {
 
 	host, err := client.GetServiceHost(ServiceManagement)
 	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("http://127.0.0.1:%d", cluster.Port()), host)
+	require.Equal(t, fmt.Sprintf("http://localhost:%d", cluster.Port()), host)
 }
 
 func TestGetServiceHostTLS(t *testing.T) {

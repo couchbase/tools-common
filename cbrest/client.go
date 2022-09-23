@@ -887,7 +887,7 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 		return "", fmt.Errorf("failed to parse host '%s': %w", host, err)
 	}
 
-	return "http://127.0.0.1:" + parsed.Port(), nil
+	return "http://localhost:" + parsed.Port(), nil
 }
 
 // perform synchronously executes the provided request returning the response and any error that occurred during the
