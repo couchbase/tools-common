@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
 	"github.com/couchbase/tools-common/objstore/objerr"
 	"github.com/couchbase/tools-common/objstore/objval"
@@ -142,14 +143,20 @@ func (t *TestClient) IterateObjects(ctx context.Context, bucket, prefix, delimit
 	}
 
 	t.lock.RLock()
-	defer t.lock.RUnlock()
 
 	b, ok := t.Buckets[bucket]
 	if !ok {
+		t.lock.RUnlock()
 		return nil
 	}
 
-	for key, object := range b {
+	// Take a copy of the bucket. This stops a deadlock that happens if fn is trying to perform an operation which
+	// requires a write lock
+	cpy := maps.Clone(b)
+
+	t.lock.RUnlock()
+
+	for key, object := range cpy {
 		if !strings.HasPrefix(key, prefix) || ShouldIgnore(key, include, exclude) {
 			continue
 		}
