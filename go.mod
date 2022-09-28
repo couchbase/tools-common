@@ -1,6 +1,6 @@
 module github.com/couchbase/tools-common
 
-go 1.19
+go 1.18
 
 require (
 	cloud.google.com/go/storage v1.27.0
