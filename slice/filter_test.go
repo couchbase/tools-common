@@ -43,3 +43,8 @@ func TestFilter(t *testing.T) {
 		})
 	}
 }
+
+// Not actually testing functionality here, just checking that the type assertion is not "comparable".
+func TestFilterNotComparable(t *testing.T) {
+	require.Empty(t, Filter([]interface{}{}))
+}
