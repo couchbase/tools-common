@@ -2,8 +2,6 @@ package fsutil
 
 import (
 	"os"
-
-	"github.com/couchbase/tools-common/log"
 )
 
 // Remove the file/directory at the given path.
@@ -14,8 +12,6 @@ func Remove(path string, ignoreNotExists bool) error {
 	if err == nil || ignoreNotExists && os.IsNotExist(err) {
 		return nil
 	}
-
-	log.Errorf("failed to remove file/directory at '%s': %s", path, err)
 
 	return err
 }
@@ -28,8 +24,6 @@ func RemoveAll(path string) error {
 	if err == nil {
 		return nil
 	}
-
-	log.Errorf("failed to remove files/directories at '%s': %s", path, err)
 
 	return err
 }

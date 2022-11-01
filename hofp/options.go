@@ -3,6 +3,7 @@ package hofp
 import (
 	"context"
 
+	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/system"
 )
@@ -22,6 +23,9 @@ type Options struct {
 	// LogPrefix is the prefix used when logging errors which occur once teardown has already begun. Defaults to
 	// '(hofp)'.
 	LogPrefix string
+
+	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
+	Logger log.Logger
 }
 
 // defaults fills any missing attributes to a sane default.

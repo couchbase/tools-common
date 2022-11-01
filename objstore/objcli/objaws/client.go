@@ -24,6 +24,7 @@ import (
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in AWS S3.
 type Client struct {
 	serviceAPI serviceAPI
+	logger     log.WrappedLogger
 }
 
 var _ objcli.Client = (*Client)(nil)
@@ -165,7 +166,7 @@ func (c *Client) createMPUThenCopyAndAppend(
 	// NOTE: We've failed for some reason, we should try to cleanup after ourselves; the AWS client does not use the
 	// given 'parts' argument, so we can omit it here
 	if err := c.AbortMultipartUpload(ctx, bucket, id, attrs.Key); err != nil {
-		log.Errorf(`(Objaws) Failed to abort multipart upload, it should be aborted manually | `+
+		c.logger.Errorf(`(Objaws) Failed to abort multipart upload, it should be aborted manually | `+
 			`{"id":"%s","key":"%s"}`, id, attrs.Key)
 	}
 

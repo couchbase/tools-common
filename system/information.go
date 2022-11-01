@@ -29,7 +29,8 @@ func (i Information) String() string {
 // GetInformation fetches and returns common system information in a platform agnostic fashion.
 //
 // NOTE: On supported platforms, the returned information may not be that of the host system but of any limits applied.
-func GetInformation() Information {
+func GetInformation(logger log.Logger) Information {
+	wrappedLogger := log.NewWrappedLogger(logger)
 	def := func(s string) string {
 		if s == "" {
 			return "unavailable"
@@ -40,17 +41,17 @@ func GetInformation() Information {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Errorf("failed to system hostname: %v", err)
+		wrappedLogger.Errorf("failed to system hostname: %v", err)
 	}
 
 	version, err := Version()
 	if err != nil {
-		log.Errorf("failed to get system version: %v", err)
+		wrappedLogger.Errorf("failed to get system version: %v", err)
 	}
 
 	memory, err := TotalMemory()
 	if err != nil {
-		log.Errorf("failed to get system total memory: %v", err)
+		wrappedLogger.Errorf("failed to get system total memory: %v", err)
 	}
 
 	return Information{

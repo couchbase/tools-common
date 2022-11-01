@@ -28,14 +28,15 @@ import (
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in Google Storage.
 type Client struct {
 	serviceAPI serviceAPI
+	logger     log.WrappedLogger
 }
 
 var _ objcli.Client = (*Client)(nil)
 
 // NewClient returns a new client which uses the given storage client, in general this should be the one created using
 // the 'storage.NewClient' function exposed by the SDK.
-func NewClient(client *storage.Client) *Client {
-	return &Client{serviceAPI: serviceClient{client}}
+func NewClient(client *storage.Client, logger log.Logger) *Client {
+	return &Client{serviceAPI: serviceClient{client}, logger: log.NewWrappedLogger(logger)}
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -405,7 +406,7 @@ func (c *Client) cleanup(ctx context.Context, bucket string, keys ...string) {
 		return
 	}
 
-	log.Errorf(`(Objaws) Failed to cleanup intermediate keys, they should be removed manually `+
+	c.logger.Errorf(`(Objaws) Failed to cleanup intermediate keys, they should be removed manually `+
 		`| {"keys":[%s],"error":"%s"}`, strings.Join(keys, ","), err)
 }
 

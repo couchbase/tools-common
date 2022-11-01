@@ -6,6 +6,7 @@ import (
 
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
+	"github.com/couchbase/tools-common/log"
 )
 
 // AuthProvider is the auth provider for the REST client which handles providing credentials/hosts required to execute
@@ -22,12 +23,19 @@ type AuthProvider struct {
 	lock    sync.RWMutex
 }
 
+// AuthProviderOptions encapsulates the options for creating a new REST AuthProvider.
+type AuthProviderOptions struct {
+	resolved *connstr.ResolvedConnectionString
+	provider aprov.Provider
+	logger   log.Logger
+}
+
 // NewAuthProvider creates a new 'AuthProvider' using the provided credentials.
-func NewAuthProvider(resolved *connstr.ResolvedConnectionString, provider aprov.Provider) *AuthProvider {
+func NewAuthProvider(options AuthProviderOptions) *AuthProvider {
 	return &AuthProvider{
-		resolved: resolved,
-		provider: provider,
-		manager:  NewClusterConfigManager(),
+		resolved: options.resolved,
+		provider: options.provider,
+		manager:  NewClusterConfigManager(options.logger),
 	}
 }
 

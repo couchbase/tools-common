@@ -48,16 +48,20 @@ type ClusterConfigManager struct {
 	cond   *sync.Cond
 	signal chan struct{}
 	once   sync.Once
+
+	logger log.WrappedLogger
 }
 
 // NewClusterConfigManager returns a new cluster config manager which will not immediately trigger a cluster config
 // update.
-func NewClusterConfigManager() *ClusterConfigManager {
+func NewClusterConfigManager(logger log.Logger) *ClusterConfigManager {
+	wrappedLogger := log.NewWrappedLogger(logger)
 	maxAge, ok := envvar.GetDuration("CB_REST_CC_MAX_AGE")
+
 	if !ok {
 		maxAge = DefaultCCMaxAge
 	} else {
-		log.Infof("(REST) (Cluster Config Manager) Set max cluster config age to: %s", maxAge)
+		wrappedLogger.Infof("(REST) (Cluster Config Manager) Set max cluster config age to: %s", maxAge)
 	}
 
 	now := time.Now()
@@ -67,6 +71,7 @@ func NewClusterConfigManager() *ClusterConfigManager {
 		maxAge: maxAge,
 		cond:   sync.NewCond(&sync.Mutex{}),
 		signal: make(chan struct{}),
+		logger: wrappedLogger,
 	}
 }
 

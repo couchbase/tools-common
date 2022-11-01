@@ -6,6 +6,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/couchbase/tools-common/fsutil"
+	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objval"
 )
@@ -37,6 +38,9 @@ type SyncOptions struct {
 	//
 	// NOTE: Only used for upload.
 	MPUThreshold int64
+
+	// Logger is the passed Logger struct that impletments the Log method for logger the user wants to use.
+	Logger log.Logger
 }
 
 // Sync copies a directory to/from cloud storage from/to a filepath.

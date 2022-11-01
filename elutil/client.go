@@ -27,6 +27,7 @@ func NewClient(options ServiceOptions) (*Client, error) {
 		TLSConfig:        options.TLSConfig,
 		ReqResLogLevel:   options.ReqResLogLevel,
 		ConnectionMode:   cbrest.ConnectionModeLoopback,
+		Logger:           options.Logger,
 	})
 
 	return &Client{client}, err

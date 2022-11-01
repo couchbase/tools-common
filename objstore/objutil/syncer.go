@@ -19,7 +19,8 @@ import (
 
 // Syncer exposes the ability to sync files and directories to/from a remote cloud provider.
 type Syncer struct {
-	opts SyncOptions
+	opts   SyncOptions
+	logger log.WrappedLogger
 }
 
 // NewSyncer creates a new syncer using the given options.
@@ -27,7 +28,12 @@ func NewSyncer(opts SyncOptions) *Syncer {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
-	return &Syncer{opts: opts}
+	syncer := Syncer{
+		opts:   opts,
+		logger: log.NewWrappedLogger(opts.Logger),
+	}
+
+	return &syncer
 }
 
 // addTrailingPathSeparator adds a trailing path separator to path if it does not have one already.
@@ -91,7 +97,7 @@ func (s *Syncer) Upload(source, destination *CloudOrFileURL) error {
 // uploadFile uploads a file to the given cloud provider. Assumes source is a file:// URL to a file, and
 // destination is a cloud path.
 func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFileURL) error {
-	log.Debugf("(objutil) Uploading '%s' to '%s'", source, destination)
+	s.logger.Debugf("(objutil) Uploading '%s' to '%s'", source, destination)
 
 	file, err := fsutil.OpenRandAccess(source.Path, 0, 0)
 	if err != nil {
@@ -171,7 +177,7 @@ func (s *Syncer) Download(source, destination *CloudOrFileURL) error {
 // downloadFile downloads a file in the cloud to a file on disk. Assumes source is a cloud URL to an object and
 // destination is a file:// URL to a file.
 func (s *Syncer) downloadFile(ctx context.Context, source, destination *CloudOrFileURL) error {
-	log.Debugf("(objutil) Downloading '%s' to '%s'", source, destination)
+	s.logger.Debugf("(objutil) Downloading '%s' to '%s'", source, destination)
 
 	err := fsutil.Mkdir(filepath.Dir(destination.Path), 0, true, true)
 	if err != nil {

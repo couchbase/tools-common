@@ -39,12 +39,16 @@ type ServiceOptions struct {
 	// MaxBufferedEventsPerDispatcher directly maps to the 'hofp.BufferMultiplier' value, and dictates the number of events
 	// that can be buffered per-goroutine.
 	MaxBufferedEventsPerDispatcher int
+
+	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
+	Logger log.Logger
 }
 
 // Service exposes an interface to report events to the local 'ns_server' instance.
 type Service struct {
 	pool   *hofp.Pool
 	client *Client
+	logger log.WrappedLogger
 }
 
 // NewService creates a new service using the given options.
@@ -60,7 +64,7 @@ func NewService(options ServiceOptions) (*Service, error) {
 		LogPrefix:        "(elutil)", // Should be unused, but set for clarity
 	})
 
-	return &Service{pool: pool, client: client}, nil
+	return &Service{pool: pool, client: client, logger: log.NewWrappedLogger(options.Logger)}, nil
 }
 
 // Report the given event asynchronously, logging event/error if we fail to do so.
@@ -73,7 +77,7 @@ func (s *Service) Report(event Event) {
 			return nil
 		}
 
-		log.Errorf("(elutil) Failed to report event '%#v' due to error '%s'", event, err)
+		s.logger.Errorf("(elutil) Failed to report event '%#v' due to error '%s'", event, err)
 
 		return nil
 	})

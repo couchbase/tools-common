@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/tools-common/log"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewClusterConfigManager(t *testing.T) {
-	manager := NewClusterConfigManager()
+	manager := NewClusterConfigManager(log.StdoutLogger{})
 	require.NotZero(t, manager.last)
 	require.Equal(t, 15*time.Second, manager.maxAge)
 	require.NotZero(t, manager.cond)
@@ -21,7 +22,7 @@ func TestNewClusterConfigManagerWithMaxAge(t *testing.T) {
 	os.Setenv("CB_REST_CC_MAX_AGE", "1m")
 	defer os.Unsetenv("CB_REST_CC_MAX_AGE")
 
-	manager := NewClusterConfigManager()
+	manager := NewClusterConfigManager(log.StdoutLogger{})
 	require.NotZero(t, manager.last)
 	require.Equal(t, time.Minute, manager.maxAge)
 	require.NotZero(t, manager.cond)
@@ -62,7 +63,7 @@ func TestClusterConfigManagerUpdate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				woken   bool
-				manager = NewClusterConfigManager()
+				manager = NewClusterConfigManager(log.StdoutLogger{})
 			)
 
 			manager.config = test.current
@@ -105,7 +106,7 @@ func TestClusterConfigManagerUpdate(t *testing.T) {
 func TestClusterConfigManagerWaitUntilUpdated(t *testing.T) {
 	var (
 		woken   bool
-		manager = NewClusterConfigManager()
+		manager = NewClusterConfigManager(log.StdoutLogger{})
 	)
 
 	go func() {
@@ -128,7 +129,7 @@ func TestClusterConfigManagerWaitUntilUpdatedContextCancel(t *testing.T) {
 	var (
 		woken       bool
 		ctx, cancel = context.WithCancel(context.Background())
-		manager     = NewClusterConfigManager()
+		manager     = NewClusterConfigManager(log.StdoutLogger{})
 	)
 
 	go func() {
@@ -149,7 +150,7 @@ func TestClusterConfigManagerWaitUntilUpdatedContextCancel(t *testing.T) {
 func TestClusterConfigManagerWaitUntilUpdatedSmokeTest(t *testing.T) {
 	var (
 		woken   = make([]bool, 1024)
-		manager = NewClusterConfigManager()
+		manager = NewClusterConfigManager(log.StdoutLogger{})
 	)
 
 	for i := 0; i < 1024; i++ {
@@ -179,7 +180,7 @@ func TestClusterConfigManagerWaitUntilExpired(t *testing.T) {
 
 	var (
 		woken   bool
-		manager = NewClusterConfigManager()
+		manager = NewClusterConfigManager(log.StdoutLogger{})
 	)
 
 	go func() {
@@ -202,7 +203,7 @@ func TestClusterConfigManagerWaitUntilExpiredContextCancel(t *testing.T) {
 	var (
 		woken       bool
 		ctx, cancel = context.WithCancel(context.Background())
-		manager     = NewClusterConfigManager()
+		manager     = NewClusterConfigManager(log.StdoutLogger{})
 	)
 
 	go func() {

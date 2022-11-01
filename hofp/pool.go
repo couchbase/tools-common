@@ -30,6 +30,8 @@ type Pool struct {
 	cleanup sync.Once
 
 	lock sync.RWMutex
+
+	logger log.WrappedLogger
 }
 
 // NewPool returns a new higher order function worker pool with the provided number of workers.
@@ -44,6 +46,7 @@ func NewPool(opts Options) *Pool {
 		hofs:   make(chan Function, opts.Size*opts.BufferMultiplier),
 		ctx:    ctx,
 		cancel: cancel,
+		logger: log.NewWrappedLogger(opts.Logger),
 	}
 
 	pool.wg.Add(opts.Size)
@@ -77,7 +80,7 @@ func (p *Pool) work() {
 			// The worker pool may already be tearing down, in which case we should log the function error so that it's
 			// not missed whilst debugging.
 			if !p.setErr(err) {
-				log.Errorf("%s Failed to execute function: %v", p.opts.LogPrefix, err)
+				p.logger.Errorf("%s Failed to execute function: %v", p.opts.LogPrefix, err)
 			}
 
 			return

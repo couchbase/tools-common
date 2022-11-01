@@ -5,14 +5,18 @@ import (
 
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
+	"github.com/couchbase/tools-common/log"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewAuthProvider(t *testing.T) {
 	actual := NewAuthProvider(
-		&connstr.ResolvedConnectionString{},
-		&aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		AuthProviderOptions{
+			&connstr.ResolvedConnectionString{},
+			&aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+			log.StdoutLogger{},
+		},
 	)
 
 	// Don't compare the time attribute from the config manager
@@ -23,7 +27,7 @@ func TestNewAuthProvider(t *testing.T) {
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{},
 		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		manager:  &ClusterConfigManager{maxAge: DefaultCCMaxAge},
+		manager:  &ClusterConfigManager{maxAge: DefaultCCMaxAge, logger: log.NewWrappedLogger(log.StdoutLogger{})},
 	}
 
 	require.Equal(t, expected, actual)
