@@ -52,7 +52,7 @@ func storageError(status int) *azblob.StorageError {
 }
 
 func TestNewClient(t *testing.T) {
-	require.Equal(t, &Client{storageAPI: serviceClient{client: nil}}, NewClient(nil))
+	require.Equal(t, &Client{storageAPI: serviceClient{client: nil}}, NewClient(ClientOptions{nil}))
 }
 
 func TestClientProvider(t *testing.T) {

@@ -33,10 +33,16 @@ type Client struct {
 
 var _ objcli.Client = (*Client)(nil)
 
+// ClientOptions encapsulates the options for creating a new GCP Client.
+type ClientOptions struct {
+	client *storage.Client
+	logger log.Logger
+}
+
 // NewClient returns a new client which uses the given storage client, in general this should be the one created using
 // the 'storage.NewClient' function exposed by the SDK.
-func NewClient(client *storage.Client, logger log.Logger) *Client {
-	return &Client{serviceAPI: serviceClient{client}, logger: log.NewWrappedLogger(logger)}
+func NewClient(options ClientOptions) *Client {
+	return &Client{serviceAPI: serviceClient{options.client}, logger: log.NewWrappedLogger(options.logger)}
 }
 
 func (c *Client) Provider() objval.Provider {

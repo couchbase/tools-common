@@ -29,10 +29,15 @@ type Client struct {
 
 var _ objcli.Client = (*Client)(nil)
 
+// ClientOptions encapsulates the options for creating a new AWS Client.
+type ClientOptions struct {
+	serviceAPI serviceAPI
+}
+
 // NewClient returns a new client which uses the given 'serviceAPI', in general this should be the one created using the
 // 's3.New' function exposed by the SDK.
-func NewClient(serviceAPI serviceAPI) *Client {
-	return &Client{serviceAPI: serviceAPI}
+func NewClient(options ClientOptions) *Client {
+	return &Client{serviceAPI: options.serviceAPI}
 }
 
 func (c *Client) Provider() objval.Provider {

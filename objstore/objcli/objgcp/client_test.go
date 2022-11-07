@@ -29,7 +29,7 @@ func TestNewClient(t *testing.T) {
 	require.Equal(
 		t,
 		&Client{serviceAPI: serviceClient{c: &storage.Client{}}, logger: log.NewWrappedLogger(log.StdoutLogger{})},
-		NewClient(&storage.Client{}, log.StdoutLogger{}),
+		NewClient(ClientOptions{&storage.Client{}, log.StdoutLogger{}}),
 	)
 }
 

@@ -35,7 +35,7 @@ func (m *mockError) OrigErr() error  { return nil }
 func TestNewClient(t *testing.T) {
 	api := &mockServiceAPI{}
 
-	require.Equal(t, &Client{serviceAPI: api}, NewClient(api))
+	require.Equal(t, &Client{serviceAPI: api}, NewClient(ClientOptions{api}))
 }
 
 func TestClientProvider(t *testing.T) {
