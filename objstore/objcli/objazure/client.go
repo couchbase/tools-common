@@ -34,13 +34,14 @@ var _ objcli.Client = (*Client)(nil)
 
 // ClientOptions encapsulates the options for creating a new Azure Client.
 type ClientOptions struct {
-	client *azblob.ServiceClient
+	// Client represents a URL to the Azure Blob Storage service allowing you to manipulate blob containers.
+	Client *azblob.ServiceClient
 }
 
 // NewClient returns a new client which uses the given service client, in general this should be the one created using
 // the 'azblob.NewServiceClient' function exposed by the SDK.
 func NewClient(options ClientOptions) *Client {
-	return &Client{storageAPI: serviceClient{client: options.client}} //nolint:gosimple
+	return &Client{storageAPI: serviceClient{client: options.Client}}
 }
 
 func (c *Client) Provider() objval.Provider {
