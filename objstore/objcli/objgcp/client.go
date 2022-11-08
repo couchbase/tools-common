@@ -36,6 +36,8 @@ var _ objcli.Client = (*Client)(nil)
 // ClientOptions encapsulates the options for creating a new GCP Client.
 type ClientOptions struct {
 	// Client is a client for interacting with Google Cloud Storage.
+	//
+	// NOTE: Required
 	Client *storage.Client
 
 	// Logger is the passed logger which implements a custom Log method

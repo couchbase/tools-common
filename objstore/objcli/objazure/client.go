@@ -35,6 +35,8 @@ var _ objcli.Client = (*Client)(nil)
 // ClientOptions encapsulates the options for creating a new Azure Client.
 type ClientOptions struct {
 	// Client represents a URL to the Azure Blob Storage service allowing you to manipulate blob containers.
+	//
+	// NOTE: Required
 	Client *azblob.ServiceClient
 }
 

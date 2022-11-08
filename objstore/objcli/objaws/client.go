@@ -33,6 +33,8 @@ var _ objcli.Client = (*Client)(nil)
 type ClientOptions struct {
 	// ServiceAPI is the is the minimal subset of functions that we use from the AWS SDK, this allows for a greatly
 	// reduce surface area for mock generation.
+	//
+	// NOTE: Required
 	ServiceAPI serviceAPI
 }
 
