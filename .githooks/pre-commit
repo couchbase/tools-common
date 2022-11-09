@@ -23,8 +23,8 @@ if [[ ${staged_go_files} == "" ]]; then
 fi
 
 # Get the config value that decides whether we write formatting changes; write and stage; or write, stage and commit
-# them.
-config=`git config couchbase.tools.format.behaviour`
+# them. If unset, then set config to empty
+config=`git config couchbase.tools.format.behaviour` || config=""
 
 # All configs other than error will rewrite the files formatted and with their imports sorted
 flags="-w"
