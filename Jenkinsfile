@@ -28,7 +28,7 @@ pipeline {
                             gerritProjects: [
                                 [
                                     compareType: "PLAIN", disableStrictForbiddenFileVerification: false,
-                                    pattern: "tools-common", branches: [[ compareType: "PLAIN", "cheshire-cat" ]]
+                                    pattern: "tools-common", branches: [[ compareType: "PLAIN", pattern: "cheshire-cat" ]]
                                 ],
                             ],
                             triggerOnEvents: [
