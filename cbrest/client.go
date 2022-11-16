@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -64,7 +63,8 @@ type ClientOptions struct {
 type Client struct {
 	client       *http.Client
 	authProvider *AuthProvider
-	clusterInfo  *cbvalue.ClusterInfo
+	// NOTE: Client only populates Enterprise, UUID and DeveloperPreview fields of clusterInfo
+	clusterInfo *cbvalue.ClusterInfo
 
 	connectionMode ConnectionMode
 
@@ -96,33 +96,6 @@ func NewClient(options ClientOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster information: %w", err)
 	}
-
-	client.logConnectionInfo()
-
-	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
-	// having the cluster uuid to determine whether it's safe to use a given cluster config.
-	if !(options.ConnectionMode.ThisNodeOnly() || options.DisableCCP) {
-		client.beginCCP()
-	}
-
-	return client, nil
-}
-
-// NewLightClient creates a new REST client which will connection to the provided cluster using the given credentials.
-// It does not populate the ClusterInfo completely and leaves that to the calling function.
-// Also updates the authProvider with the bootstrapped node's host configuration for the rest of the nodes.
-//
-// NOTE: The returned client may (depending on the provided options) acquire resources which must be cleaned up using
-// the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
-// goroutine.
-func NewLightClient(options ClientOptions) (*Client, error) {
-	client, err := returnBootstrappedClient(options)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update the cluster hostnames in authProvider to contain all node hostnames
-	client.authProvider.UpdateResolvedAddress()
 
 	client.logConnectionInfo()
 
@@ -958,23 +931,10 @@ func (c *Client) GetClusterInfo() (*cbvalue.ClusterInfo, error) {
 		return nil, fmt.Errorf("failed to get cluster metadata: %w", err)
 	}
 
-	version, err := c.GetClusterVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster version: %w", err)
-	}
-
-	maxVBuckets, uniformVBuckets, err := c.GetMaxVBuckets()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get max number of vBuckets: %w", err)
-	}
-
 	return &cbvalue.ClusterInfo{
 		Enterprise:       meta.Enterprise,
 		UUID:             meta.UUID,
 		DeveloperPreview: meta.DeveloperPreview,
-		Version:          version,
-		MaxVBuckets:      maxVBuckets,
-		UniformVBuckets:  uniformVBuckets,
 	}, nil
 }
 
@@ -983,13 +943,6 @@ type ClusterMetadata struct {
 	Enterprise       bool   `json:"isEnterprise"`
 	UUID             string `json:"uuid"`
 	DeveloperPreview bool   `json:"isDeveloperPreview"`
-}
-
-// SetClusterMetaData sets the cluster Enterprise, UUID and DeveloperPreview fields for populating NewLightClient
-func (c *Client) SetClusterMetadata(clusterMetadata ClusterMetadata) {
-	c.clusterInfo.Enterprise = clusterMetadata.Enterprise
-	c.clusterInfo.UUID = clusterMetadata.UUID
-	c.clusterInfo.DeveloperPreview = clusterMetadata.DeveloperPreview
 }
 
 // GetClusterMetaData extracts some common metadata from the cluster.
@@ -1028,103 +981,9 @@ func (c *Client) SetClusterVersion(version cbvalue.ClusterVersion) {
 	c.clusterInfo.Version = version
 }
 
-// GetClusterVersion extracts version information from the cluster nodes.
-func (c *Client) GetClusterVersion() (cbvalue.ClusterVersion, error) {
-	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           EndpointPoolsDefault,
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
-	}
-
-	response, err := c.Execute(request)
-	if err != nil {
-		return cbvalue.ClusterVersion{}, fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	type overlay struct {
-		Nodes []struct {
-			Version string `json:"version"`
-		} `json:"nodes"`
-	}
-
-	var decoded *overlay
-
-	err = json.Unmarshal(response.Body, &decoded)
-	if err != nil {
-		return cbvalue.ClusterVersion{}, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	clusterVersion := cbvalue.ClusterVersion{
-		MinVersion: cbvalue.Version(strings.Split(decoded.Nodes[0].Version, "-")[0]),
-	}
-
-	for _, node := range decoded.Nodes {
-		nodeVersion := cbvalue.Version(strings.Split(node.Version, "-")[0])
-		if clusterVersion.MinVersion == nodeVersion {
-			continue
-		}
-
-		if nodeVersion < clusterVersion.MinVersion {
-			clusterVersion.MinVersion = nodeVersion
-		}
-
-		clusterVersion.Mixed = true
-	}
-
-	return clusterVersion, nil
-}
-
 func (c *Client) SetMaxVBuckets(maxVBuckets uint16, uniformVBuckets bool) {
 	c.clusterInfo.MaxVBuckets = maxVBuckets
 	c.clusterInfo.UniformVBuckets = uniformVBuckets
-}
-
-// GetMaxVBuckets uses the bucket vBucket maps to determine the maximum number of vBuckets on the target cluster.
-func (c *Client) GetMaxVBuckets() (uint16, bool, error) {
-	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           EndpointBuckets,
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
-	}
-
-	response, err := c.Execute(request)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	type overlay struct {
-		VBucketServerMap struct {
-			VBucketMap [][2]int `json:"vBucketMap"`
-		} `json:"VBucketServerMap"`
-	}
-
-	var decoded []*overlay
-
-	err = json.Unmarshal(response.Body, &decoded)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	if len(decoded) == 0 {
-		return 0, true, nil
-	}
-
-	var (
-		uniform = true
-		max     = len(decoded[0].VBucketServerMap.VBucketMap)
-	)
-
-	for _, bucket := range decoded {
-		num := len(bucket.VBucketServerMap.VBucketMap)
-		uniform = uniform && max == num
-		max = maths.Max(max, num)
-	}
-
-	return uint16(max), uniform, nil
 }
 
 // Close releases any resources that are actively being consumed/used by the client.

@@ -49,25 +49,6 @@ func newTestClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
 	})
 }
 
-// newTestClient returns a client which is boostrapped against the provided cluster.
-//
-// NOTE: Returns an error because some tests expect bootstrapping to fail.
-func newTestLightClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
-	pool := x509.NewCertPool()
-
-	if cluster.Certificate() != nil {
-		pool.AddCert(cluster.Certificate())
-	}
-
-	return NewLightClient(ClientOptions{
-		ConnectionString: cluster.URL(),
-		DisableCCP:       disableCCP,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		TLSConfig:        &tls.Config{RootCAs: pool},
-		Logger:           log.StdoutLogger{},
-	})
-}
-
 func TestNewClientWithTransportDefaults(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
@@ -157,50 +138,6 @@ func TestNewClient(t *testing.T) {
 		},
 	}
 
-	require.Equal(t, expected, client.authProvider)
-}
-
-func TestNewLightClient(t *testing.T) {
-	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{&TestNode{}, &TestNode{}}})
-	defer cluster.Close()
-
-	client, err := newTestLightClient(cluster, true)
-	require.NoError(t, err)
-
-	// Don't compare the time attribute from the config manager
-	client.authProvider.manager.last = nil
-	client.authProvider.manager.signal = nil
-	client.authProvider.manager.cond = nil
-
-	expected := &AuthProvider{
-		resolved: &connstr.ResolvedConnectionString{
-			Addresses: []connstr.Address{{
-				Host: cluster.Address(),
-				Port: cluster.Port(),
-			}, {
-				Host: cluster.Address(),
-				Port: cluster.Port(),
-			}},
-		},
-		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-		manager: &ClusterConfigManager{
-			config: &ClusterConfig{
-				Nodes: Nodes{{
-					Hostname:           cluster.Address(),
-					Services:           &Services{Management: cluster.Port()},
-					AlternateAddresses: AlternateAddresses{},
-				}, {
-					Hostname:           cluster.Address(),
-					Services:           &Services{Management: cluster.Port()},
-					AlternateAddresses: AlternateAddresses{},
-				}},
-			},
-			maxAge: DefaultCCMaxAge,
-			logger: log.NewWrappedLogger(log.StdoutLogger{}),
-		},
-	}
-
-	require.Equal(t, &cbvalue.ClusterInfo{Enterprise: false, UniformVBuckets: false}, client.clusterInfo)
 	require.Equal(t, expected, client.authProvider)
 }
 
@@ -1643,57 +1580,6 @@ func TestClientUnmarshalCCReconstructIPV6AlternateAddress(t *testing.T) {
 	}
 }
 
-func TestGetClusterVersion(t *testing.T) {
-	type test struct {
-		name     string
-		nodes    TestNodes
-		expected cbvalue.ClusterVersion
-	}
-
-	tests := []*test{
-		{
-			name:     "SingleNodeCC",
-			nodes:    TestNodes{{Version: cbvalue.Version7_0_0}},
-			expected: cbvalue.ClusterVersion{MinVersion: cbvalue.Version7_0_0},
-		},
-		{
-			name:     "MultiNodeCC",
-			nodes:    TestNodes{{Version: cbvalue.Version7_0_0}, {Version: cbvalue.Version7_0_0}},
-			expected: cbvalue.ClusterVersion{MinVersion: cbvalue.Version7_0_0},
-		},
-		{
-			name: "MixedMultiNodeLowestFirst",
-			nodes: TestNodes{
-				{Version: cbvalue.Version6_6_0}, {Version: cbvalue.Version7_0_0}, {Version: cbvalue.Version7_0_0},
-			},
-			expected: cbvalue.ClusterVersion{MinVersion: cbvalue.Version6_6_0, Mixed: true},
-		},
-		{
-			name: "MixedMultiNodeLowestLast",
-			nodes: TestNodes{
-				{Version: cbvalue.Version7_0_0}, {Version: cbvalue.Version7_0_0}, {Version: cbvalue.Version6_6_0},
-			},
-			expected: cbvalue.ClusterVersion{MinVersion: cbvalue.Version6_6_0, Mixed: true},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			cluster := NewTestCluster(t, TestClusterOptions{
-				Nodes: test.nodes,
-			})
-			defer cluster.Close()
-
-			client, err := newTestClient(cluster, true)
-			require.NoError(t, err)
-
-			version, err := client.GetClusterVersion()
-			require.NoError(t, err)
-			require.Equal(t, test.expected, version)
-		})
-	}
-}
-
 func TestGetClusterMetaData(t *testing.T) {
 	type test struct {
 		name             string
@@ -1735,73 +1621,6 @@ func TestGetClusterMetaData(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, test.enterprise, meta.Enterprise)
 			require.Equal(t, test.developerPreview, meta.DeveloperPreview)
-		})
-	}
-}
-
-func TestGetMaxVBuckets(t *testing.T) {
-	type test struct {
-		name    string
-		buckets TestBuckets
-		max     uint16
-		uniform bool
-	}
-
-	tests := []*test{
-		{
-			name:    "NoBuckets",
-			uniform: true,
-		},
-		{
-			name: "AllTheSame",
-			buckets: TestBuckets{
-				"bucket1": {NumVBuckets: 64},
-				"bucket2": {NumVBuckets: 64},
-			},
-			max:     64,
-			uniform: true,
-		},
-		{
-			name: "FirstWithMore",
-			buckets: TestBuckets{
-				"bucket1": {NumVBuckets: 1024},
-				"bucket2": {NumVBuckets: 64},
-				"bucket3": {NumVBuckets: 64},
-			},
-			max: 1024,
-		},
-		{
-			name: "MiddleWithMore",
-			buckets: TestBuckets{
-				"bucket1": {NumVBuckets: 64},
-				"bucket2": {NumVBuckets: 1024},
-				"bucket3": {NumVBuckets: 64},
-			},
-			max: 1024,
-		},
-		{
-			name: "LastWithMore",
-			buckets: TestBuckets{
-				"bucket1": {NumVBuckets: 64},
-				"bucket2": {NumVBuckets: 64},
-				"bucket3": {NumVBuckets: 1024},
-			},
-			max: 1024,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			cluster := NewTestCluster(t, TestClusterOptions{Buckets: test.buckets})
-			defer cluster.Close()
-
-			client, err := newTestClient(cluster, true)
-			require.NoError(t, err)
-
-			maxVBuckets, uniformVBuckets, err := client.GetMaxVBuckets()
-			require.NoError(t, err)
-			require.Equal(t, test.max, maxVBuckets)
-			require.Equal(t, test.uniform, uniformVBuckets)
 		})
 	}
 }
