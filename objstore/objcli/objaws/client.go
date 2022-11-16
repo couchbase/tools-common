@@ -230,6 +230,17 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 }
 
 func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
+	return c.deleteDirectory(ctx, bucket, prefix, c.deleteObjects)
+}
+
+// deleteDirectory is a wrapper function which allows unit testing the 'DeleteDirectory' function with a mocked deletion
+// callback; this is required because the callback uses 'serviceAPI' which when mocked acquires a lock, causing a
+// deadlock.
+func (c *Client) deleteDirectory(
+	ctx context.Context,
+	bucket, prefix string,
+	fn func(ctx context.Context, bucket string, keys ...string) error,
+) error {
 	var err error
 
 	callback := func(page *s3.ListObjectsV2Output, _ bool) bool {
@@ -239,7 +250,7 @@ func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) err
 			keys = append(keys, *object.Key)
 		}
 
-		err = c.deleteObjects(ctx, bucket, keys...)
+		err = fn(ctx, bucket, keys...)
 
 		return err == nil
 	}
@@ -254,7 +265,7 @@ func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) err
 		return handleError(input.Bucket, nil, err)
 	}
 
-	return nil
+	return err
 }
 
 // deleteObjects performs a batched delete operation for a single page (<=1000) of keys.

@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -541,10 +540,7 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 }
 
 func TestClientDeleteDirectory(t *testing.T) {
-	var (
-		api = &mockServiceAPI{}
-		wg  sync.WaitGroup
-	)
+	api := &mockServiceAPI{}
 
 	fn1 := func(input *s3.ListObjectsV2Input) bool {
 		var (
@@ -569,9 +565,7 @@ func TestClientDeleteDirectory(t *testing.T) {
 			},
 		}
 
-		wg.Add(1)
-
-		go func() { defer wg.Done(); fn(&s3.ListObjectsV2Output{Contents: contents}, true) }()
+		fn(&s3.ListObjectsV2Output{Contents: contents}, true)
 
 		return true
 	}
@@ -579,30 +573,67 @@ func TestClientDeleteDirectory(t *testing.T) {
 	api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
 		Return(nil)
 
-	fn := func(input *s3.DeleteObjectsInput) bool {
-		var (
-			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
-			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
-			objects = input.Delete != nil && reflect.DeepEqual(input.Delete.Objects, []*s3.ObjectIdentifier{
-				{Key: aws.String("/path/to/key1")},
-				{Key: aws.String("/path/to/key2")},
-			})
-		)
+	client := &Client{serviceAPI: api}
 
-		return bucket && quiet && objects
+	callback := func(_ context.Context, bucket string, keys ...string) error {
+		require.Equal(t, "bucket", bucket)
+		require.Equal(t, []string{"/path/to/key1", "/path/to/key2"}, keys)
+
+		return nil
 	}
 
-	api.On("DeleteObjectsWithContext", testutil.MockMatchContext, mock.MatchedBy(fn)).
-		Return(&s3.DeleteObjectsOutput{}, nil)
-
-	client := &Client{serviceAPI: api}
-	require.NoError(t, client.DeleteDirectory(context.Background(), "bucket", "prefix"))
-
-	wg.Wait()
+	err := client.deleteDirectory(context.Background(), "bucket", "prefix", callback)
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
-	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
+}
+
+func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.ListObjectsV2Input) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix = input.Prefix != nil && *input.Prefix == "prefix"
+		)
+
+		return bucket && prefix
+	}
+
+	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
+		contents := []*s3.Object{
+			{
+				Key:          aws.String("/path/to/key1"),
+				Size:         aws.Int64(64),
+				LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			},
+			{
+				Key:          aws.String("/path/to/key2"),
+				Size:         aws.Int64(128),
+				LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+			},
+		}
+
+		fn(&s3.ListObjectsV2Output{Contents: contents}, true)
+
+		return true
+	}
+
+	api.On("ListObjectsV2PagesWithContext", testutil.MockMatchContext, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
+		Return(nil)
+
+	client := &Client{serviceAPI: api}
+
+	callback := func(_ context.Context, bucket string, keys ...string) error {
+		return assert.AnError
+	}
+
+	err := client.deleteDirectory(context.Background(), "bucket", "prefix", callback)
+	require.ErrorIs(t, err, assert.AnError)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
 }
 
 func TestClientIterateObjects(t *testing.T) {
