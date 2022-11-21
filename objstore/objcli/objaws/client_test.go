@@ -451,6 +451,16 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
 }
 
+func TestClientDeleteObjectsNoKeys(t *testing.T) {
+	api := &mockServiceAPI{}
+	client := &Client{serviceAPI: api}
+
+	require.Equal(t, nil, client.deleteObjects(context.Background(), "bucket"))
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 0)
+}
+
 func TestClientDeleteObjectsSinglePage(t *testing.T) {
 	api := &mockServiceAPI{}
 

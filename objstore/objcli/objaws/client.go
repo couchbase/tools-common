@@ -270,6 +270,14 @@ func (c *Client) deleteDirectory(
 
 // deleteObjects performs a batched delete operation for a single page (<=1000) of keys.
 func (c *Client) deleteObjects(ctx context.Context, bucket string, keys ...string) error {
+	// We use ListObjectsV2PagesWithContext to delete a directory. This takes deleteObjects
+	// as a callback whenever it receives a page, even if that page is empty. We then call
+	// DeleteObjectsWithContext even if there aren't any keys. If no keys are found we return
+	// early to avoid returning the error
+	if len(keys) == 0 {
+		return nil
+	}
+
 	input := &s3.DeleteObjectsInput{
 		Bucket: aws.String(bucket),
 		Delete: &s3.Delete{Quiet: aws.Bool(true)},
