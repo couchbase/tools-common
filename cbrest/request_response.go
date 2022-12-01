@@ -28,6 +28,13 @@ const (
 
 // Request encapsulates the parameters/options which are required when sending a REST request.
 type Request struct {
+	// Host overrides the host to which the request is dispatched to, when omitted, a host is chosen based on the
+	// service the request is to be dispatched to. If this attribute is provided, 'Service' is ignored.
+	//
+	// NOTE: Here be dragons, it's far more robust to use the 'Service' attribute to determine which host a request
+	// should be dispatched to.
+	Host string
+
 	// Method is the method used for this REST request. Should be one of the constants defined in the 'http' module.
 	Method Method
 
@@ -47,7 +54,8 @@ type Request struct {
 	// QueryParameters are additional values which will be encoded and postfixed to the request URL.
 	QueryParameters url.Values
 
-	// Service indicates that this request should be sent to a node which is running a specific service.
+	// Service indicates that this request should be sent to a node which is running a specific service. If 'Host' is
+	// provided, this attribute is ignored.
 	Service Service
 
 	// ExpectedStatusCode indicates that when this REST request is successful, we will get this specific status code.

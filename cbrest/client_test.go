@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
@@ -469,6 +470,35 @@ func TestClientExecute(t *testing.T) {
 	expected := &Response{
 		StatusCode: http.StatusOK,
 		Body:       []byte("body"),
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	actual, err := client.Execute(request)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+}
+
+func TestClientExecuteWithOverrideHost(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusTeapot)
+	}))
+
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	request := &Request{
+		Host:               server.URL,
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusTeapot,
+		Method:             http.MethodGet,
+	}
+
+	expected := &Response{
+		StatusCode: http.StatusTeapot,
+		Body:       make([]byte, 0),
 	}
 
 	client, err := newTestClient(cluster, true)

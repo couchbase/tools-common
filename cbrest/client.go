@@ -445,11 +445,6 @@ func (c *Client) logConnectionInfo() {
 	c.logger.Infof("(REST) Successfully connected to cluster | %s", data)
 }
 
-// GetTerseClusterInfo returns the terse cluster info as a response body, unmarshalled.
-func (c *Client) GetTerseClusterInfo(host string) ([]byte, error) {
-	return c.get(host, "/pools/default/terseClusterInfo")
-}
-
 // EnterpriseCluster returns a boolean indicating whether this is an enterprise cluster.
 //
 // NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterMetaData'.
@@ -802,7 +797,7 @@ func (c *Client) do(ctx *retry.Context, request *Request) (*http.Response, error
 // meaning the request timeout is not reset by retries.
 func (c *Client) prepare(ctx *retry.Context, request *Request) (*http.Request, error) {
 	// Get the fully qualified address to the node that we are sending this request to
-	host, err := c.serviceHost(request.Service, ctx.Attempt()-1)
+	host, err := c.serviceHostForRequest(request, ctx.Attempt()-1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host for service '%s': %w", request.Service, err)
 	}
@@ -833,7 +828,17 @@ func (c *Client) prepare(ctx *retry.Context, request *Request) (*http.Request, e
 	return req, nil
 }
 
-// serviceHost returns the service host that this request should be dispatched too.
+// serviceHostForRequest returns the service host that this request should be dispatched too.
+func (c *Client) serviceHostForRequest(request *Request, attempt int) (string, error) {
+	// If the user has specified a host, use that instead
+	if request.Host != "" {
+		return request.Host, nil
+	}
+
+	return c.serviceHost(request.Service, attempt)
+}
+
+// serviceHost returns a host that's running the given service.
 func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 	host, err := c.authProvider.GetServiceHost(service, attempt)
 	if err != nil {
