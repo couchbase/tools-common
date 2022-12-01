@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/couchbase/tools-common/aprov"
-	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/envvar"
 	"github.com/couchbase/tools-common/errutil"
@@ -63,8 +62,7 @@ type ClientOptions struct {
 type Client struct {
 	client       *http.Client
 	authProvider *AuthProvider
-	// NOTE: Client only populates Enterprise, UUID and DeveloperPreview fields of clusterInfo
-	clusterInfo *cbvalue.ClusterInfo
+	clusterInfo  *clusterInfo
 
 	connectionMode ConnectionMode
 
@@ -92,7 +90,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 	}
 
 	// Get commonly used information about the cluster now to avoid multiple duplicate requests at a later date
-	client.clusterInfo, err = client.GetClusterInfo()
+	client.clusterInfo, err = client.getClusterInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster information: %w", err)
 	}
@@ -174,7 +172,7 @@ func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 		pollTimeout:    pollTimeout,
 		requestRetries: requestRetries,
 		reqResLogLevel: options.ReqResLogLevel,
-		clusterInfo:    &cbvalue.ClusterInfo{},
+		clusterInfo:    &clusterInfo{},
 		logger:         logger,
 	}
 
@@ -466,32 +464,11 @@ func (c *Client) ClusterUUID() string {
 	return c.clusterInfo.UUID
 }
 
-// ClusterVersion returns the version information extracted from the cluster after bootstrapping.
-//
-// NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterVersion'.
-func (c *Client) ClusterVersion() cbvalue.ClusterVersion {
-	return c.clusterInfo.Version
-}
-
 // DeveloperPreview returns a boolean indicating whether this cluster is in Developer Preview mode.
 //
 // NOTE: This function may return stale data, for the most up-to-date information, use 'GetClusterMetaData'.
 func (c *Client) DeveloperPreview() bool {
 	return c.clusterInfo.DeveloperPreview
-}
-
-// MaxVBuckets returns the maximum number of vBuckets on the target cluster.
-//
-// NOTE: This function may return stale data, for the most up-to-date information, use 'GetMaxVBuckets'.
-func (c *Client) MaxVBuckets() uint16 {
-	return c.clusterInfo.MaxVBuckets
-}
-
-// UniformVBuckets returns a boolean indicating whether all the buckets on the cluster have the same amount of vBuckets.
-//
-// NOTE: This function may return stale data, for the most up-to-date information, use 'GetMaxVBuckets'.
-func (c *Client) UniformVBuckets() bool {
-	return c.clusterInfo.UniformVBuckets
 }
 
 // PollTimeout returns the poll timeout used by the current client.
@@ -922,68 +899,6 @@ func (c *Client) GetAllServiceHosts(service Service) ([]string, error) {
 	}
 
 	return []string{host}, nil
-}
-
-// GetClusterInfo gets commonly used information about the cluster; this includes the uuid and version.
-func (c *Client) GetClusterInfo() (*cbvalue.ClusterInfo, error) {
-	meta, err := c.GetClusterMetaData()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster metadata: %w", err)
-	}
-
-	return &cbvalue.ClusterInfo{
-		Enterprise:       meta.Enterprise,
-		UUID:             meta.UUID,
-		DeveloperPreview: meta.DeveloperPreview,
-	}, nil
-}
-
-// ClusterMetadata wraps some common cluster metadata.
-type ClusterMetadata struct {
-	Enterprise       bool   `json:"isEnterprise"`
-	UUID             string `json:"uuid"`
-	DeveloperPreview bool   `json:"isDeveloperPreview"`
-}
-
-// GetClusterMetaData extracts some common metadata from the cluster.
-func (c *Client) GetClusterMetaData() (*ClusterMetadata, error) {
-	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           EndpointPools,
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
-	}
-
-	response, err := c.Execute(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	var decoded *ClusterMetadata
-
-	err = json.Unmarshal(response.Body, &decoded)
-	if err == nil {
-		return decoded, nil
-	}
-
-	// We will fail to unmarshal the response from the node if it's uninitialized, this is because the "uuid" field will
-	// be an empty array, instead of a string; if this is the case, return a clearer error message.
-	if bytes.Contains(response.Body, []byte(`"uuid":[]`)) {
-		return nil, ErrNodeUninitialized
-	}
-
-	return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-}
-
-// SetClusterVersion is for LightClient to set cluster version in calling function
-func (c *Client) SetClusterVersion(version cbvalue.ClusterVersion) {
-	c.clusterInfo.Version = version
-}
-
-func (c *Client) SetMaxVBuckets(maxVBuckets uint16, uniformVBuckets bool) {
-	c.clusterInfo.MaxVBuckets = maxVBuckets
-	c.clusterInfo.UniformVBuckets = uniformVBuckets
 }
 
 // Close releases any resources that are actively being consumed/used by the client.

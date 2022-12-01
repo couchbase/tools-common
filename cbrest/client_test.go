@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/couchbase/tools-common/aprov"
-	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/netutil"
@@ -1580,51 +1579,6 @@ func TestClientUnmarshalCCReconstructIPV6AlternateAddress(t *testing.T) {
 	}
 }
 
-func TestGetClusterMetaData(t *testing.T) {
-	type test struct {
-		name             string
-		enterprise       bool
-		developerPreview bool
-	}
-
-	tests := []*test{
-		{
-			name:       "EE",
-			enterprise: true,
-		},
-		{
-			name: "CE",
-		},
-		{
-			name:             "EE-DP",
-			enterprise:       true,
-			developerPreview: true,
-		},
-		{
-			name:             "CE-DP",
-			developerPreview: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			cluster := NewTestCluster(t, TestClusterOptions{
-				Enterprise:       test.enterprise,
-				DeveloperPreview: test.developerPreview,
-			})
-			defer cluster.Close()
-
-			client, err := newTestClient(cluster, true)
-			require.NoError(t, err)
-
-			meta, err := client.GetClusterMetaData()
-			require.NoError(t, err)
-			require.Equal(t, test.enterprise, meta.Enterprise)
-			require.Equal(t, test.developerPreview, meta.DeveloperPreview)
-		})
-	}
-}
-
 func TestClientBeginCCP(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
@@ -1785,7 +1739,7 @@ func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
 func TestClientValidHost(t *testing.T) {
 	type test struct {
 		name     string
-		info     *cbvalue.ClusterInfo
+		info     *clusterInfo
 		body     []byte
 		expected bool
 	}
@@ -1793,18 +1747,18 @@ func TestClientValidHost(t *testing.T) {
 	tests := []*test{
 		{
 			name:     "ValidHost",
-			info:     &cbvalue.ClusterInfo{UUID: "uuid"},
+			info:     &clusterInfo{UUID: "uuid"},
 			body:     []byte(`{"uuid":"uuid"}`),
 			expected: true,
 		},
 		{
 			name: "InvalidHostFromAnotherCluster",
-			info: &cbvalue.ClusterInfo{UUID: "uuid"},
+			info: &clusterInfo{UUID: "uuid"},
 			body: []byte(`{"uuid":"another_uuid"}`),
 		},
 		{
 			name: "InvalidHostUninitialized",
-			info: &cbvalue.ClusterInfo{UUID: "uuid"},
+			info: &clusterInfo{UUID: "uuid"},
 			body: []byte(`{"uuid":[]}`),
 		},
 		{
