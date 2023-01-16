@@ -1,6 +1,7 @@
 package cbrest
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/couchbase/tools-common/aprov"
@@ -493,6 +494,69 @@ func TestAuthProviderSuccessiveBootstrapping(t *testing.T) {
 			}
 
 			require.Equal(t, test.expected, hosts)
+		})
+	}
+}
+
+func TestAuthProviderShouldUseAltAddr(t *testing.T) {
+	type test struct {
+		name     string
+		resolved *connstr.ResolvedConnectionString
+		expected bool
+	}
+
+	tests := []test{
+		{
+			name:     "NoNetworkProvided",
+			resolved: &connstr.ResolvedConnectionString{Params: url.Values{}},
+		},
+		{
+			name:     "DefaultNetworkProvided",
+			resolved: &connstr.ResolvedConnectionString{Params: url.Values{"network": {"default"}}},
+		},
+		{
+			name:     "ExternalNetworkProvided",
+			resolved: &connstr.ResolvedConnectionString{Params: url.Values{"network": {"external"}}},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider := &AuthProvider{resolved: test.resolved}
+
+			actual, err := provider.shouldUseAltAddr("", nil)
+			require.NoError(t, err)
+			require.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestAuthProviderShouldUseAltAddrInvalidNetworkQueryParam(t *testing.T) {
+	type test struct {
+		name    string
+		network string
+	}
+
+	tests := []test{
+		{
+			name:    "Unexpected",
+			network: "nope",
+		},
+		{
+			name:    "Internal",
+			network: "internal",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider := &AuthProvider{
+				resolved: &connstr.ResolvedConnectionString{Params: url.Values{"network": {test.network}}},
+			}
+
+			_, err := provider.shouldUseAltAddr("", nil)
+			require.ErrorIs(t, err, ErrInvalidNetwork)
 		})
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -123,9 +124,8 @@ func TestNewClient(t *testing.T) {
 		manager: &ClusterConfigManager{
 			config: &ClusterConfig{
 				Nodes: Nodes{{
-					Hostname:           cluster.Address(),
-					Services:           &Services{Management: cluster.Port()},
-					AlternateAddresses: AlternateAddresses{},
+					Hostname: cluster.Address(),
+					Services: &Services{Management: cluster.Port()},
 				}},
 			},
 			maxAge: DefaultCCMaxAge,
@@ -292,13 +292,17 @@ func TestNewClientFailedToBootstrapAgainstAnyHostForbidden(t *testing.T) {
 	require.NotNil(t, bootstrapFailure.ErrAuthorization)
 }
 
-func TestNewClientAltAddress(t *testing.T) {
+func TestNewClientForcedExternalNetworkMode(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{
 		Nodes: TestNodes{{AltAddress: true}},
 	})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster, true)
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL() + "?network=external",
+		DisableCCP:       true,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	})
 	require.NoError(t, err)
 
 	// Don't compare the time attribute from the config manager
@@ -314,18 +318,36 @@ func TestNewClientAltAddress(t *testing.T) {
 					Port: cluster.Port(),
 				},
 			},
+			Params: url.Values{"network": {"external"}},
 		},
-		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		useAltAddr: true,
+		provider:   &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
 		manager: &ClusterConfigManager{
 			config: &ClusterConfig{
 				Nodes: cluster.Nodes(),
 			},
 			maxAge: DefaultCCMaxAge,
 		},
-		useAltAddr: true,
 	}
 
 	require.Equal(t, expected, client.authProvider)
+}
+
+func TestNewClientForcedExternalNetworkModeNoExternal(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	_, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL() + "?network=external",
+		DisableCCP:       true,
+		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+	})
+
+	// External networking isn't enabled on the cluster, therefore, we should be unable to find a node running the
+	// management service.
+	var errNotAvailable *ServiceNotAvailableError
+
+	require.ErrorAs(t, err, &errNotAvailable)
 }
 
 func TestNewClientTLS(t *testing.T) {
