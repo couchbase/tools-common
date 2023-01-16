@@ -2,6 +2,7 @@ package connstr
 
 import (
 	"net"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,6 +42,9 @@ type ConnectionString struct {
 	//
 	// NOTE: This attribute is required, and must be non-empty.
 	Addresses []Address
+
+	// Params are any parsed query parameters, will be <nil> if none were parsed.
+	Params url.Values
 }
 
 // ResolvedConnectionString is similar to a 'ConnectionString', however, addresses are resolved i.e. ports/schemes are
@@ -56,6 +60,9 @@ type ResolvedConnectionString struct {
 	//
 	// NOTE: This attribute is required, and must be non-empty.
 	Addresses []Address
+
+	// Params are any parsed query parameters, will be <nil> if none were parsed.
+	Params url.Values
 }
 
 // Parse the given connection string and perform first tier validation i.e. it's possible for a parsed connection string
@@ -65,10 +72,13 @@ type ResolvedConnectionString struct {
 // documentation at https://docs.couchbase.com/server/7.0/backup-restore/cbbackupmgr-backup.html#host-formats.
 func Parse(connectionString string) (*ConnectionString, error) {
 	// partMatcher matches and groups the different parts of a given connection string. For example:
-	// couchbases://10.0.0.1:11222,10.0.0.2,10.0.0.3:11207
+	// couchbases://10.0.0.1:11222,10.0.0.2,10.0.0.3:11207?network=external
 	// Group 'scheme': couchbases
 	// Group 'hosts': 10.0.0.1:11222,10.0.0.2,10.0.0.3:11207
-	partMatcher := regexp.MustCompile(`((?P<scheme>.*):\/\/)?(([^\/?:]*)(:([^\/?:@]*))?@)?(?P<hosts>[^\/?]*)(\/([^\?]*))?`)
+	// Group 'params': network=external
+	partMatcher := regexp.MustCompile(
+		`((?P<scheme>.*):\/\/)?(([^\/?:]*)(:([^\/?:@]*))?@)?(?P<hosts>[^\/?]*)(\/([^\?]*))?(\?(?P<params>.*))?`,
+	)
 
 	// hostMatcher matches and groups different parts of a comma separated list of hostname in a connection string.
 	// For example:
@@ -113,6 +123,13 @@ func Parse(connectionString string) (*ConnectionString, error) {
 		return nil, ErrNoAddressesParsed
 	}
 
+	var err error
+
+	parsed.Params, err = parseParams(parts[partMatcher.SubexpIndex("params")])
+	if err != nil {
+		return nil, err
+	}
+
 	return parsed, nil
 }
 
@@ -137,12 +154,26 @@ func parseHost(hostInfo []string, hostMatcher *regexp.Regexp) (Address, error) {
 	return address, nil
 }
 
+// parseParams parses and converts the given query parameter string.
+func parseParams(params string) (url.Values, error) {
+	parsed, err := url.ParseQuery(params)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parsed) == 0 {
+		return nil, nil
+	}
+
+	return parsed, nil
+}
+
 // Resolve the current connection string and return addresses which can be used to bootstrap from. Will perform
 // additional validation, once resolved the connection string is valid and can be used.
 func (c *ConnectionString) Resolve() (*ResolvedConnectionString, error) {
 	var (
 		defaultPort uint16
-		resolved    = &ResolvedConnectionString{}
+		resolved    = &ResolvedConnectionString{Params: c.Params}
 	)
 
 	switch c.Scheme {
