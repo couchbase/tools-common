@@ -15,6 +15,35 @@ import (
 	"github.com/couchbase/tools-common/objstore/objval"
 )
 
+func TestStripPrefix(t *testing.T) {
+	tests := []struct{ name, prefix, fullPath, expected string }{
+		{
+			name:     "NoTrailingSlash",
+			prefix:   "foo/bar",
+			fullPath: "foo/bar/baz/01.txt",
+			expected: "bar/baz/01.txt",
+		},
+		{
+			name:     "TrailingSlash",
+			prefix:   "foo/bar/",
+			fullPath: "foo/bar/baz/01.txt",
+			expected: "baz/01.txt",
+		},
+		{
+			name:     "DoesNothingIfNotAPrefix",
+			prefix:   "foo/",
+			fullPath: "bar/baz/01.txt",
+			expected: "bar/baz/01.txt",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, stripPrefix(test.prefix, test.fullPath))
+		})
+	}
+}
+
 func TestCompressUploadOptsDefaults(t *testing.T) {
 	opts := CompressObjectsOpts{
 		Client:            objcli.NewTestClient(t, objval.ProviderAWS),

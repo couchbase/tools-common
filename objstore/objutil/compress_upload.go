@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
+	"strings"
 
 	"github.com/couchbase/tools-common/freelist"
 	"github.com/couchbase/tools-common/hofp"
@@ -86,9 +88,34 @@ func (o *CompressObjectsOpts) defaults() {
 	}
 }
 
+// stipPrefix removes prefix from the beginning of full path.
+//
+// NOTE: if a trailing '/' is provided then the full prefix will be removed. Without it we will retain the last path
+// element. For example:
+//
+// prefix   | fullPath           | return
+// ---------+--------------------+---------------
+// foo/bar  | foo/bar/baz/01.txt | bar/baz/01.txt
+// foo/bar/ | foo/bar/baz/01.txt | baz/01.txt
+func stripPrefix(prefix, fullPath string) string {
+	endsWithSeparator := strings.HasSuffix(prefix, "/")
+
+	pref := prefix
+	if !endsWithSeparator {
+		pref += "/"
+	}
+
+	res := strings.TrimPrefix(fullPath, pref)
+	if endsWithSeparator {
+		return res
+	}
+
+	return path.Join(path.Base(prefix), res)
+}
+
 // download streams the given object and writes it to zipWriter.
-func download(ctx context.Context, cli objcli.Client, bucket, key string, zipWriter *zip.Writer) error {
-	writer, err := zipWriter.Create(key)
+func download(ctx context.Context, cli objcli.Client, bucket, prefix, key string, zipWriter *zip.Writer) error {
+	writer, err := zipWriter.Create(stripPrefix(prefix, key))
 	if err != nil {
 		return fmt.Errorf("could not create file in zip: %w", err)
 	}
@@ -114,7 +141,7 @@ func iterate(ctx context.Context, opts CompressObjectsOpts, zipWriter *zip.Write
 			return nil
 		}
 
-		return download(ctx, opts.Client, opts.SourceBucket, attrs.Key, zipWriter)
+		return download(ctx, opts.Client, opts.SourceBucket, opts.Prefix, attrs.Key, zipWriter)
 	}
 
 	err := opts.Client.IterateObjects(ctx,
