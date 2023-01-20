@@ -44,8 +44,8 @@ func TestStripPrefix(t *testing.T) {
 	}
 }
 
-func TestCompressUploadOptsDefaults(t *testing.T) {
-	opts := CompressObjectsOpts{
+func TestCompressUploadOptionsDefaults(t *testing.T) {
+	opts := CompressObjectsOptions{
 		Client:            objcli.NewTestClient(t, objval.ProviderAWS),
 		SourceBucket:      "bucket",
 		DestinationBucket: "bucket",
@@ -55,22 +55,24 @@ func TestCompressUploadOptsDefaults(t *testing.T) {
 
 	opts.defaults()
 
-	require.Equal(t, CompressObjectsOpts{
+	expected := CompressObjectsOptions{
+		Options: Options{
+			Context:  opts.Context,
+			PartSize: objaws.MinUploadSize,
+		},
 		SourceBucket:      "bucket",
 		DestinationBucket: "bucket",
 		Prefix:            "prefix",
 		Destination:       "dest",
-		PartSize:          objaws.MinUploadSize,
 		PartUploadWorkers: 4,
+		Client:            opts.Client,
+	}
 
-		// These fields we're not interesting in checking, so ensure they're always equal to the actual result
-		Context: opts.Context,
-		Client:  opts.Client,
-	}, opts)
+	require.Equal(t, expected, opts)
 }
 
-func TestCompressUploadOptsMissing(t *testing.T) {
-	require.Error(t, CompressObjects(CompressObjectsOpts{}))
+func TestCompressUploadOptionsMissing(t *testing.T) {
+	require.Error(t, CompressObjects(CompressObjectsOptions{}))
 }
 
 func TestCompressUpload(t *testing.T) {
@@ -108,9 +110,9 @@ func TestCompressUpload(t *testing.T) {
 		require.NoError(t, cli.PutObject(context.Background(), "bucket", path.path, bytes.NewReader(buf)))
 	}
 
-	require.NoError(t, CompressObjects(CompressObjectsOpts{
+	require.NoError(t, CompressObjects(CompressObjectsOptions{
+		Options:           Options{PartSize: PartSize},
 		Client:            cli,
-		PartSize:          PartSize,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",

@@ -21,17 +21,14 @@ import (
 // PartCompleteFunc is called once a part of the zip file has been uploaded. size is the size of the part uploaded.
 type PartCompleteFunc func(size int)
 
-// CompressObjectsOpts specifies options which configure what and how objects are compressed and uploaded.
-type CompressObjectsOpts struct {
-	Context context.Context
+// CompressObjectsOptions specifies options which configure what and how objects are compressed and uploaded.
+type CompressObjectsOptions struct {
+	Options
 
 	// Client is the objcli.Client to use to download and upload.
 	//
 	// NOTE: required
 	Client objcli.Client
-
-	// PartSize is the size of parts to upload.
-	PartSize int64
 
 	// PartUploadWorkers is the number of parts to upload at once.
 	PartUploadWorkers int
@@ -69,7 +66,7 @@ type CompressObjectsOpts struct {
 	Destination string
 }
 
-func (o *CompressObjectsOpts) defaults() {
+func (o *CompressObjectsOptions) defaults() {
 	if o.Context == nil {
 		o.Context = context.Background()
 	}
@@ -135,7 +132,7 @@ func download(ctx context.Context, cli objcli.Client, bucket, prefix, key string
 }
 
 // iterate calls download on each object that matches the iterate parameters given in opts.
-func iterate(ctx context.Context, opts CompressObjectsOpts, zipWriter *zip.Writer) error {
+func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Writer) error {
 	fn := func(attrs *objval.ObjectAttrs) error {
 		if attrs.IsDir() {
 			return nil
@@ -164,7 +161,7 @@ func iterate(ctx context.Context, opts CompressObjectsOpts, zipWriter *zip.Write
 // NOTE: It does this by keeping opts.PartUploadWorkers internal buffers, reading into those and uploading them as parts
 // of the final object. Having multiple buffers means we do not need to wait for a part to be uploaded to start reading
 // from reader again.
-func uploadFromReader(ctx context.Context, opts CompressObjectsOpts, reader io.Reader) error {
+func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader io.Reader) error {
 	fl := freelist.NewFreeListWithFactory(opts.PartUploadWorkers, func() []byte { return make([]byte, opts.PartSize) })
 
 	// payload is the metadata we pass when uploading so that we can give the buffer back to the freelist and call
@@ -234,7 +231,7 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOpts, reader io.R
 // CompressObjects takes an object storage prefix and a destination. It will create a zip in destination and compress
 // and upload every object with the given prefix there. Each object will be streamed from cloud storage, through a
 // ZipWriter and back to cloud storage.
-func CompressObjects(opts CompressObjectsOpts) error {
+func CompressObjects(opts CompressObjectsOptions) error {
 	if opts.Client == nil || opts.SourceBucket == "" || opts.Prefix == "" || opts.DestinationBucket == "" ||
 		opts.Destination == "" {
 		return fmt.Errorf("missing required parameters")
