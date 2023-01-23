@@ -1,14 +1,14 @@
 package objazure
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
 	"github.com/couchbase/tools-common/objstore/objerr"
 )
@@ -22,8 +22,8 @@ const (
 
 // GetServiceClient returns the Azure Service Client that facilitates all the necessary interactions with the Azure
 // blob storage.
-func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *azblob.ClientOptions) (
-	*azblob.ServiceClient, error,
+func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *service.ClientOptions) (
+	*service.Client, error,
 ) {
 	serviceURL, err := getServiceURL(endpoint, accessKeyID)
 	if err != nil {
@@ -51,8 +51,8 @@ func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *az
 // fails to find any static credentials, instead of failing we proceed to try to create a Service Client with a token
 // credential.
 func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccessKey string,
-	options *azblob.ClientOptions,
-) (*azblob.ServiceClient, error) {
+	options *service.ClientOptions,
+) (*service.Client, error) {
 	credentials, err := getStaticCredentials(accessKeyID, secretAccessKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get static credentials: %w", handleCredsError(err))
@@ -62,7 +62,7 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 		return nil, nil
 	}
 
-	client, err := azblob.NewServiceClientWithSharedKey(serviceURL, credentials, options)
+	client, err := service.NewClientWithSharedKeyCredential(serviceURL, credentials, options)
 	if err != nil {
 		return nil, err // Purposefully not wrapped
 	}
@@ -79,7 +79,7 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 //
 // Despite the credential trying all of these methods, we do not support authentication using Service principal with
 // username and password, and using CLI.
-func getServiceClientWithTokenCredential(serviceURL string, options *azblob.ClientOptions) (*azblob.ServiceClient,
+func getServiceClientWithTokenCredential(serviceURL string, options *service.ClientOptions) (*service.Client,
 	error,
 ) {
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -88,7 +88,7 @@ func getServiceClientWithTokenCredential(serviceURL string, options *azblob.Clie
 		return nil, objerr.ErrNoCredentialsFound
 	}
 
-	client, err := azblob.NewServiceClient(serviceURL, credential, options)
+	client, err := service.NewClient(serviceURL, credential, options)
 	if err != nil {
 		return nil, err // Purposefully not wrapped
 	}
@@ -191,15 +191,11 @@ func getStaticCredentialsFromEnv() (*azblob.SharedKeyCredential, error) {
 // handleCredsError converts the given error (returned from fetching the credentials) into a more user friendly error
 // where possible.
 func handleCredsError(err error) error {
-	var azureErr *azblob.StorageError
-	if err == nil || !errors.As(err, &azureErr) || azureErr.Response() == nil { //nolint:bodyclose
-		return err
+	if bloberror.HasCode(err, bloberror.AuthenticationFailed) {
+		return objerr.ErrUnauthenticated
 	}
 
-	switch azureErr.Response().StatusCode { //nolint:bodyclose
-	case http.StatusUnauthorized:
-		return objerr.ErrUnauthenticated
-	case http.StatusForbidden:
+	if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
 		return objerr.ErrUnauthorized
 	}
 

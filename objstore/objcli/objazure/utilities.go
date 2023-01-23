@@ -1,46 +1,31 @@
 package objazure
 
 import (
-	"errors"
-	"net/http"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 
 	"github.com/couchbase/tools-common/objstore/objerr"
 )
 
 // handleError converts an error relating accessing an object via its key into a user friendly error where possible.
 func handleError(bucket, key string, err error) error {
-	var azureErr *azblob.StorageError
-	if err == nil || !errors.As(err, &azureErr) {
-		return objerr.HandleError(err)
-	}
-
-	var (
-		statusCode = -1
-		resp       = azureErr.Response() //nolint:bodyclose
-	)
-
-	if resp != nil {
-		statusCode = resp.StatusCode
-	}
-
-	switch statusCode {
-	case http.StatusUnauthorized:
+	if bloberror.HasCode(err, bloberror.AuthenticationFailed) {
 		return objerr.ErrUnauthenticated
-	case http.StatusForbidden:
+	}
+
+	if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
 		return objerr.ErrUnauthorized
 	}
 
-	switch azureErr.ErrorCode {
-	case azblob.StorageErrorCodeBlobNotFound:
+	if bloberror.HasCode(err, bloberror.BlobNotFound) {
 		// This shouldn't trigger but may aid in debugging in the future
 		if key == "" {
 			key = "<empty blob name>"
 		}
 
 		return &objerr.NotFoundError{Type: "blob", Name: key}
-	case azblob.StorageErrorCodeContainerNotFound:
+	}
+
+	if bloberror.HasCode(err, bloberror.ContainerNotFound) {
 		// This shouldn't trigger but may aid in debugging in the future
 		if bucket == "" {
 			bucket = "<empty container name>"
@@ -49,12 +34,10 @@ func handleError(bucket, key string, err error) error {
 		return &objerr.NotFoundError{Type: "container", Name: bucket}
 	}
 
-	// This isn't a status code we plan to handle manually, return the complete error
-	return err
+	return objerr.HandleError(err)
 }
 
 // isKeyNotFound returns a boolean indicating whether the given error is a 'ServiceCodeBlobNotFound' error.
 func isKeyNotFound(err error) bool {
-	var azureErr *azblob.StorageError
-	return errors.As(err, &azureErr) && azureErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound
+	return bloberror.HasCode(err, bloberror.BlobNotFound)
 }

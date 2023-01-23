@@ -10,6 +10,7 @@ import (
 	"github.com/couchbase/tools-common/objstore/objerr"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -244,12 +245,12 @@ func TestHandleCredsError(t *testing.T) {
 		},
 		{
 			name:     "Unauthenticated",
-			err:      storageError(http.StatusUnauthorized),
+			err:      respError(bloberror.AuthenticationFailed),
 			expected: objerr.ErrUnauthenticated,
 		},
 		{
 			name:     "Unauthorized",
-			err:      storageError(http.StatusForbidden),
+			err:      respError(bloberror.AuthorizationFailure),
 			expected: objerr.ErrUnauthorized,
 		},
 	}

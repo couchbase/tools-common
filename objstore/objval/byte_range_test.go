@@ -3,7 +3,7 @@ package objval
 import (
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,9 +77,9 @@ func TestByteRangeToOffsetLength(t *testing.T) {
 		{
 			name:          "AzureCountToEnd",
 			input:         &ByteRange{Start: 64},
-			defaultLength: azblob.CountToEnd,
+			defaultLength: blob.CountToEnd,
 			offset:        64,
-			length:        azblob.CountToEnd,
+			length:        blob.CountToEnd,
 		},
 	}
 
