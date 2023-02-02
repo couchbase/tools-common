@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
 	"github.com/couchbase/tools-common/objstore/objerr"
@@ -70,20 +69,21 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 	return client, nil
 }
 
-// getServiceClientWithStaticCredentials attempts to create an Azure Service Client with a token credential. To achieve
-// this we use the Default Azure SDK credential, which tries the following authentication methods:
-//   a) Service principal (1. with secret, 2. with certificate, 3. username and password)
-//   b) Managed identity
-//   c) CLI
+// getServiceClientWithStaticCredentials attempts to create an Azure Service Client with a token credential, this will
+// auth by:
+//
+//	a) Service principal (1. with secret, 2. with certificate, 3. username and password)
+//	b) Managed identity
+//
 // Despite the credential trying all of these methods, we do not support authentication using Service principal with
-// username and password, and using CLI.
-func getServiceClientWithTokenCredential(serviceURL string, options *azblob.ClientOptions) (*azblob.ServiceClient,
-	error,
-) {
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+// username and password.
+func getServiceClientWithTokenCredential(
+	serviceURL string,
+	options *azblob.ClientOptions,
+) (*azblob.ServiceClient, error) {
+	credential, err := NewTokenCredential()
 	if err != nil {
-		// We return this error here because this is the last source of credentials that we check
-		return nil, objerr.ErrNoCredentialsFound
+		return nil, err
 	}
 
 	client, err := azblob.NewServiceClient(serviceURL, credential, options)
