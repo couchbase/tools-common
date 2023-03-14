@@ -10,9 +10,12 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/couchbase/tools-common/format"
 	"github.com/couchbase/tools-common/freelist"
 	"github.com/couchbase/tools-common/hofp"
+	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/objstore/objval"
@@ -64,6 +67,9 @@ type CompressObjectsOptions struct {
 	//
 	// NOTE: required
 	Destination string
+
+	// Logger is the log.Logger we should use for reporting information.
+	Logger log.Logger
 }
 
 func (o *CompressObjectsOptions) defaults() {
@@ -111,13 +117,20 @@ func stripPrefix(prefix, fullPath string) string {
 }
 
 // download streams the given object and writes it to zipWriter.
-func download(ctx context.Context, cli objcli.Client, bucket, prefix, key string, zipWriter *zip.Writer) error {
-	writer, err := zipWriter.Create(stripPrefix(prefix, key))
+func download(
+	ctx context.Context, opts CompressObjectsOptions, logger log.WrappedLogger, key string, sz int64,
+	zipWriter *zip.Writer,
+) error {
+	start := time.Now()
+
+	logger.Infof("Starting download of %s", key)
+
+	writer, err := zipWriter.Create(stripPrefix(opts.Prefix, key))
 	if err != nil {
 		return fmt.Errorf("could not create file in zip: %w", err)
 	}
 
-	obj, err := cli.GetObject(ctx, bucket, key, nil)
+	obj, err := opts.Client.GetObject(ctx, opts.SourceBucket, key, nil)
 	if err != nil {
 		return fmt.Errorf("could not get object '%s': %w", key, err)
 	}
@@ -128,17 +141,21 @@ func download(ctx context.Context, cli objcli.Client, bucket, prefix, key string
 		return fmt.Errorf("could not copy object into zip: %w", err)
 	}
 
+	logger.Infof("Downloaded %s (%s bytes) in %s", key, format.Bytes(uint64(sz)), time.Since(start))
+
 	return nil
 }
 
 // iterate calls download on each object that matches the iterate parameters given in opts.
 func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Writer) error {
+	logger := log.NewWrappedLogger(opts.Logger)
+
 	fn := func(attrs *objval.ObjectAttrs) error {
 		if attrs.IsDir() {
 			return nil
 		}
 
-		return download(ctx, opts.Client, opts.SourceBucket, opts.Prefix, attrs.Key, zipWriter)
+		return download(ctx, opts, logger, attrs.Key, attrs.Size, zipWriter)
 	}
 
 	err := opts.Client.IterateObjects(ctx,
