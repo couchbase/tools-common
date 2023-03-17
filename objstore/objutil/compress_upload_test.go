@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"math/rand"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,6 +74,23 @@ func TestCompressUploadOptionsDefaults(t *testing.T) {
 
 func TestCompressUploadOptionsMissing(t *testing.T) {
 	require.Error(t, CompressObjects(CompressObjectsOptions{}))
+}
+
+// TestCompressUploadIterateError tests to see that CompressObjects doesn't hang
+// when iterate returns an error (MB-55967)
+func TestCompressUploadIterateError(t *testing.T) {
+	cli := objcli.NewTestClient(t, objval.ProviderAWS)
+
+	require.Error(t, CompressObjects(CompressObjectsOptions{
+		Client:            cli,
+		SourceBucket:      "bucket",
+		Prefix:            "prefix",
+		DestinationBucket: "bucket",
+		Destination:       "export.zip",
+		// Include and Exclude both being non-nil means iterate will return an error
+		Include: []*regexp.Regexp{{}},
+		Exclude: []*regexp.Regexp{{}},
+	}))
 }
 
 func TestCompressUpload(t *testing.T) {

@@ -264,6 +264,9 @@ func CompressObjects(opts CompressObjectsOptions) error {
 	)
 
 	pool.Queue(func(ctx context.Context) error { //nolint:errcheck
+		defer w.Close()
+		defer zipWriter.Close()
+
 		if err := iterate(ctx, opts, zipWriter); err != nil {
 			return fmt.Errorf("could not iterate through objects: %w", err)
 		}
