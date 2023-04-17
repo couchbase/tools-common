@@ -30,7 +30,7 @@ pipeline {
                             gerritProjects: [
                                 [
                                     compareType: "PLAIN", disableStrictForbiddenFileVerification: false,
-                                    pattern: "tools-common", branches: [[ compareType: "PLAIN", pattern: "disabled" ]]
+                                    pattern: "tools-common", branches: [[ compareType: "PLAIN", pattern: "master" ]]
                                 ],
                             ],
                             triggerOnEvents: [
