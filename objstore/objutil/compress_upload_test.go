@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math"
 	"math/rand"
 	"regexp"
 	"testing"
@@ -14,7 +15,49 @@ import (
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/objstore/objval"
+	"github.com/couchbase/tools-common/slice"
 )
+
+const partSize = 1024
+
+// paths is a list of objects to create. This ensures we test a few different cases: objects the size of partSize, an
+// odd size (i.e. not divisable or a factor of partSize), a multiple of partSize and +/- 1.
+var paths = []struct {
+	path string
+	size int64
+}{
+	{path: "prefix/foo.txt", size: partSize},
+	{path: "prefix/1/bar.txt", size: 147},
+	{path: "prefix/1/2/baz.txt", size: 4 * partSize},
+	{path: "prefix/1/2/boo.txt", size: partSize + 1},
+	{path: "prefix/1/2/moo.txt", size: partSize - 1},
+}
+
+// setupTestClient populates a test objcli.Client with the objects in paths and returns it.
+func setupTestClient(t *testing.T) *objcli.TestClient {
+	var (
+		testData = make([]byte, 4*partSize)
+		n, err   = rand.Read(testData)
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, len(testData), n)
+
+	cli := objcli.NewTestClient(t, objval.ProviderAWS)
+
+	for _, path := range paths {
+		var (
+			buf    = make([]byte, path.size)
+			n, err = rand.Read(buf)
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, len(buf), n)
+		require.NoError(t, cli.PutObject(context.Background(), "bucket", path.path, bytes.NewReader(buf[0:path.size])))
+	}
+
+	return cli
+}
 
 func TestStripPrefix(t *testing.T) {
 	tests := []struct{ name, prefix, fullPath, expected string }{
@@ -94,42 +137,9 @@ func TestCompressUploadIterateError(t *testing.T) {
 }
 
 func TestCompressUpload(t *testing.T) {
-	const PartSize = 1024
-
-	var (
-		testData = make([]byte, 1024)
-		n, err   = rand.Read(testData)
-	)
-
-	require.NoError(t, err)
-	require.Equal(t, len(testData), n)
-
-	cli := objcli.NewTestClient(t, objval.ProviderAWS)
-
-	// Test a few different cases: objects the size of PartSize, an odd size (i.e. not divisable or a factor of PartSize)
-	// and a multiple of PartSize
-	paths := []struct {
-		path string
-		size int64
-	}{
-		{path: "prefix/foo.txt", size: PartSize},
-		{path: "prefix/1/bar.txt", size: 147},
-		{path: "prefix/1/2/baz.txt", size: 4 * PartSize},
-	}
-
-	for _, path := range paths {
-		var (
-			buf    = make([]byte, path.size)
-			n, err = rand.Read(buf)
-		)
-
-		require.NoError(t, err)
-		require.Equal(t, len(buf), n)
-		require.NoError(t, cli.PutObject(context.Background(), "bucket", path.path, bytes.NewReader(buf)))
-	}
-
+	cli := setupTestClient(t)
 	require.NoError(t, CompressObjects(CompressObjectsOptions{
-		Options:           Options{PartSize: PartSize},
+		Options:           Options{PartSize: partSize},
 		Client:            cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
@@ -157,5 +167,53 @@ func TestCompressUpload(t *testing.T) {
 		buf, err := io.ReadAll(file)
 		require.NoError(t, err)
 		require.Equal(t, cli.Buckets["bucket"][path.path].Body, buf)
+	}
+}
+
+func TestCompressUploadProgressReporting(t *testing.T) {
+	var (
+		cli = setupTestClient(t)
+
+		reports = make([]float64, 0, len(paths))
+		fn      = func(progress float64) { reports = append(reports, progress) }
+	)
+
+	require.NoError(t, CompressObjects(CompressObjectsOptions{
+		Options:                Options{PartSize: partSize},
+		Client:                 cli,
+		SourceBucket:           "bucket",
+		Prefix:                 "prefix",
+		DestinationBucket:      "bucket",
+		Destination:            "export.zip",
+		ProgressReportCallback: fn,
+	}))
+
+	var total float64
+	for _, path := range paths {
+		total += float64(path.size)
+	}
+
+	// The iteration of the objects is not defined, so we can get different progress reports every time this test is
+	// run. To work around this we ensure the difference between each progress report is equal to one of the sizes of
+	// the files.
+	objectSizes := make([]int64, len(paths))
+	for i := range paths {
+		objectSizes[i] = paths[i].size
+	}
+
+	for i, report := range reports {
+		require.Greater(t, report, 0.0)
+		require.LessOrEqual(t, report, 1.0)
+
+		diff := report
+		if i > 0 {
+			diff = report - reports[i-1]
+		}
+
+		// We need to round here to avoid precision errors.
+		size := int64(math.Round(diff * total))
+		require.Contains(t, objectSizes, size)
+
+		objectSizes = slice.Filter(objectSizes, func(e int64) bool { return e != size })
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path"
 	"regexp"
 	"strings"
@@ -24,6 +25,13 @@ import (
 // PartCompleteFunc is called once a part of the zip file has been uploaded. size is the size of the part uploaded.
 type PartCompleteFunc func(size int)
 
+// ProgressReportFunc is called every time a file has been fully downloaded during CompressUpload. progress is how far
+// into downloading every object with the path prefix we are.
+type ProgressReportFunc func(progress float64)
+
+// downloadCompleteFunc is called when an object has been downloaded. size is the number of bytes in the object.
+type downloadCompleteFunc func(size int64)
+
 // CompressObjectsOptions specifies options which configure what and how objects are compressed and uploaded.
 type CompressObjectsOptions struct {
 	Options
@@ -38,6 +46,12 @@ type CompressObjectsOptions struct {
 
 	// PartCompleteCallback is called once a part has been uploaded.
 	PartCompleteCallback PartCompleteFunc
+
+	// ProgressReportCallback is called to report how far into the CompressUpload process we are.
+	//
+	// NOTE: If provided then CompressUpload will calculate the size of all objects with the given prefix before
+	// starting the download, which may take some time.
+	ProgressReportCallback ProgressReportFunc
 
 	// SourceBucket is the bucket to compress objects from.
 	//
@@ -147,7 +161,7 @@ func download(
 }
 
 // iterate calls download on each object that matches the iterate parameters given in opts.
-func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Writer) error {
+func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Writer, cb downloadCompleteFunc) error {
 	logger := log.NewWrappedLogger(opts.Logger)
 
 	fn := func(attrs *objval.ObjectAttrs) error {
@@ -155,7 +169,15 @@ func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Wr
 			return nil
 		}
 
-		return download(ctx, opts, logger, attrs.Key, attrs.Size, zipWriter)
+		if err := download(ctx, opts, logger, attrs.Key, attrs.Size, zipWriter); err != nil {
+			return err
+		}
+
+		if cb != nil {
+			cb(attrs.Size)
+		}
+
+		return nil
 	}
 
 	err := opts.Client.IterateObjects(ctx,
@@ -245,6 +267,31 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 	return nil
 }
 
+// calculateSize calculates the total size of all objects with the given prefix.
+func calculateSize(opts CompressObjectsOptions) (int64, error) {
+	var (
+		total int64
+		fn    = func(attrs *objval.ObjectAttrs) error {
+			total += attrs.Size
+			return nil
+		}
+	)
+
+	err := opts.Client.IterateObjects(opts.Context,
+		opts.SourceBucket,
+		opts.Prefix,
+		opts.Delimiter,
+		opts.Include,
+		opts.Exclude,
+		fn,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("error whilst iterating objects: %w", err)
+	}
+
+	return total, nil
+}
+
 // CompressObjects takes an object storage prefix and a destination. It will create a zip in destination and compress
 // and upload every object with the given prefix there. Each object will be streamed from cloud storage, through a
 // ZipWriter and back to cloud storage.
@@ -256,18 +303,41 @@ func CompressObjects(opts CompressObjectsOptions) error {
 
 	opts.defaults()
 
+	var totalSize int64
+
+	if opts.ProgressReportCallback != nil {
+		var err error
+
+		totalSize, err = calculateSize(opts)
+		if err != nil {
+			return fmt.Errorf("could not calculate size of objects with path prefix: %w", err)
+		}
+	}
+
 	var (
 		r, w      = io.Pipe()
 		zipWriter = zip.NewWriter(w)
 
+		bytesDownloaded int64
+		fn              func(size int64)
+
 		pool = hofp.NewPool(hofp.Options{Context: opts.Context, Size: 2})
 	)
+
+	if opts.ProgressReportCallback != nil && totalSize != 0 {
+		fn = func(size int64) {
+			bytesDownloaded += size
+
+			progress := math.Min(float64(bytesDownloaded)/float64(totalSize), 1.0)
+			opts.ProgressReportCallback(progress)
+		}
+	}
 
 	pool.Queue(func(ctx context.Context) error { //nolint:errcheck
 		defer w.Close()
 		defer zipWriter.Close()
 
-		if err := iterate(ctx, opts, zipWriter); err != nil {
+		if err := iterate(ctx, opts, zipWriter, fn); err != nil {
 			return fmt.Errorf("could not iterate through objects: %w", err)
 		}
 
