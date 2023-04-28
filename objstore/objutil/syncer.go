@@ -107,7 +107,7 @@ func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFil
 
 	var reader ioiface.ReadAtSeeker = file
 	if s.opts.Limiter != nil {
-		reader = ratelimit.NewRateLimitedReader(ctx, reader, s.opts.Limiter)
+		reader = ratelimit.NewRateLimitedReadAtSeeker(ctx, reader, s.opts.Limiter)
 	}
 
 	opts := UploadOptions{
@@ -192,7 +192,7 @@ func (s *Syncer) downloadFile(ctx context.Context, source, destination *CloudOrF
 
 	var writer io.WriterAt = file
 	if s.opts.Limiter != nil {
-		writer = ratelimit.NewRateLimitedWriter(ctx, writer, s.opts.Limiter)
+		writer = ratelimit.NewRateLimitedWriterAt(ctx, writer, s.opts.Limiter)
 	}
 
 	opts := DownloadOptions{

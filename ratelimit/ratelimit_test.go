@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -69,38 +70,100 @@ func testReadWriter(
 	})
 }
 
-func TestRateLimitedReaderAt(t *testing.T) {
+func TestRateLimitedReadAt(t *testing.T) {
 	var (
-		limit       = rate.NewLimiter(rate.Every(interval), bufSize)
-		ctx, cancel = context.WithCancel(context.Background())
-		b           = make([]byte, 1024)
-		r           = bytes.NewReader(b)
-		rlr         = NewRateLimitedReader(ctx, r, limit)
+		limit = rate.NewLimiter(rate.Every(interval), bufSize)
+		b     = make([]byte, 1024)
+		r     = bytes.NewReader(b)
+
+		ctx1, cancel1 = context.WithCancel(context.Background())
+		RLReaderAt    = NewRateLimitedReaderAt(ctx1, r, limit)
+
+		ctx2, cancel2  = context.WithCancel(context.Background())
+		RLReadAtSeeker = NewRateLimitedReadAtSeeker(ctx2, r, limit)
 	)
 
-	testReadWriter(t, rlr.ReadAt, cancel)
+	testReadWriter(t, RLReaderAt.ReadAt, cancel1)
+	testReadWriter(t, RLReadAtSeeker.ReadAt, cancel2)
 }
 
-func TestRateLimitedReader(t *testing.T) {
+func TestRateLimitedRead(t *testing.T) {
 	var (
-		limit       = rate.NewLimiter(rate.Every(interval), bufSize)
-		ctx, cancel = context.WithCancel(context.Background())
-		b           = make([]byte, 1024)
-		r           = bytes.NewReader(b)
-		rlr         = NewRateLimitedReader(ctx, r, limit)
+		limit = rate.NewLimiter(rate.Every(interval), bufSize)
+		b     = make([]byte, 1024)
+		r     = bytes.NewReader(b)
+
+		ctx1, cancel1 = context.WithCancel(context.Background())
+		RLReader      = NewRateLimitedReader(ctx1, r, limit)
+
+		ctx2, cancel2  = context.WithCancel(context.Background())
+		RLReadAtSeeker = NewRateLimitedReadAtSeeker(ctx2, r, limit)
 	)
 
-	testReadWriter(t, func(p []byte, off int64) (int, error) { return rlr.Read(p) }, cancel)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return RLReader.Read(p) }, cancel1)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return RLReadAtSeeker.Read(p) }, cancel2)
 }
 
-func TestRateLimitedWriterAt(t *testing.T) {
+func TestRateLimitedWrite(t *testing.T) {
 	var (
-		limit       = rate.NewLimiter(rate.Every(interval), bufSize)
-		ctx, cancel = context.WithCancel(context.Background())
-		b           = make([]byte, 1024)
-		w           = aws.NewWriteAtBuffer(b)
-		rlw         = NewRateLimitedWriter(ctx, w, limit)
+		limit = rate.NewLimiter(rate.Every(interval), bufSize)
+		b     = make([]byte, 1024)
+
+		w             = bytes.NewBuffer(b)
+		ctx1, cancel1 = context.WithCancel(context.Background())
+		RLWriter      = NewRateLimitedWriter(ctx1, w, limit)
+
+		ow              = NewMockWriteAtSeeker(aws.NewWriteAtBuffer(b), 0)
+		ctx2, cancel2   = context.WithCancel(context.Background())
+		RLWriteAtSeeker = NewRateLimitedWriteAtSeeker(ctx2, ow, limit)
 	)
 
-	testReadWriter(t, rlw.WriteAt, cancel)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return RLWriter.Write(p) }, cancel1)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return RLWriteAtSeeker.Write(p) }, cancel2)
+}
+
+func TestRateLimitedWriteAt(t *testing.T) {
+	var (
+		limit = rate.NewLimiter(rate.Every(interval), bufSize)
+		b     = make([]byte, 1024)
+
+		w             = aws.NewWriteAtBuffer(b)
+		ctx1, cancel1 = context.WithCancel(context.Background())
+		RLWriterAt    = NewRateLimitedWriterAt(ctx1, w, limit)
+
+		ow              = NewMockWriteAtSeeker(w, 0)
+		ctx2, cancel2   = context.WithCancel(context.Background())
+		RLWriteAtSeeker = NewRateLimitedWriteAtSeeker(ctx2, ow, limit)
+	)
+
+	testReadWriter(t, RLWriterAt.WriteAt, cancel1)
+	testReadWriter(t, RLWriteAtSeeker.WriteAt, cancel2)
+}
+
+// An MockWriteAtSeeker maps writes at offset base to offset base+off in the underlying writer.
+type MockWriteAtSeeker struct {
+	w    io.WriterAt
+	base int64 // the original offset
+	off  int64 // the current offset
+}
+
+// NewMockWriteAtSeeker returns an OffsetWriter that writes to w starting at offset off.
+func NewMockWriteAtSeeker(w io.WriterAt, off int64) *MockWriteAtSeeker {
+	return &MockWriteAtSeeker{w, off, off}
+}
+
+func (o *MockWriteAtSeeker) Write(p []byte) (n int, err error) {
+	n, err = o.w.WriteAt(p, o.off)
+	o.off += int64(n)
+
+	return
+}
+
+func (o *MockWriteAtSeeker) WriteAt(p []byte, off int64) (n int, err error) {
+	off += o.base
+	return o.w.WriteAt(p, off)
+}
+
+func (o *MockWriteAtSeeker) Seek(_ int64, _ int) (int64, error) {
+	return 0, nil
 }
