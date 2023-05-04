@@ -95,6 +95,62 @@ func (r *RateLimitedReadAtSeeker) Seek(offset int64, whence int) (int64, error) 
 	return r.r.Seek(offset, whence)
 }
 
+// RateLimitedReadCloser will use its limiter as a rate limit on the number of bytes read.
+type RateLimitedReadCloser struct {
+	ctx     context.Context
+	r       io.ReadCloser
+	limiter *rate.Limiter
+}
+
+// NewRateLimitedReadCloser creates a new RateLimitedReadCloser which respects "limiter" in terms of the number of bytes
+// read.
+func NewRateLimitedReadCloser(ctx context.Context, r io.ReadCloser, limiter *rate.Limiter) *RateLimitedReadCloser {
+	return &RateLimitedReadCloser{ctx: ctx, r: r, limiter: limiter}
+}
+
+// Read will read into p whilst respecting the rate limit.
+func (r *RateLimitedReadCloser) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	if n <= 0 {
+		return n, err
+	}
+
+	return n, waitChunked(r.ctx, r.limiter, n)
+}
+
+// Close will close the reader
+func (r *RateLimitedReadCloser) Close() error {
+	return r.r.Close()
+}
+
+// RateLimitedReadSeeker will use its limiter as a rate limit on the number of bytes read.
+type RateLimitedReadSeeker struct {
+	ctx     context.Context
+	r       io.ReadSeeker
+	limiter *rate.Limiter
+}
+
+// NewRateLimitedReadSeeker creates a RateLimitedReadSeeker which respects "limiter" in terms of the number of bytes
+// read.
+func NewRateLimitedReadSeeker(ctx context.Context, r io.ReadSeeker, limiter *rate.Limiter) *RateLimitedReadSeeker {
+	return &RateLimitedReadSeeker{ctx: ctx, r: r, limiter: limiter}
+}
+
+// Read will read into p whilst respecting the rate limit.
+func (r *RateLimitedReadSeeker) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	if n <= 0 {
+		return n, err
+	}
+
+	return n, waitChunked(r.ctx, r.limiter, n)
+}
+
+// Seek sets the offset for the next read.
+func (r *RateLimitedReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	return r.r.Seek(offset, whence)
+}
+
 // RateLimitedWriter will use its limiter as a rate limit on the number of bytes written.
 type RateLimitedWriter struct {
 	ctx     context.Context
@@ -202,6 +258,8 @@ var (
 	_ io.Reader            = (*RateLimitedReader)(nil)
 	_ io.ReaderAt          = (*RateLimitedReaderAt)(nil)
 	_ ioiface.ReadAtSeeker = (*RateLimitedReadAtSeeker)(nil)
+	_ io.ReadCloser        = (*RateLimitedReadCloser)(nil)
+	_ io.ReadSeeker        = (*RateLimitedReadSeeker)(nil)
 
 	_ io.Writer             = (*RateLimitedWriter)(nil)
 	_ io.WriterAt           = (*RateLimitedWriterAt)(nil)

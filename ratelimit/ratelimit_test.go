@@ -90,18 +90,27 @@ func TestRateLimitedReadAt(t *testing.T) {
 func TestRateLimitedRead(t *testing.T) {
 	var (
 		limit = rate.NewLimiter(rate.Every(interval), bufSize)
-		b     = make([]byte, 1024)
+		b     = make([]byte, 2048)
 		r     = bytes.NewReader(b)
+		rc    = NewMockReadCloser(r)
 
-		ctx1, cancel1 = context.WithCancel(context.Background())
-		RLReader      = NewRateLimitedReader(ctx1, r, limit)
+		readerCtx, readerCancel = context.WithCancel(context.Background())
+		rlReader                = NewRateLimitedReader(readerCtx, r, limit)
 
-		ctx2, cancel2  = context.WithCancel(context.Background())
-		RLReadAtSeeker = NewRateLimitedReadAtSeeker(ctx2, r, limit)
+		readAtSeekerCtx, readAtSeekerCancel = context.WithCancel(context.Background())
+		rlReadAtSeeker                      = NewRateLimitedReadAtSeeker(readAtSeekerCtx, r, limit)
+
+		readCloserCtx, readCloserCancel = context.WithCancel(context.Background())
+		rlReadCloser                    = NewRateLimitedReadCloser(readCloserCtx, rc, limit)
+
+		readSeekerCtx, readSeekerCancel = context.WithCancel(context.Background())
+		rlReadSeeker                    = NewRateLimitedReadSeeker(readSeekerCtx, r, limit)
 	)
 
-	testReadWriter(t, func(p []byte, off int64) (int, error) { return RLReader.Read(p) }, cancel1)
-	testReadWriter(t, func(p []byte, off int64) (int, error) { return RLReadAtSeeker.Read(p) }, cancel2)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return rlReader.Read(p) }, readerCancel)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return rlReadAtSeeker.Read(p) }, readAtSeekerCancel)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return rlReadCloser.Read(p) }, readCloserCancel)
+	testReadWriter(t, func(p []byte, off int64) (int, error) { return rlReadSeeker.Read(p) }, readSeekerCancel)
 }
 
 func TestRateLimitedWrite(t *testing.T) {
@@ -140,7 +149,23 @@ func TestRateLimitedWriteAt(t *testing.T) {
 	testReadWriter(t, RLWriteAtSeeker.WriteAt, cancel2)
 }
 
-// An MockWriteAtSeeker maps writes at offset base to offset base+off in the underlying writer.
+// MockReadCloser implements io.ReadCloser by accepting an io.Reader and mocking the Close method.
+// It should only be used for testing.
+type MockReadCloser struct {
+	io.Reader
+}
+
+// NewMockReadCloser returns a MockReadCloser.
+func NewMockReadCloser(r io.Reader) *MockReadCloser {
+	return &MockReadCloser{r}
+}
+
+// Close is mocked i.e. it doesn't do anything
+func (rc *MockReadCloser) Close() error {
+	return nil
+}
+
+// MockWriteAtSeeker maps writes at offset base to offset base+off in the underlying writer.
 type MockWriteAtSeeker struct {
 	w    io.WriterAt
 	base int64 // the original offset
