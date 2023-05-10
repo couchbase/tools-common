@@ -17,6 +17,7 @@ import (
 
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
+	"github.com/couchbase/tools-common/httptools"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/testutil"
@@ -58,7 +59,7 @@ func TestNewClientWithTransportDefaults(t *testing.T) {
 
 	defer client.Close()
 
-	transport := client.client.Transport.(*http.Transport)
+	transport := client.requestClient.GetBaseHTTPClient().Transport.(*http.Transport)
 
 	require.Zero(t, transport.ExpectContinueTimeout)
 	require.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout)
@@ -457,7 +458,7 @@ cCVg2wGSe3uR/Ce3aC3Tr1g=
 	_, err = newTestClient(cluster, true)
 	require.Error(t, err)
 
-	var errUnknownX509Error *UnknownX509Error
+	var errUnknownX509Error *httptools.UnknownX509Error
 
 	require.ErrorAs(t, err, &errUnknownX509Error)
 }
@@ -472,14 +473,16 @@ func TestClientExecute(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
-	expected := &Response{
+	expected := &httptools.Response{
 		StatusCode: http.StatusOK,
 		Body:       []byte("body"),
 	}
@@ -504,14 +507,16 @@ func TestClientExecuteWithOverrideHost(t *testing.T) {
 	defer server.Close()
 
 	request := &Request{
-		Host:               server.URL,
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusTeapot,
-		Method:             http.MethodGet,
+		Request: httptools.Request{
+			Host:               server.URL,
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusTeapot,
+			Method:             http.MethodGet,
+		},
 	}
 
-	expected := &Response{
+	expected := &httptools.Response{
 		StatusCode: http.StatusTeapot,
 		Body:       make([]byte, 0),
 	}
@@ -538,11 +543,13 @@ func TestClientExecuteRetryWithCCUpdate(t *testing.T) {
 			defer cluster.Close()
 
 			request := &Request{
-				ContentType:        ContentTypeURLEncoded,
-				Endpoint:           "/test",
-				ExpectedStatusCode: http.StatusOK,
-				Method:             http.MethodGet,
-				Service:            ServiceManagement,
+				Request: httptools.Request{
+					ContentType:        httptools.ContentTypeURLEncoded,
+					Endpoint:           "/test",
+					ExpectedStatusCode: http.StatusOK,
+					Method:             http.MethodGet,
+				},
+				Service: ServiceManagement,
 			}
 
 			client, err := newTestClient(cluster, disableCCP)
@@ -551,7 +558,7 @@ func TestClientExecuteRetryWithCCUpdate(t *testing.T) {
 
 			_, err = client.Execute(request)
 
-			var retriesExhausted *RetriesExhaustedError
+			var retriesExhausted *httptools.RetriesExhaustedError
 
 			require.ErrorAs(t, err, &retriesExhausted)
 			require.Equal(t, int64(3), client.authProvider.manager.config.Revision)
@@ -571,11 +578,13 @@ func TestClientExecuteRetryResponseWithCCUpdate(t *testing.T) {
 			defer cluster.Close()
 
 			request := &Request{
-				ContentType:        ContentTypeURLEncoded,
-				Endpoint:           "/test",
-				ExpectedStatusCode: http.StatusOK,
-				Method:             http.MethodGet,
-				Service:            ServiceManagement,
+				Request: httptools.Request{
+					ContentType:        httptools.ContentTypeURLEncoded,
+					Endpoint:           "/test",
+					ExpectedStatusCode: http.StatusOK,
+					Method:             http.MethodGet,
+				},
+				Service: ServiceManagement,
 			}
 
 			client, err := newTestClient(cluster, disableCCP)
@@ -584,7 +593,7 @@ func TestClientExecuteRetryResponseWithCCUpdate(t *testing.T) {
 
 			_, err = client.Execute(request)
 
-			var retriesExhausted *RetriesExhaustedError
+			var retriesExhausted *httptools.RetriesExhaustedError
 
 			require.ErrorAs(t, err, &retriesExhausted)
 			require.Equal(t, int64(3), client.authProvider.manager.config.Revision)
@@ -613,12 +622,14 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:          ContentTypeURLEncoded,
-		Endpoint:             "/test",
-		ExpectedStatusCode:   http.StatusOK,
-		Method:               http.MethodGet,
-		NoRetryOnStatusCodes: []int{http.StatusGatewayTimeout},
-		Service:              ServiceManagement,
+		Request: httptools.Request{
+			ContentType:          httptools.ContentTypeURLEncoded,
+			Endpoint:             "/test",
+			ExpectedStatusCode:   http.StatusOK,
+			Method:               http.MethodGet,
+			NoRetryOnStatusCodes: []int{http.StatusGatewayTimeout},
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -628,10 +639,10 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 
 	_, err = client.Execute(request)
 
-	var unexpectedStatus *UnexpectedStatusCodeError
+	var unexpectedStatus *httptools.UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
-	require.Equal(t, []byte("Hello, World!"), unexpectedStatus.body)
+	require.Equal(t, []byte("Hello, World!"), unexpectedStatus.Body)
 	require.Equal(t, 1, attempts)
 }
 
@@ -645,12 +656,14 @@ func TestClientExecuteWithModeLoopback(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:          ContentTypeURLEncoded,
-		Endpoint:             "/test",
-		ExpectedStatusCode:   http.StatusOK,
-		Method:               http.MethodGet,
-		NoRetryOnStatusCodes: []int{http.StatusGatewayTimeout},
-		Service:              ServiceManagement,
+		Request: httptools.Request{
+			ContentType:          httptools.ContentTypeURLEncoded,
+			Endpoint:             "/test",
+			ExpectedStatusCode:   http.StatusOK,
+			Method:               http.MethodGet,
+			NoRetryOnStatusCodes: []int{http.StatusGatewayTimeout},
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := NewClient(ClientOptions{
@@ -689,14 +702,16 @@ func TestClientExecuteWithDefaultRetries(t *testing.T) {
 			defer cluster.Close()
 
 			request := &Request{
-				ContentType:        ContentTypeURLEncoded,
-				Endpoint:           "/test",
-				ExpectedStatusCode: http.StatusOK,
-				Method:             http.MethodGet,
-				Service:            ServiceManagement,
+				Request: httptools.Request{
+					ContentType:        httptools.ContentTypeURLEncoded,
+					Endpoint:           "/test",
+					ExpectedStatusCode: http.StatusOK,
+					Method:             http.MethodGet,
+				},
+				Service: ServiceManagement,
 			}
 
-			expected := &Response{
+			expected := &httptools.Response{
 				StatusCode: http.StatusOK,
 				Body:       []byte("body"),
 			}
@@ -727,15 +742,17 @@ func TestClientExecuteWithRetries(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		RetryOnStatusCodes: []int{http.StatusTooEarly},
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+			RetryOnStatusCodes: []int{http.StatusTooEarly},
+		},
+		Service: ServiceManagement,
 	}
 
-	expected := &Response{
+	expected := &httptools.Response{
 		StatusCode: http.StatusOK,
 		Body:       []byte("body"),
 	}
@@ -805,14 +822,16 @@ func TestClientExecuteWithRetryAfter(t *testing.T) {
 			defer cluster.Close()
 
 			request := &Request{
-				ContentType:        ContentTypeURLEncoded,
-				Endpoint:           "/test",
-				ExpectedStatusCode: http.StatusOK,
-				Method:             http.MethodGet,
-				Service:            ServiceManagement,
+				Request: httptools.Request{
+					ContentType:        httptools.ContentTypeURLEncoded,
+					Endpoint:           "/test",
+					ExpectedStatusCode: http.StatusOK,
+					Method:             http.MethodGet,
+				},
+				Service: ServiceManagement,
 			}
 
-			expected := &Response{
+			expected := &httptools.Response{
 				StatusCode: http.StatusOK,
 				Body:       make([]byte, 0),
 			}
@@ -842,14 +861,16 @@ func TestClientExecuteStandardError(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           EndpointPools,
-		ExpectedStatusCode: http.StatusTeapot, // We will not get this status code, so we should error out
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           EndpointPools,
+			ExpectedStatusCode: http.StatusTeapot, // We will not get this status code, so we should error out
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
-	expected := &Response{
+	expected := &httptools.Response{
 		StatusCode: http.StatusOK,
 		Body:       []byte(`{"isEnterprise":false,"uuid":"","isDeveloperPreview":false}` + "\n"),
 	}
@@ -863,7 +884,7 @@ func TestClientExecuteStandardError(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, expected, actual)
 
-	var unexpectedStatus *UnexpectedStatusCodeError
+	var unexpectedStatus *httptools.UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
 }
@@ -878,12 +899,14 @@ func TestClientExecuteWithNonIdepotentRequest(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodPost,
-		RetryOnStatusCodes: []int{http.StatusTooEarly},
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodPost,
+			RetryOnStatusCodes: []int{http.StatusTooEarly},
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -895,8 +918,8 @@ func TestClientExecuteWithNonIdepotentRequest(t *testing.T) {
 	require.Error(t, err)
 
 	var (
-		retriesExhausted *RetriesExhaustedError
-		unexpectedStatus *UnexpectedStatusCodeError
+		retriesExhausted *httptools.RetriesExhaustedError
+		unexpectedStatus *httptools.UnexpectedStatusCodeError
 	)
 
 	require.False(t, errors.As(err, &retriesExhausted)) // testify doesn't appear to have a 'NotErrorAs' function...
@@ -913,12 +936,14 @@ func TestClientExecuteWithRetriesExhausted(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		RetryOnStatusCodes: []int{http.StatusTooEarly},
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+			RetryOnStatusCodes: []int{http.StatusTooEarly},
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -929,7 +954,7 @@ func TestClientExecuteWithRetriesExhausted(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var retriesExhausted *RetriesExhaustedError
+	var retriesExhausted *httptools.RetriesExhaustedError
 
 	require.ErrorAs(t, err, &retriesExhausted)
 }
@@ -944,11 +969,13 @@ func TestClientExecuteSpecificServiceNotAvailable(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceAnalytics,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceAnalytics,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -974,11 +1001,13 @@ func TestClientExecuteAuthError(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -989,7 +1018,7 @@ func TestClientExecuteAuthError(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var unauthorized *AuthenticationError
+	var unauthorized *httptools.AuthenticationError
 
 	require.ErrorAs(t, err, &unauthorized)
 }
@@ -1004,11 +1033,13 @@ func TestClientExecuteInternalServerError(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1019,10 +1050,10 @@ func TestClientExecuteInternalServerError(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var internalServerError *InternalServerError
+	var internalServerError *httptools.InternalServerError
 
 	require.ErrorAs(t, err, &internalServerError)
-	require.Equal(t, []byte("response body"), internalServerError.body)
+	require.Equal(t, []byte("response body"), internalServerError.Body)
 }
 
 func TestClientExecute404Status(t *testing.T) {
@@ -1035,11 +1066,13 @@ func TestClientExecute404Status(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1050,7 +1083,7 @@ func TestClientExecute404Status(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var endpointNotFound *EndpointNotFoundError
+	var endpointNotFound *httptools.EndpointNotFoundError
 
 	require.ErrorAs(t, err, &endpointNotFound)
 }
@@ -1065,11 +1098,13 @@ func TestClientExecuteUnexpectedEOF(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1080,7 +1115,7 @@ func TestClientExecuteUnexpectedEOF(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var unexpectedEOB *UnexpectedEndOfBodyError
+	var unexpectedEOB *httptools.UnexpectedEndOfBodyError
 
 	require.ErrorAs(t, err, &unexpectedEOB)
 }
@@ -1095,11 +1130,13 @@ func TestClientExecuteSocketClosedInFlight(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1110,7 +1147,7 @@ func TestClientExecuteSocketClosedInFlight(t *testing.T) {
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
-	var socketClosedInFlight *SocketClosedInFlightError
+	var socketClosedInFlight *httptools.SocketClosedInFlightError
 
 	require.ErrorAs(t, err, &socketClosedInFlight)
 }
@@ -1144,11 +1181,13 @@ func TestClientExecuteStream(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1185,11 +1224,13 @@ func TestClientExecuteStreamNoTimeout(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1224,12 +1265,14 @@ func TestClientExecuteStreamAcceptMinusOneTimeout(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
-		Timeout:            -1,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+			Timeout:            -1,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1257,12 +1300,14 @@ func TestClientExecuteStreamDoNotAcceptTimeout(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
-		Timeout:            time.Second,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+			Timeout:            time.Second,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1284,11 +1329,13 @@ func TestClientExecuteStreamCloseOnContextCancel(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1327,11 +1374,13 @@ func TestClientExecuteStreamWithHijack(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1365,11 +1414,13 @@ func TestClientExecuteStreamWithBinaryPayload(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1404,11 +1455,13 @@ func TestClientExecuteStreamWithError(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1420,7 +1473,7 @@ func TestClientExecuteStreamWithError(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, stream)
 
-	var unauthorized *AuthenticationError
+	var unauthorized *httptools.AuthenticationError
 
 	require.ErrorAs(t, err, &unauthorized)
 }
@@ -1435,11 +1488,13 @@ func TestClientExecuteStreamWithUnexpectedStatusCode(t *testing.T) {
 	defer cluster.Close()
 
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           "/test",
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           "/test",
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	client, err := newTestClient(cluster, true)
@@ -1451,7 +1506,7 @@ func TestClientExecuteStreamWithUnexpectedStatusCode(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, stream)
 
-	var unexpectedStatus *UnexpectedStatusCodeError
+	var unexpectedStatus *httptools.UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
 }
@@ -1886,16 +1941,26 @@ func TestClientValidHost(t *testing.T) {
 			cluster := NewTestCluster(t, TestClusterOptions{UUID: uuid, Handlers: handlers})
 			defer cluster.Close()
 
+			logger := log.StdoutLogger{}
+
 			client := &Client{
-				client: &http.Client{},
 				authProvider: NewAuthProvider(AuthProviderOptions{
 					&connstr.ResolvedConnectionString{},
 					&aprov.Static{Username: "username", Password: "password"},
 					log.StdoutLogger{},
 				}),
 				clusterInfo: test.info,
-				logger:      log.NewWrappedLogger(log.StdoutLogger{}),
+				logger:      log.NewWrappedLogger(logger),
 			}
+
+			var err error
+			client.requestClient = httptools.NewClient(
+				&http.Client{},
+				client.authProvider,
+				logger,
+				httptools.ClientOptions{},
+			)
+			require.NoError(t, err)
 
 			valid, err := client.validHost(fmt.Sprintf("http://localhost:%d", cluster.Port()))
 			require.NoError(t, err)
@@ -1916,9 +1981,9 @@ func TestClientGetWithRequestError(t *testing.T) {
 
 	defer client.Close()
 
-	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), Endpoint("/test"))
+	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), httptools.Endpoint("/test"))
 
-	var socketClosedInFlight *SocketClosedInFlightError
+	var socketClosedInFlight *httptools.SocketClosedInFlightError
 
 	require.ErrorAs(t, err, &socketClosedInFlight)
 }
@@ -1935,9 +2000,9 @@ func TestClientGetWithUnexpectedStatusCode(t *testing.T) {
 
 	defer client.Close()
 
-	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), Endpoint("/test"))
+	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), httptools.Endpoint("/test"))
 
-	var unexpectedStatus *UnexpectedStatusCodeError
+	var unexpectedStatus *httptools.UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
 }
@@ -1954,44 +2019,49 @@ func TestClientDoRequestWithCustomTimeout(t *testing.T) {
 	})
 	defer cluster.Close()
 
-	client, err := newTestClient(cluster, true)
-	require.NoError(t, err)
+	type test struct {
+		desc          string
+		clientTimeout time.Duration
+		customTimeout time.Duration
+	}
 
-	defer client.Close()
+	tests := []test{
+		{
+			desc:          "custom larger than client",
+			clientTimeout: 100 * time.Millisecond,
+			customTimeout: 800 * time.Millisecond,
+		},
+		{
+			desc:          "custom smaller than client",
+			clientTimeout: 800 * time.Millisecond,
+			customTimeout: 100 * time.Millisecond,
+		},
+	}
 
-	t.Run("custom larger than client", func(t *testing.T) {
-		client.client.Timeout = 100 * time.Millisecond
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			os.Setenv("CB_REST_CLIENT_TIMEOUT_SECS", tc.clientTimeout.String())
+			client, err := newTestClient(cluster, true)
+			require.NoError(t, err)
 
-		res, err := client.Execute(
-			&Request{
-				Method:             http.MethodGet,
-				Endpoint:           "/test",
-				ExpectedStatusCode: http.StatusOK,
-				Service:            ServiceManagement,
-				Timeout:            800 * time.Millisecond,
-			},
-		)
+			defer client.Close()
 
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, res.StatusCode)
-	})
+			res, err := client.Execute(
+				&Request{
+					Request: httptools.Request{
+						Method:             http.MethodGet,
+						Endpoint:           "/test",
+						ExpectedStatusCode: http.StatusOK,
+						Timeout:            tc.customTimeout,
+					},
+					Service: ServiceManagement,
+				},
+			)
 
-	t.Run("custom smaller than client", func(t *testing.T) {
-		client.client.Timeout = 800 * time.Millisecond
-
-		res, err := client.Execute(
-			&Request{
-				Method:             http.MethodGet,
-				Endpoint:           "/test",
-				ExpectedStatusCode: http.StatusOK,
-				Service:            ServiceManagement,
-				Timeout:            100 * time.Millisecond,
-			},
-		)
-
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, res.StatusCode)
-	})
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, res.StatusCode)
+		})
+	}
 }
 
 func TestClientWaitUntilUpdated(t *testing.T) {

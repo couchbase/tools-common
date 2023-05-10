@@ -1,4 +1,4 @@
-package cbrest
+package httptools
 
 import (
 	"testing"

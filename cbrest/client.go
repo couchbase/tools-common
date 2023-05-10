@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,13 +19,10 @@ import (
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/connstr"
 	"github.com/couchbase/tools-common/envvar"
-	"github.com/couchbase/tools-common/errutil"
+	"github.com/couchbase/tools-common/httptools"
 	"github.com/couchbase/tools-common/log"
-	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/retry"
-
-	"golang.org/x/exp/slices"
 )
 
 // NOTE: Naming conventions for requests/responses in this file, are as follows:
@@ -60,14 +58,13 @@ type ClientOptions struct {
 
 // Client is a REST client used to retrieve/send information to/from a Couchbase Cluster.
 type Client struct {
-	client       *http.Client
-	authProvider *AuthProvider
-	clusterInfo  *clusterInfo
+	requestClient *httptools.Client
+	authProvider  *AuthProvider
+	clusterInfo   *clusterInfo
 
 	connectionMode ConnectionMode
 
-	pollTimeout    time.Duration
-	requestRetries int
+	pollTimeout time.Duration
 
 	reqResLogLevel log.Level
 
@@ -166,14 +163,26 @@ func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 
 	// Added nil ClusterInfo so that it can be populated later if needed.
 	client := &Client{
-		client:         newHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, timeouts)),
 		authProvider:   NewAuthProvider(authProviderOptions),
 		connectionMode: options.ConnectionMode,
 		pollTimeout:    pollTimeout,
-		requestRetries: requestRetries,
 		reqResLogLevel: options.ReqResLogLevel,
 		clusterInfo:    &clusterInfo{},
 		logger:         logger,
+	}
+
+	client.requestClient = httptools.NewClient(
+		httptools.NewHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, timeouts)),
+		client.authProvider.provider,
+		options.Logger,
+		httptools.ClientOptions{
+			RequestRetries: requestRetries,
+			ReqResLogLevel: client.reqResLogLevel,
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client with retries: %w", err)
 	}
 
 	err = client.bootstrap()
@@ -190,8 +199,8 @@ func (c *Client) bootstrap() error {
 	// for successive calls until we run out of possible hosts (at which point we exit having failed to bootstrap).
 	var (
 		hostFunc          = c.authProvider.bootstrapHostFunc()
-		errAuthentication *AuthenticationError
-		errAuthorization  *AuthorizationError
+		errAuthentication *httptools.AuthenticationError
+		errAuthorization  *httptools.AuthorizationError
 	)
 
 	for {
@@ -210,9 +219,11 @@ func (c *Client) bootstrap() error {
 			break
 		}
 
+		err = handleError(err)
+
 		var (
 			errUnknownAuthority *UnknownAuthorityError
-			errUnknownX509Error *UnknownX509Error
+			errUnknownX509Error *httptools.UnknownX509Error
 		)
 
 		// For security reasons, return immediately if the user is connecting using TLS and we've received an x509 error
@@ -374,33 +385,39 @@ func (c *Client) validHost(host string) (bool, error) {
 
 // get is similar to the public 'Execute' function, however, it is meant only to be used internally is less flexible and
 // doesn't support automatic retries.
-func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
+func (c *Client) get(host string, endpoint httptools.Endpoint) ([]byte, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), defaultInternalRequestTimeout)
 	defer cancelFunc()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, host+string(endpoint), nil)
+	request := &httptools.Request{
+		Host:               host,
+		Endpoint:           endpoint,
+		Method:             http.MethodGet,
+		ExpectedStatusCode: http.StatusOK,
+	}
+
+	response, err := c.requestClient.ExecuteNoRetries(ctx, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, handleError(err)
 	}
 
-	setAuthHeaders(host, c.authProvider, req)
+	return response.Body, nil
+}
 
-	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0) //nolint:bodyclose
-	if err != nil {
-		return nil, handleRequestError(req, err) // Purposefully not wrapped
+// handleError takes an error we receive from httptools and wraps it if it is of a specific type. Currently we only
+// wrap x509.UnknownAuthorityError to provide a user friendly error message.
+func handleError(err error) error {
+	if err == nil {
+		return nil
 	}
-	defer c.cleanupResp(resp) //nolint:wsl
-
-	body, err := readBody(http.MethodGet, endpoint, resp.Body, resp.ContentLength)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+	// If we received and unknown authority error, wrap it with our informative error explaining the alternatives
+	// available to the user.
+	var unknownAuth x509.UnknownAuthorityError
+	if errors.As(err, &unknownAuth) {
+		return &UnknownAuthorityError{inner: err}
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, handleResponseError(http.MethodGet, endpoint, resp.StatusCode, body)
-	}
-
-	return body, nil
+	return err
 }
 
 // unmarshalCC is a utility function which handles unmarshalling the cluster config response whilst cleaning
@@ -473,7 +490,7 @@ func (c *Client) PollTimeout() time.Duration {
 
 // RequestRetries returns the number of times a request will be retried for known failure cases.
 func (c *Client) RequestRetries() int {
-	return c.requestRetries
+	return c.requestClient.RequestRetries()
 }
 
 // Nodes returns a copy of the slice of all the nodes in the cluster.
@@ -499,31 +516,20 @@ func (c *Client) AltAddr() bool {
 
 // Execute the given request to completion reading the entire response body whilst honoring request level
 // retries/timeout.
-func (c *Client) Execute(request *Request) (*Response, error) {
+func (c *Client) Execute(request *Request) (*httptools.Response, error) {
 	return c.ExecuteWithContext(context.Background(), request)
 }
 
 // ExecuteWithContext the given request to completion, using the provided context, reading the entire response body
 // whilst honoring request level retries/timeout.
-func (c *Client) ExecuteWithContext(ctx context.Context, request *Request) (*Response, error) {
-	resp, err := c.Do(ctx, request) //nolint:bodyclose
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
+func (c *Client) ExecuteWithContext(ctx context.Context, request *Request) (*httptools.Response, error) {
+	retryCustomize := &CustomRetry{
+		client:  c,
+		request: request,
 	}
-	defer c.cleanupResp(resp) //nolint:wsl
+	httpClientResponse, err := c.requestClient.ExecuteWithRetries(ctx, &request.Request, retryCustomize)
 
-	response := &Response{StatusCode: resp.StatusCode}
-
-	response.Body, err = readBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
-	if err != nil {
-		return response, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if response.StatusCode == request.ExpectedStatusCode {
-		return response, nil
-	}
-
-	return response, handleResponseError(request.Method, request.Endpoint, response.StatusCode, response.Body)
+	return httpClientResponse, handleError(err)
 }
 
 // ExecuteStream executes the given request, returning a read only channel which can be used to read updates from a
@@ -562,14 +568,14 @@ func (c *Client) ExecuteStreamWithContext(ctx context.Context, request *Request)
 	}
 
 	// Received a valid response, but with the wrong status code, ensure we drain and close the response body
-	defer c.cleanupResp(resp)
+	defer c.requestClient.CleanupResp(resp)
 
-	body, err := readBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
+	body, err := httptools.ReadBody(request.Method, request.Endpoint, resp.Body, resp.ContentLength)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return nil, handleResponseError(request.Method, request.Endpoint, resp.StatusCode, body)
+	return nil, httptools.HandleResponseError(request.Method, request.Endpoint, resp.StatusCode, body)
 }
 
 // beginStream constructs a stream, and kicks off a goroutine to wait for, and process mutations.
@@ -587,7 +593,7 @@ func (c *Client) beginStream(ctx *retry.Context, request *Request, resp *http.Re
 // stream processes payloads from a streaming endpoint, dispatching them to the provided channel.
 func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Response, stream chan<- StreamingResponse) {
 	// Ensure the response is always drained, and closed and that the response stream is always closed
-	defer func() { c.cleanupResp(resp); close(stream) }()
+	defer func() { c.requestClient.CleanupResp(resp); close(stream) }()
 
 	var (
 		reader = bufio.NewReader(resp.Body)
@@ -637,119 +643,12 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 //
 // NOTE: If the returned error is nil, the Response will contain a non-nil Body which the caller is expected to close.
 func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, error) {
-	shouldRetry := func(ctx *retry.Context, payload any, err error) bool {
-		if resp := payload.(*http.Response); resp != nil {
-			return c.shouldRetryWithResponse(ctx, request, resp)
-		}
-
-		return c.shouldRetryWithError(ctx, request, err)
+	retryCustomize := &CustomRetry{
+		client:  c,
+		request: request,
 	}
 
-	logRetry := func(ctx *retry.Context, payload any, err error) {
-		msg := fmt.Sprintf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s'", ctx.Attempt(), request.Method,
-			request.Endpoint)
-
-		if err != nil {
-			msg = fmt.Sprintf("%s: which failed due to error: %s", msg, err)
-		} else {
-			msg = fmt.Sprintf("%s: which failed with status code %d", msg, payload.(*http.Response).StatusCode)
-		}
-
-		// We don't log at error level because we expect some requests to fail and be explicitly handled by the caller
-		// for example when checking if a bucket exists.
-		c.logger.Warnf(msg)
-	}
-
-	cleanup := func(payload any) {
-		resp := payload.(*http.Response)
-		if resp == nil {
-			return
-		}
-
-		c.cleanupResp(resp)
-	}
-
-	retryer := retry.NewRetryer(retry.RetryerOptions{
-		MaxRetries:  c.requestRetries,
-		ShouldRetry: shouldRetry,
-		Log:         logRetry,
-		Cleanup:     cleanup,
-	})
-
-	payload, err := retryer.DoWithContext(
-		ctx,
-		func(ctx *retry.Context) (any, error) { return c.do(ctx, request) }, //nolint:bodyclose
-	)
-
-	resp := payload.(*http.Response)
-
-	if err == nil || (resp != nil && resp.StatusCode == request.ExpectedStatusCode) {
-		return resp, err
-	}
-
-	// The request failed, meaning the response won't be returned to the user, ensure it's cleaned up
-	defer c.cleanupResp(resp)
-
-	// Retries exhausted, convert the error into something more informative
-	if retry.IsRetriesExhausted(err) {
-		err = &RetriesExhaustedError{retries: c.requestRetries, err: enhanceError(errors.Unwrap(err), request, resp)}
-	}
-
-	return nil, err
-}
-
-// shouldRetryWithError returns a boolean indicating whether the given error is retryable.
-func (c *Client) shouldRetryWithError(ctx *retry.Context, request *Request, err error) bool {
-	c.logger.Warnf("(REST) (Attempt %d) (%s) Request to endpoint '%s' failed due to error: %s", ctx.Attempt(),
-		request.Method, request.Endpoint, err)
-
-	if !shouldRetry(err) {
-		return false
-	}
-
-	// We always update the cluster config after a failed request, since some connection failures may be due to an
-	// attempt to address a node which is no longer a member of the cluster or even running Couchbase Server. For
-	// example, the 'connection refused' error.
-	c.waitUntilUpdated(ctx)
-
-	return true
-}
-
-// shouldRetryWithResponse returns a boolean indicating whether the given request is retryable.
-//
-// NOTE: When CCP is enabled, this function may block until the client has the latest available cluster config.
-func (c *Client) shouldRetryWithResponse(ctx *retry.Context, request *Request, resp *http.Response) bool {
-	// We've got our expected status code, don't retry
-	if resp.StatusCode == request.ExpectedStatusCode {
-		return false
-	}
-
-	c.logger.Warnf("(REST) (Attempt %d) (%s) Request to endpoint '%s' failed with status code %d", ctx.Attempt(),
-		request.Method, request.Endpoint, resp.StatusCode)
-
-	// Either this request can't be retried, or the user has explicitly stated that they don't want this status code
-	// retried, don't retry.
-	if !request.IsIdempotent() || slices.Contains(request.NoRetryOnStatusCodes, resp.StatusCode) {
-		return false
-	}
-
-	var (
-		updateCC = slices.Contains([]int{http.StatusUnauthorized}, resp.StatusCode)
-		retry    = updateCC || netutil.IsTemporaryFailure(resp.StatusCode) ||
-			slices.Contains(request.RetryOnStatusCodes, resp.StatusCode)
-	)
-
-	if !retry {
-		return false
-	}
-
-	if updateCC {
-		c.waitUntilUpdated(ctx)
-	}
-
-	waitForRetryAfter(resp)
-
-	return true
+	return c.requestClient.Do(ctx, &request.Request, retryCustomize)
 }
 
 // waitUntilUpdated blocks the calling goroutine until the cluster config has been updated.
@@ -776,56 +675,6 @@ func (c *Client) waitUntilUpdated(ctx context.Context) {
 	if err != nil {
 		c.logger.Warnf("(REST) Failed to update cluster config, will retry: %v", err)
 	}
-}
-
-// do is a convenience which prepares then performs the provided request.
-func (c *Client) do(ctx *retry.Context, request *Request) (*http.Response, error) {
-	prep, err := c.prepare(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare request: %w", err)
-	}
-
-	resp, err := c.perform(ctx, prep, c.reqResLogLevel, request.Timeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform request: %w", err)
-	}
-
-	return resp, nil
-}
-
-// prepare converts the request into a raw HTTP request which can be dispatched to the cluster. Uses the same context
-// meaning the request timeout is not reset by retries.
-func (c *Client) prepare(ctx *retry.Context, request *Request) (*http.Request, error) {
-	// Get the fully qualified address to the node that we are sending this request to
-	host, err := c.serviceHostForRequest(request, ctx.Attempt()-1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get host for service '%s': %w", request.Service, err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, string(request.Method), host+string(request.Endpoint),
-		bytes.NewReader(request.Body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// If we received one or more non-nil query parameters ensure that they will be postfixed to the request URL.
-	if len(request.QueryParameters) != 0 {
-		req.URL.RawQuery = request.QueryParameters.Encode()
-	}
-
-	// Using 'Set' overwrites an existing values set in the header, set these values first to that the settings below
-	// take precedence.
-	for key, value := range request.Header {
-		req.Header.Set(key, value)
-	}
-
-	setAuthHeaders(host, c.authProvider, req)
-
-	// Set the content type for the request body. Note that we don't default to a value e.g. if must be set for every
-	// request otherwise the string zero value will be used.
-	req.Header.Set("Content-Type", string(request.ContentType))
-
-	return req, nil
 }
 
 // serviceHostForRequest returns the service host that this request should be dispatched too.
@@ -858,35 +707,6 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 	return "http://localhost:" + parsed.Port(), nil
 }
 
-// perform synchronously executes the provided request returning the response and any error that occurred during the
-// process.
-func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
-	timeout time.Duration,
-) (*http.Response, error) {
-	c.logger.Log(level, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", ctx.Attempt(), req.Method, req.URL)
-
-	client := c.client
-
-	// We only use the custom timeout if it is bigger than the client one. This is so that it can be overridden via
-	// environmental variables.
-	if timeout == -1 || timeout > client.Timeout {
-		client = newHTTPClient(maths.Max(0, timeout), client.Transport)
-	}
-
-	resp, err := client.Do(req)
-	if err == nil {
-		c.logger.Log(level, "(REST) (Attempt %d) (%s) (%d) Received response from '%s'", ctx.Attempt(), req.Method,
-			resp.StatusCode, req.URL)
-
-		return resp, nil
-	}
-
-	c.logger.Errorf("(REST) (Attempt %d) (%s) Failed to perform request to '%s': %s", ctx.Attempt(), req.Method,
-		req.URL, err)
-
-	return nil, handleRequestError(req, err)
-}
-
 // GetServiceHost retrieves the address for a single node in the cluster which is running the provided service.
 func (c *Client) GetServiceHost(service Service) (string, error) {
 	return c.serviceHost(service, 0)
@@ -917,22 +737,4 @@ func (c *Client) Close() {
 
 	c.ctx = nil
 	c.cancelFunc = nil
-}
-
-// cleanupResp drains the response body and ensures it's closed.
-func (c *Client) cleanupResp(resp *http.Response) {
-	if resp == nil {
-		return
-	}
-
-	defer resp.Body.Close()
-
-	_, err := io.Copy(io.Discard, resp.Body)
-	if err == nil ||
-		errors.Is(err, http.ErrBodyReadAfterClose) ||
-		errutil.Contains(err, "http: read on closed response body") {
-		return
-	}
-
-	c.logger.Warnf("(REST) Failed to drain response body due to unexpected error: %s", err)
 }

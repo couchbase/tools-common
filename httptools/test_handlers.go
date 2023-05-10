@@ -1,4 +1,4 @@
-package cbrest
+package httptools
 
 import (
 	"encoding/json"
@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/httptools"
 	"github.com/couchbase/tools-common/testutil"
 )
 
@@ -23,15 +22,14 @@ func (e TestHandlers) Add(method, endpoint string, handler http.HandlerFunc) {
 }
 
 // Handle utility function which handles the provided request returning a boolen indicating whether a handler was found.
-func (e TestHandlers) Handle(writer http.ResponseWriter, request *http.Request) bool {
+func (e TestHandlers) Handle(writer http.ResponseWriter, request *http.Request) {
 	handler, ok := e[fmt.Sprintf("%s:%s", request.Method, request.URL.Path)]
 	if !ok {
-		return false
+		writer.WriteHeader(http.StatusNotFound)
+		return
 	}
 
 	handler(writer, request)
-
-	return true
 }
 
 // NewTestHandler creates the most basic type of handler which will respond with the provided status/body.
@@ -41,42 +39,6 @@ func NewTestHandler(t *testing.T, status int, body []byte) http.HandlerFunc {
 
 		_, err := writer.Write(body)
 		require.NoError(t, err)
-	}
-}
-
-// NewTestHandlerWithStream creates a handler which will respond with a streaming response writing the provided body a
-// given number of times.
-func NewTestHandlerWithStream(t *testing.T, responses int, body []byte) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Transfer-Encoding", "chunked")
-		writer.WriteHeader(http.StatusOK)
-
-		for i := 0; i < responses; i++ {
-			_, err := writer.Write(body)
-			require.NoError(t, err)
-
-			//nolint:lll
-			// We're mimicking the behavior of 'ns_server' here by writing quadruple newlines, see
-			// https://github.com/couchbase/ns_server/blob/d5d1e828e570737aedae95de56b5e3fb178f4059/src/menelaus_util.erl#L620-L628.
-			_, err = writer.Write([]byte("\n\n\n\n"))
-			require.NoError(t, err)
-		}
-	}
-}
-
-// NewTestHandlerWithStreamHijack creates a handler which will respond with a streaming response which will be
-// immediately closed.
-func NewTestHandlerWithStreamHijack(t *testing.T) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Transfer-Encoding", "chunked")
-		writer.WriteHeader(http.StatusOK)
-
-		hijacker, ok := writer.(http.Hijacker)
-		require.True(t, ok)
-
-		conn, _, err := hijacker.Hijack()
-		require.NoError(t, err)
-		require.NoError(t, conn.Close())
 	}
 }
 
@@ -133,9 +95,9 @@ func NewTestHandlerWithHijack(t *testing.T) http.HandlerFunc {
 func NewTestHandlerWithValue(t *testing.T, status int, body []byte, value any) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		switch request.Header.Get("Content-Type") {
-		case string(httptools.ContentTypeJSON):
+		case string(ContentTypeJSON):
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&value))
-		case string(httptools.ContentTypeURLEncoded):
+		case string(ContentTypeURLEncoded):
 			values, err := url.ParseQuery(string(testutil.ReadAll(t, request.Body)))
 			require.NoError(t, err)
 

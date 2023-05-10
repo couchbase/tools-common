@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/couchbase/tools-common/httptools"
 )
 
 // clusterMetadata wraps some common cluster metadata.
@@ -17,11 +19,13 @@ type clusterMetadata struct {
 // getClusterMetaData extracts some common metadata from the cluster.
 func (c *Client) getClusterMetaData() (*clusterMetadata, error) {
 	request := &Request{
-		ContentType:        ContentTypeURLEncoded,
-		Endpoint:           EndpointPools,
-		ExpectedStatusCode: http.StatusOK,
-		Method:             http.MethodGet,
-		Service:            ServiceManagement,
+		Request: httptools.Request{
+			ContentType:        httptools.ContentTypeURLEncoded,
+			Endpoint:           EndpointPools,
+			ExpectedStatusCode: http.StatusOK,
+			Method:             http.MethodGet,
+		},
+		Service: ServiceManagement,
 	}
 
 	response, err := c.Execute(request)
