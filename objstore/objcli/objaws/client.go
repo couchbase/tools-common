@@ -104,9 +104,10 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 
 func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
 	input := &s3.PutObjectInput{
-		Body:   body,
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Body:              body,
+		Bucket:            aws.String(bucket),
+		Key:               aws.String(key),
+		ChecksumAlgorithm: aws.String(s3.ChecksumAlgorithmSha256),
 	}
 
 	_, err := c.serviceAPI.PutObjectWithContext(ctx, input)
@@ -409,12 +410,13 @@ func (c *Client) UploadPart(
 	}
 
 	input := &s3.UploadPartInput{
-		Body:          body,
-		Bucket:        aws.String(bucket),
-		ContentLength: aws.Int64(size),
-		Key:           aws.String(key),
-		PartNumber:    aws.Int64(int64(number)),
-		UploadId:      aws.String(id),
+		Body:              body,
+		Bucket:            aws.String(bucket),
+		ContentLength:     aws.Int64(size),
+		Key:               aws.String(key),
+		PartNumber:        aws.Int64(int64(number)),
+		UploadId:          aws.String(id),
+		ChecksumAlgorithm: aws.String(s3.ChecksumAlgorithmSha256),
 	}
 
 	output, err := c.serviceAPI.UploadPartWithContext(ctx, input)
