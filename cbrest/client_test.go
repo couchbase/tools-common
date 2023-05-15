@@ -56,6 +56,8 @@ func TestNewClientWithTransportDefaults(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	transport := client.client.Transport.(*http.Transport)
 
 	require.Zero(t, transport.ExpectContinueTimeout)
@@ -112,6 +114,8 @@ func TestNewClient(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
 	client.authProvider.manager.signal = nil
@@ -152,6 +156,8 @@ func TestNewClientThisNodeOnly(t *testing.T) {
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
+
+	defer client.Close()
 	require.Len(t, client.authProvider.manager.config.Nodes, 1)
 }
 
@@ -176,8 +182,10 @@ func TestNewClientBeginCCPAfterClusterInfo(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{Handlers: handlers})
 	defer cluster.Close()
 
-	_, err := newTestClient(cluster, false)
+	client, err := newTestClient(cluster, false)
 	require.NoError(t, err)
+
+	defer client.Close()
 }
 
 func TestNewClientClusterNotInitialized(t *testing.T) {
@@ -311,6 +319,8 @@ func TestNewClientAltAddress(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
 	client.authProvider.manager.signal = nil
@@ -348,6 +358,8 @@ func TestNewClientTLS(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	// Don't compare the time attribute from the config manager
 	client.authProvider.manager.last = nil
@@ -475,6 +487,8 @@ func TestClientExecute(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	actual, err := client.Execute(request)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
@@ -487,6 +501,7 @@ func TestClientExecuteWithOverrideHost(t *testing.T) {
 
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
+	defer server.Close()
 
 	request := &Request{
 		Host:               server.URL,
@@ -503,6 +518,8 @@ func TestClientExecuteWithOverrideHost(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	actual, err := client.Execute(request)
 	require.NoError(t, err)
@@ -607,6 +624,8 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.Execute(request)
 
 	var unexpectedStatus *UnexpectedStatusCodeError
@@ -684,6 +703,7 @@ func TestClientExecuteWithDefaultRetries(t *testing.T) {
 
 			client, err := newTestClient(cluster, true)
 			require.NoError(t, err)
+			defer client.Close()
 
 			actual, err := client.Execute(request)
 			require.NoError(t, err)
@@ -722,6 +742,8 @@ func TestClientExecuteWithRetries(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	actual, err := client.Execute(request)
 	require.NoError(t, err)
@@ -797,6 +819,7 @@ func TestClientExecuteWithRetryAfter(t *testing.T) {
 
 			client, err := newTestClient(cluster, true)
 			require.NoError(t, err)
+			defer client.Close()
 
 			start := time.Now()
 
@@ -834,6 +857,8 @@ func TestClientExecuteStandardError(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	actual, err := client.Execute(request)
 	require.Error(t, err)
 	require.Equal(t, expected, actual)
@@ -863,6 +888,8 @@ func TestClientExecuteWithNonIdepotentRequest(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	_, err = client.Execute(request)
 	require.Error(t, err)
@@ -897,6 +924,8 @@ func TestClientExecuteWithRetriesExhausted(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
@@ -924,6 +953,8 @@ func TestClientExecuteSpecificServiceNotAvailable(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	_, err = client.Execute(request)
 	require.Error(t, err)
@@ -953,6 +984,8 @@ func TestClientExecuteAuthError(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
@@ -980,6 +1013,8 @@ func TestClientExecuteInternalServerError(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	_, err = client.Execute(request)
 	require.Error(t, err)
@@ -1010,6 +1045,8 @@ func TestClientExecute404Status(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
@@ -1038,6 +1075,8 @@ func TestClientExecuteUnexpectedEOF(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.Execute(request)
 	require.Error(t, err)
 
@@ -1065,6 +1104,8 @@ func TestClientExecuteSocketClosedInFlight(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	_, err = client.Execute(request)
 	require.Error(t, err)
@@ -1113,6 +1154,8 @@ func TestClientExecuteStream(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	stream, err := client.ExecuteStream(request)
 	require.NoError(t, err)
 	require.NotNil(t, stream)
@@ -1152,6 +1195,8 @@ func TestClientExecuteStreamNoTimeout(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	stream, err := client.ExecuteStream(request)
 	require.NoError(t, err)
 	require.NotNil(t, stream)
@@ -1190,6 +1235,8 @@ func TestClientExecuteStreamAcceptMinusOneTimeout(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	stream, err := client.ExecuteStream(request)
 	require.NoError(t, err)
 	require.NotNil(t, stream)
@@ -1221,6 +1268,8 @@ func TestClientExecuteStreamDoNotAcceptTimeout(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.ExecuteStream(request)
 	require.ErrorIs(t, err, ErrStreamWithTimeout)
 }
@@ -1244,6 +1293,8 @@ func TestClientExecuteStreamCloseOnContextCancel(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1286,6 +1337,8 @@ func TestClientExecuteStreamWithHijack(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1321,6 +1374,8 @@ func TestClientExecuteStreamWithBinaryPayload(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1359,6 +1414,8 @@ func TestClientExecuteStreamWithError(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	stream, err := client.ExecuteStream(request)
 	require.Error(t, err)
 	require.Nil(t, stream)
@@ -1388,6 +1445,8 @@ func TestClientExecuteStreamWithUnexpectedStatusCode(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	stream, err := client.ExecuteStream(request)
 	require.Error(t, err)
 	require.Nil(t, stream)
@@ -1403,6 +1462,8 @@ func TestGetServiceHost(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	host, err := client.GetServiceHost(ServiceManagement)
 	require.NoError(t, err)
@@ -1437,6 +1498,8 @@ func TestGetServiceHostTLS(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	host, err := client.GetServiceHost(ServiceManagement)
 	require.NoError(t, err)
 	require.Equal(t, cluster.URL(), host)
@@ -1454,6 +1517,8 @@ func TestGetAllServiceHosts(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	hosts, err := client.GetAllServiceHosts(ServiceManagement)
 	require.NoError(t, err)
@@ -1516,6 +1581,7 @@ func TestGetAllServiceHostsTLS(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			defer client.Close()
 
 			hosts, err := client.GetAllServiceHosts(ServiceManagement)
 			require.NoError(t, err)
@@ -1616,6 +1682,8 @@ func TestClientBeginCCP(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	var closed bool
 
 	go func() {
@@ -1679,6 +1747,8 @@ func TestClientUpdateCC(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	rev := client.authProvider.manager.config.Revision
 
 	require.NoError(t, client.updateCC())
@@ -1691,6 +1761,8 @@ func TestClientUpdateCCExhaustedClusterNodes(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	client.authProvider.manager.config.Nodes = make(Nodes, 0)
 	rev := client.authProvider.manager.config.Revision
@@ -1705,6 +1777,8 @@ func TestClientUpdateCCFromNode(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	rev := client.authProvider.manager.config.Revision
 
@@ -1738,6 +1812,8 @@ func TestClientUpdateCCFromHost(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	rev := client.authProvider.manager.config.Revision
 
@@ -1838,6 +1914,8 @@ func TestClientGetWithRequestError(t *testing.T) {
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
 
+	defer client.Close()
+
 	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), Endpoint("/test"))
 
 	var socketClosedInFlight *SocketClosedInFlightError
@@ -1854,6 +1932,8 @@ func TestClientGetWithUnexpectedStatusCode(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	_, err = client.get(fmt.Sprintf("http://localhost:%d", cluster.Port()), Endpoint("/test"))
 
@@ -1876,6 +1956,8 @@ func TestClientDoRequestWithCustomTimeout(t *testing.T) {
 
 	client, err := newTestClient(cluster, true)
 	require.NoError(t, err)
+
+	defer client.Close()
 
 	t.Run("custom larger than client", func(t *testing.T) {
 		client.client.Timeout = 100 * time.Millisecond
