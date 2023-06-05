@@ -158,18 +158,18 @@ func (m *MockblobAPI) EXPECT() *MockblobAPIMockRecorder {
 }
 
 // GetSASURL mocks base method.
-func (m *MockblobAPI) GetSASURL(permissions sas.BlobPermissions, start, expiry time.Time) (string, error) {
+func (m *MockblobAPI) GetSASURL(permissions sas.BlobPermissions, expiry time.Time, options *blob.GetSASURLOptions) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSASURL", permissions, start, expiry)
+	ret := m.ctrl.Call(m, "GetSASURL", permissions, expiry, options)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetSASURL indicates an expected call of GetSASURL.
-func (mr *MockblobAPIMockRecorder) GetSASURL(permissions, start, expiry interface{}) *gomock.Call {
+func (mr *MockblobAPIMockRecorder) GetSASURL(permissions, expiry, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSASURL", reflect.TypeOf((*MockblobAPI)(nil).GetSASURL), permissions, start, expiry)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSASURL", reflect.TypeOf((*MockblobAPI)(nil).GetSASURL), permissions, expiry, options)
 }
 
 // MockflatBlobsPager is a mock of flatBlobsPager interface.
@@ -390,18 +390,18 @@ func (mr *MockblockBlobAPIMockRecorder) StageBlock(ctx, base64BlockID, body, opt
 }
 
 // StageBlockFromURL mocks base method.
-func (m *MockblockBlobAPI) StageBlockFromURL(ctx context.Context, base64BlockID, sourceURL string, length int64, options *blockblob.StageBlockFromURLOptions) (blockblob.StageBlockFromURLResponse, error) {
+func (m *MockblockBlobAPI) StageBlockFromURL(ctx context.Context, base64BlockID, sourceURL string, options *blockblob.StageBlockFromURLOptions) (blockblob.StageBlockFromURLResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StageBlockFromURL", ctx, base64BlockID, sourceURL, length, options)
+	ret := m.ctrl.Call(m, "StageBlockFromURL", ctx, base64BlockID, sourceURL, options)
 	ret0, _ := ret[0].(blockblob.StageBlockFromURLResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // StageBlockFromURL indicates an expected call of StageBlockFromURL.
-func (mr *MockblockBlobAPIMockRecorder) StageBlockFromURL(ctx, base64BlockID, sourceURL, length, options interface{}) *gomock.Call {
+func (mr *MockblockBlobAPIMockRecorder) StageBlockFromURL(ctx, base64BlockID, sourceURL, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StageBlockFromURL", reflect.TypeOf((*MockblockBlobAPI)(nil).StageBlockFromURL), ctx, base64BlockID, sourceURL, length, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StageBlockFromURL", reflect.TypeOf((*MockblockBlobAPI)(nil).StageBlockFromURL), ctx, base64BlockID, sourceURL, options)
 }
 
 // URL mocks base method.

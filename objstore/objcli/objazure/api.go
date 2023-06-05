@@ -58,7 +58,7 @@ func (c containerClient) NewListBlobsHierarchyPager(
 }
 
 type blobAPI interface {
-	GetSASURL(permissions sas.BlobPermissions, start, expiry time.Time) (string, error)
+	GetSASURL(permissions sas.BlobPermissions, expiry time.Time, options *blob.GetSASURLOptions) (string, error)
 }
 
 var _ blobAPI = (*blob.Client)(nil)
@@ -85,8 +85,9 @@ type blockBlobAPI interface {
 	) (blockblob.GetBlockListResponse, error)
 	StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeekCloser, options *blockblob.StageBlockOptions,
 	) (blockblob.StageBlockResponse, error)
-	StageBlockFromURL(ctx context.Context, base64BlockID, sourceURL string, length int64,
-		options *blockblob.StageBlockFromURLOptions) (blockblob.StageBlockFromURLResponse, error)
+	StageBlockFromURL(
+		ctx context.Context, base64BlockID, sourceURL string, options *blockblob.StageBlockFromURLOptions,
+	) (blockblob.StageBlockFromURLResponse, error)
 	URL() string
 	Upload(ctx context.Context, body io.ReadSeekCloser, options *blockblob.UploadOptions,
 	) (blockblob.UploadResponse, error)

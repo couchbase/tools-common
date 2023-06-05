@@ -214,9 +214,9 @@ func TestClientAppendToObject(t *testing.T) {
 
 	bAPI.
 		EXPECT().
-		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockID, sourceURL string, length int64, options *blockblob.StageBlockFromURLOptions,
+			ctx context.Context, base64BlockID, sourceURL string, options *blockblob.StageBlockFromURLOptions,
 		) (blockblob.StageBlockFromURLResponse, error) {
 			require.Equal(t, int64(0), options.Range.Offset)
 			require.Equal(t, int64(blob.CountToEnd), options.Range.Count)
@@ -329,9 +329,6 @@ func TestClientUploadPart(t *testing.T) {
 		DoAndReturn(func(
 			ctx context.Context, base64BlockID string, body io.ReadSeekCloser, options *blockblob.StageBlockOptions,
 		) (blockblob.StageBlockResponse, error) {
-			expected := md5.Sum([]byte("value"))
-			require.Equal(t, options.TransactionalContentMD5, expected[:])
-
 			return blockblob.StageBlockResponse{}, nil
 		})
 
@@ -393,9 +390,9 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 
 			dstAPI.
 				EXPECT().
-				StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(
-					ctx context.Context, base64BlockID, url string, length int64, options *blockblob.StageBlockFromURLOptions,
+					ctx context.Context, base64BlockID, url string, options *blockblob.StageBlockFromURLOptions,
 				) (blockblob.StageBlockFromURLResponse, error) {
 					require.Equal(t, test.eOffset, options.Range.Offset)
 					require.Equal(t, test.eLength, options.Range.Count)
@@ -439,9 +436,9 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 	dstAPI.
 		EXPECT().
-		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockID, url string, length int64, options *blockblob.StageBlockFromURLOptions,
+			ctx context.Context, base64BlockID, url string, options *blockblob.StageBlockFromURLOptions,
 		) (blockblob.StageBlockFromURLResponse, error) {
 			require.Equal(t, int64(0), options.Range.Count)
 

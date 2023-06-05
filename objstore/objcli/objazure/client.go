@@ -390,7 +390,7 @@ func (c *Client) UploadPart(
 		ctx,
 		blockID,
 		aws.ReadSeekCloser(body),
-		&blockblob.StageBlockOptions{TransactionalContentMD5: md5sum.Sum(nil)},
+		&blockblob.StageBlockOptions{TransactionalValidation: blob.TransferValidationTypeMD5{}},
 	)
 
 	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
@@ -425,7 +425,6 @@ func (c *Client) UploadPartCopy(
 		ctx,
 		blockID,
 		srcURL,
-		0, // Should be set to 0 (https://docs.microsoft.com/en-us/rest/api/storageservices/put-block-from-url)
 		&blockblob.StageBlockFromURLOptions{Range: blob.HTTPRange{Offset: offset, Count: length}},
 	)
 	if err != nil {
@@ -445,7 +444,9 @@ func (c *Client) getUploadPartCopySrcURL(bucket, src string) (string, error) {
 		expiry      = start.Add(48 * time.Hour)
 	)
 
-	url, err := srcClient.GetSASURL(permissions, start, expiry)
+	opts := blob.GetSASURLOptions{StartTime: &start}
+
+	url, err := srcClient.GetSASURL(permissions, expiry, &opts)
 
 	if err == nil {
 		return url, nil
