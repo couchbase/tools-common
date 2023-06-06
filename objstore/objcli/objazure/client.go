@@ -390,7 +390,7 @@ func (c *Client) UploadPart(
 		ctx,
 		blockID,
 		aws.ReadSeekCloser(body),
-		&blockblob.StageBlockOptions{TransactionalValidation: blob.TransferValidationTypeMD5{}},
+		&blockblob.StageBlockOptions{TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil))},
 	)
 
 	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
