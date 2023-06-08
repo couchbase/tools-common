@@ -9,6 +9,8 @@ import (
 	"github.com/couchbase/tools-common/objstore/objval"
 )
 
+//go:generate mockery --name Client --case underscore --inpackage
+
 // IterateFunc is the function used when iterating over objects, this function will be called once for each object whose
 // key matches the provided filtering.
 type IterateFunc func(attrs *objval.ObjectAttrs) error
