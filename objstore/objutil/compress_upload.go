@@ -323,7 +323,7 @@ func CompressObjects(opts CompressObjectsOptions) error {
 		bytesDownloaded int64
 		fn              func(size int64)
 
-		pool = hofp.NewPool(hofp.Options{Context: opts.Context, Size: 2})
+		pool = hofp.NewPool(hofp.Options{Context: opts.Context, Size: 2, Logger: opts.Logger})
 	)
 
 	if opts.ProgressReportCallback != nil && totalSize != 0 {
