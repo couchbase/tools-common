@@ -200,7 +200,9 @@ func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Wr
 // NOTE: It does this by keeping opts.PartUploadWorkers internal buffers, reading into those and uploading them as parts
 // of the final object. Having multiple buffers means we do not need to wait for a part to be uploaded to start reading
 // from reader again.
-func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader io.Reader) error {
+func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader io.ReadCloser) error {
+	defer reader.Close()
+
 	fl := freelist.NewFreeListWithFactory(opts.PartUploadWorkers, func() []byte { return make([]byte, opts.PartSize) })
 
 	// payload is the metadata we pass when uploading so that we can give the buffer back to the freelist and call

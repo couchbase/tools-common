@@ -10,12 +10,15 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/couchbase/tools-common/objstore/objcli"
 	"github.com/couchbase/tools-common/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/objstore/objval"
 	"github.com/couchbase/tools-common/slice"
+	"github.com/couchbase/tools-common/testutil"
 )
 
 const partSize = 1024
@@ -216,4 +219,80 @@ func TestCompressUploadProgressReporting(t *testing.T) {
 
 		objectSizes = slice.Filter(objectSizes, func(e int64) bool { return e != size })
 	}
+}
+
+// TestCompressUploadIterateError tests to see that CompressObjects doesn't hang if the upload goroutine exits with an
+// error (MB-57297).
+func TestCompressUploadUploadError(t *testing.T) {
+	const size = 10 * 1024 * 1024
+
+	cli := objcli.MockClient{}
+	cli.
+		On(
+			"IterateObjects", testutil.MockMatchContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything,
+		).
+		Return(func(
+			ctx context.Context, bucket, prefix, delimiter string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc,
+		) error {
+			_ = fn(&objval.ObjectAttrs{
+				Key:  "foo",
+				Size: size,
+			})
+
+			return nil
+		})
+
+	cli.
+		On("GetObject", testutil.MockMatchContext, mock.Anything, mock.Anything, mock.Anything).
+		Return(func(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
+			var (
+				body = make([]byte, size)
+				r    = io.NopCloser(bytes.NewReader(body))
+			)
+
+			s, err := rand.Read(body)
+			require.NoError(t, err)
+			require.Equal(t, size, s)
+
+			return &objval.Object{Body: r}, nil
+		})
+
+	cli.On("CreateMultipartUpload", testutil.MockMatchContext, mock.Anything, mock.Anything).Return("mp-001", nil)
+
+	// To make the scenario more realistic we allow a couple of parts to get uploaded before returning an error.
+	var i int
+
+	cli.
+		On(
+			"UploadPart", testutil.MockMatchContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything,
+		).
+		Return(func(ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
+			if i < 2 {
+				return objval.Part{}, nil
+			}
+
+			i++
+
+			return objval.Part{}, assert.AnError
+		})
+
+	cli.
+		On(
+			"AbortMultipartUpload", testutil.MockMatchContext, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything,
+		).
+		Return(nil)
+
+	require.Error(t, CompressObjects(CompressObjectsOptions{
+		Options:           Options{PartSize: 1024},
+		Client:            &cli,
+		SourceBucket:      "bucket",
+		Prefix:            "prefix",
+		DestinationBucket: "bucket",
+		Destination:       "export.zip",
+	}))
+
+	cli.AssertExpectations(t)
 }
