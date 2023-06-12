@@ -144,6 +144,33 @@ func TestParse(t *testing.T) {
 				Addresses: []Address{{Host: "[2001:4860:4860::8888]", Port: 12345}},
 			},
 		},
+		{
+			name:  "ValidWithQueryParam",
+			input: "couchbase://[2001:4860:4860::8888]:12345?network=external",
+			expected: &ConnectionString{
+				Scheme:    "couchbase",
+				Addresses: []Address{{Host: "[2001:4860:4860::8888]", Port: 12345}},
+				Params:    map[string][]string{"network": {"external"}},
+			},
+		},
+		{
+			name:  "ValidWithMultiValueQueryParams",
+			input: "couchbase://[2001:4860:4860::8888]:12345?network=internal&network=external",
+			expected: &ConnectionString{
+				Scheme:    "couchbase",
+				Addresses: []Address{{Host: "[2001:4860:4860::8888]", Port: 12345}},
+				Params:    map[string][]string{"network": {"internal", "external"}},
+			},
+		},
+		{
+			name:  "ValidWithMultipleQueryParams",
+			input: "couchbase://[2001:4860:4860::8888]:12345?a=b&b=a",
+			expected: &ConnectionString{
+				Scheme:    "couchbase",
+				Addresses: []Address{{Host: "[2001:4860:4860::8888]", Port: 12345}},
+				Params:    map[string][]string{"a": {"b"}, "b": {"a"}},
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -9,13 +9,14 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/couchbase/tools-common/aprov"
 	"github.com/couchbase/tools-common/errutil"
 	"github.com/couchbase/tools-common/log"
 	"github.com/couchbase/tools-common/maths"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/retry"
-	"golang.org/x/exp/slices"
 )
 
 // Client is a generalized client for sending and receiving http requests that wraps various functionality such as error
@@ -62,15 +63,13 @@ type ClientOptions struct {
 //   - logger: logger is the passed Logger struct that implements the Log method for logger the user wants to use.
 //   - options: options is an object that contains optional parameters for the client.
 func NewClient(client *http.Client, authProvider aprov.Provider, logger log.Logger, options ClientOptions) *Client {
-	loggerWrapped := log.NewWrappedLogger(logger)
-
 	return &Client{
 		client:         client,
 		reqResLogLevel: options.ReqResLogLevel,
 		requestRetries: options.RequestRetries,
 		authProvider:   authProvider,
 		retryer:        options.Retryer,
-		logger:         loggerWrapped,
+		logger:         log.NewWrappedLogger(logger),
 	}
 }
 

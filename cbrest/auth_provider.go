@@ -113,12 +113,16 @@ func (a *AuthProvider) SetClusterConfig(host string, config *ClusterConfig) erro
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if err := a.manager.Update(config); err != nil {
+	err := a.manager.Update(config)
+	if err != nil {
 		return err
 	}
 
 	// Only update the alternate address settings if we've accepted the config
-	a.useAltAddr = a.shouldUseAltAddr(host, config.Nodes)
+	a.useAltAddr, err = a.shouldUseAltAddr(host, config.Nodes)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -149,18 +153,28 @@ func (a *AuthProvider) bootstrapHostFunc() func() string {
 }
 
 // shouldUseAltAddr returns a boolean indicating whether we should send all future requests using alternative addresses.
-func (a *AuthProvider) shouldUseAltAddr(host string, nodes Nodes) bool {
+func (a *AuthProvider) shouldUseAltAddr(host string, nodes Nodes) (bool, error) {
+	network := a.resolved.Params.Get("network")
+	switch network {
+	case "", "default":
+		// Ignore, use heuristic
+	case "external":
+		return true, nil
+	default:
+		return false, ErrInvalidNetwork
+	}
+
 	for _, node := range nodes {
 		if node.Hostname == host {
-			return false
+			return false, nil
 		}
 
 		if node.AlternateAddresses.External != nil && node.AlternateAddresses.External.Hostname == host {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // updateResolvedAddress updates the resolved connection string for AuthProvider to contain all node addresses.

@@ -29,6 +29,9 @@ var (
 
 	// ErrStreamWithTimeout is returned if the user attempts to execute a stream with a non-zero timeout.
 	ErrStreamWithTimeout = errors.New("using a timeout when executing a streaming request is unsupported")
+
+	// ErrInvalidNetwork is returned if the user supplies an invalid value for the 'network' query parameter.
+	ErrInvalidNetwork = errors.New("invalid use of 'network' query parameter, expected 'default' or 'external'")
 )
 
 // BootstrapFailureError is returned to the user if we've failed to bootstrap the REST client.
