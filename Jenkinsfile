@@ -5,7 +5,7 @@ import hudson.model.Run
 import jenkins.model.CauseOfInterruption.UserInterruption
 
 pipeline {
-    agent { label "linux&&neo" }
+    agent { label "linux&&master" }
 
     environment {
         GO_TARBALL_URL = "https://golang.org/dl/go1.18.6.linux-amd64.tar.gz"
