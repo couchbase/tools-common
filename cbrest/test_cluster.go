@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/couchbase/tools-common/httptools"
 	"github.com/couchbase/tools-common/netutil"
 	"github.com/couchbase/tools-common/testutil"
 
@@ -68,7 +67,7 @@ func NewTestCluster(t *testing.T, options TestClusterOptions) *TestCluster {
 	}
 
 	// def will set the provided endpoint in the handlers if there isn't already a definition.
-	def := func(method string, endpoint httptools.Endpoint,
+	def := func(method string, endpoint Endpoint,
 		handler func(writer http.ResponseWriter, request *http.Request),
 	) {
 		_, ok := options.Handlers[fmt.Sprintf("%s:%s", method, endpoint)]

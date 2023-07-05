@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/httptools"
 	"github.com/couchbase/tools-common/testutil"
 )
 
@@ -133,9 +132,9 @@ func NewTestHandlerWithHijack(t *testing.T) http.HandlerFunc {
 func NewTestHandlerWithValue(t *testing.T, status int, body []byte, value any) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		switch request.Header.Get("Content-Type") {
-		case string(httptools.ContentTypeJSON):
+		case string(ContentTypeJSON):
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&value))
-		case string(httptools.ContentTypeURLEncoded):
+		case string(ContentTypeURLEncoded):
 			values, err := url.ParseQuery(string(testutil.ReadAll(t, request.Body)))
 			require.NoError(t, err)
 

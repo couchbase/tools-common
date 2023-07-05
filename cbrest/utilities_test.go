@@ -1,7 +1,6 @@
-package httptools
+package cbrest
 
 import (
-	"crypto/x509"
 	"fmt"
 	"testing"
 
@@ -29,12 +28,12 @@ func TestShouldRetry(t *testing.T) {
 		},
 		{
 			name:     "UnknownAuthority",
-			err:      &x509.UnknownAuthorityError{},
+			err:      &UnknownAuthorityError{},
 			expected: true,
 		},
 		{
 			name:     "WrappedError",
-			err:      fmt.Errorf("%w", &x509.UnknownAuthorityError{}),
+			err:      fmt.Errorf("%w", &UnknownAuthorityError{}),
 			expected: true,
 		},
 	}
@@ -49,7 +48,7 @@ func TestShouldRetry(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, ShouldRetry(test.err))
+			require.Equal(t, test.expected, shouldRetry(test.err))
 		})
 	}
 }
