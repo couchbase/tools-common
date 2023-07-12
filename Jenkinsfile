@@ -79,7 +79,7 @@ pipeline {
             steps {
                 timeout(time: 5, unit: "MINUTES") {
                     dir("${PROJECT}") {
-                        sh "golangci-lint run --timeout 5m"
+                        sh "./scripts/cv/lint.sh"
                     }
                 }
             }
@@ -91,17 +91,11 @@ pipeline {
                 sh "mkdir -p reports"
 
                 dir("${PROJECT}") {
-                    // Clean the Go test cache
-                    sh "go clean -testcache"
-
-                    // Run the unit testing
-                    sh "2>&1 go test -v -timeout=15m -count=1 -coverprofile=coverage.out ./... | tee ${WORKSPACE}/reports/test.raw"
-
-                    // Convert the test output into valid 'junit' xml
-                    sh "cat ${WORKSPACE}/reports/test.raw | go-junit-report > ${WORKSPACE}/reports/test.xml"
-
-                    // Convert the coverage report into valid 'cobertura' xml
-                    sh "gocov convert coverage.out | gocov-xml > ${WORKSPACE}/reports/coverage.xml"
+                    // Run unit testing with coverage and place output in 'reports'.
+                    //
+                    // - 'reports/tests.xml'
+                    // - 'reports/coverage.xml'
+                    sh "./scripts/cv/test.sh reports"
                 }
             }
         }
@@ -109,8 +103,8 @@ pipeline {
         stage("Benchmark") {
             steps {
                 dir("${PROJECT}") {
-                    // Run the benchmarks without running any tests by setting '-run='^$'
-                    sh "go test -timeout=15m -count=1 -run='^\044' -bench=Benchmark ./..."
+                    // Run the benchmarks without running any tests
+                    sh "./scripts/cv/benchmark.sh"
                 }
             }
         }
@@ -119,7 +113,7 @@ pipeline {
     post {
         always {
             // Post the test results
-            junit allowEmptyResults: true, testResults: "reports/test.xml"
+            junit allowEmptyResults: true, testResults: "reports/tests.xml"
 
             // Post the test coverage
             cobertura autoUpdateStability: false, autoUpdateHealth: false, onlyStable: false, coberturaReportFile: "reports/coverage.xml", conditionalCoverageTargets: "70, 10, 30", failNoReports: false, failUnhealthy: true, failUnstable: true, lineCoverageTargets: "70, 10, 30", methodCoverageTargets: "70, 10, 30", maxNumberOfBuilds: 0, sourceEncoding: "ASCII", zoomCoverageChart: false
