@@ -274,7 +274,7 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 	return nil
 }
 
-func (c *Client) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
+func (c *Client) CreateMultipartUpload(_ context.Context, _, _ string) (string, error) {
 	return uuid.NewString(), nil
 }
 
@@ -322,7 +322,10 @@ func (c *Client) UploadPart(
 // NOTE: Google storage does not support byte range copying, therefore, only the entire object may be copied; this may
 // be done by either not providing a byte range, or providing a byte range for the entire object.
 func (c *Client) UploadPartCopy(
-	ctx context.Context, bucket, id, dst, src string, number int, br *objval.ByteRange,
+	ctx context.Context,
+	bucket, id, dst, src string,
+	_ int,
+	br *objval.ByteRange,
 ) (objval.Part, error) {
 	if err := br.Valid(false); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
@@ -354,7 +357,7 @@ func (c *Client) UploadPartCopy(
 	return objval.Part{ID: intermediate, Size: attrs.Size}, nil
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key string, parts ...objval.Part) error {
+func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, _, key string, parts ...objval.Part) error {
 	converted := make([]string, 0, len(parts))
 
 	for _, part := range parts {

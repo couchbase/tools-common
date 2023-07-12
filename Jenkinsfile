@@ -14,7 +14,7 @@ pipeline {
         GOBIN = "${GOROOT}/bin"
         PATH="${PATH}:${GOBIN}:${WORKSPACE}/bin"
 
-        GOLANGCI_LINT_VERSION = "v1.47.3"
+        GOLANGCI_LINT_VERSION = "v1.53.3"
 
         PROJECT = "${WORKSPACE}/tools-common"
     }

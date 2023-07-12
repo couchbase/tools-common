@@ -385,7 +385,7 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 
 	setAuthHeaders(host, c.authProvider, req)
 
-	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0) //nolint:bodyclose
+	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0)
 	if err != nil {
 		return nil, handleRequestError(req, err) // Purposefully not wrapped
 	}
@@ -506,7 +506,7 @@ func (c *Client) Execute(request *Request) (*Response, error) {
 // ExecuteWithContext the given request to completion, using the provided context, reading the entire response body
 // whilst honoring request level retries/timeout.
 func (c *Client) ExecuteWithContext(ctx context.Context, request *Request) (*Response, error) {
-	resp, err := c.Do(ctx, request) //nolint:bodyclose
+	resp, err := c.Do(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}

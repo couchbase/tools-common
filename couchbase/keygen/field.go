@@ -44,8 +44,8 @@ func (f field) next(data []byte) (string, error) {
 		converted = append(converted, field)
 	}
 
-	any := jsoniter.Get(data, converted...)
-	switch any.ValueType() {
+	val := jsoniter.Get(data, converted...)
+	switch val.ValueType() {
 	case jsoniter.InvalidValue:
 		return "", &ResultError{
 			reason: "resulting field does not exist",
@@ -60,5 +60,5 @@ func (f field) next(data []byte) (string, error) {
 		}
 	}
 
-	return any.ToString(), nil
+	return val.ToString(), nil
 }

@@ -159,7 +159,7 @@ func (t *TestCluster) Handler(writer http.ResponseWriter, request *http.Request)
 }
 
 // Pools implements the /pools endpoint, the return values can be modified using the cluster options.
-func (t *TestCluster) Pools(writer http.ResponseWriter, request *http.Request) {
+func (t *TestCluster) Pools(writer http.ResponseWriter, _ *http.Request) {
 	testutil.EncodeJSON(t.t, writer, struct {
 		Enterprise       bool   `json:"isEnterprise"`
 		UUID             string `json:"uuid"`
@@ -173,7 +173,7 @@ func (t *TestCluster) Pools(writer http.ResponseWriter, request *http.Request) {
 
 // PoolsDefault implements the /pools/default endpoint, values can be modified by modifying the nodes in the cluster
 // using the cluster options.
-func (t *TestCluster) PoolsDefault(writer http.ResponseWriter, request *http.Request) {
+func (t *TestCluster) PoolsDefault(writer http.ResponseWriter, _ *http.Request) {
 	testutil.EncodeJSON(t.t, writer, struct {
 		Nodes []node `json:"nodes"`
 	}{
@@ -183,7 +183,7 @@ func (t *TestCluster) PoolsDefault(writer http.ResponseWriter, request *http.Req
 
 // Buckets implements the /pools/default/buckets endpoint, values can be modified by modifying the buckets in the
 // cluster using the cluster options.
-func (t *TestCluster) Buckets(writer http.ResponseWriter, request *http.Request) {
+func (t *TestCluster) Buckets(writer http.ResponseWriter, _ *http.Request) {
 	buckets := make([]bucket, 0, len(t.options.Buckets))
 	for n, b := range t.options.Buckets {
 		buckets = append(buckets, bucket{
@@ -227,7 +227,7 @@ func (t *TestCluster) BucketManifest(name string) func(writer http.ResponseWrite
 
 // NodeServices implements the /pools/default/nodeServices endpoint, values can be modified by modifying the nodes in
 // the cluster using the cluster options.
-func (t *TestCluster) NodeServices(writer http.ResponseWriter, request *http.Request) {
+func (t *TestCluster) NodeServices(writer http.ResponseWriter, _ *http.Request) {
 	defer func() { t.revision++ }()
 
 	testutil.EncodeJSON(t.t, writer, struct {

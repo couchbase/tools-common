@@ -50,7 +50,7 @@ func (t *TestClient) Provider() objval.Provider {
 	return t.provider
 }
 
-func (t *TestClient) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
+func (t *TestClient) GetObject(_ context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -70,7 +70,7 @@ func (t *TestClient) GetObject(ctx context.Context, bucket, key string, br *objv
 	}, nil
 }
 
-func (t *TestClient) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
+func (t *TestClient) GetObjectAttrs(_ context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -82,7 +82,7 @@ func (t *TestClient) GetObjectAttrs(ctx context.Context, bucket, key string) (*o
 	return &object.ObjectAttrs, nil
 }
 
-func (t *TestClient) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
+func (t *TestClient) PutObject(_ context.Context, bucket, key string, body io.ReadSeeker) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -91,7 +91,7 @@ func (t *TestClient) PutObject(ctx context.Context, bucket, key string, body io.
 	return nil
 }
 
-func (t *TestClient) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
+func (t *TestClient) AppendToObject(_ context.Context, bucket, key string, data io.ReadSeeker) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -105,7 +105,7 @@ func (t *TestClient) AppendToObject(ctx context.Context, bucket, key string, dat
 	return nil
 }
 
-func (t *TestClient) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
+func (t *TestClient) DeleteObjects(_ context.Context, bucket string, keys ...string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -118,7 +118,7 @@ func (t *TestClient) DeleteObjects(ctx context.Context, bucket string, keys ...s
 	return nil
 }
 
-func (t *TestClient) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
+func (t *TestClient) DeleteDirectory(_ context.Context, bucket, prefix string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -135,7 +135,7 @@ func (t *TestClient) DeleteDirectory(ctx context.Context, bucket, prefix string)
 	return nil
 }
 
-func (t *TestClient) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
+func (t *TestClient) IterateObjects(_ context.Context, bucket, prefix, delimiter string, include,
 	exclude []*regexp.Regexp, fn IterateFunc,
 ) error {
 	if include != nil && exclude != nil {
@@ -181,7 +181,7 @@ func (t *TestClient) IterateObjects(ctx context.Context, bucket, prefix, delimit
 	return nil
 }
 
-func (t *TestClient) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
+func (t *TestClient) CreateMultipartUpload(_ context.Context, _, _ string) (string, error) {
 	return uuid.NewString(), nil
 }
 
@@ -208,7 +208,10 @@ func (t *TestClient) ListParts(ctx context.Context, bucket, id, key string) ([]o
 }
 
 func (t *TestClient) UploadPart(
-	ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker,
+	_ context.Context,
+	bucket, id, key string,
+	number int,
+	body io.ReadSeeker,
 ) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -225,7 +228,7 @@ func (t *TestClient) UploadPart(
 	return part, nil
 }
 
-func (t *TestClient) UploadPartCopy(ctx context.Context, bucket, id, dst, src string, number int,
+func (t *TestClient) UploadPartCopy(_ context.Context, bucket, id, dst, src string, number int,
 	br *objval.ByteRange,
 ) (objval.Part, error) {
 	t.lock.Lock()
@@ -248,7 +251,7 @@ func (t *TestClient) UploadPartCopy(ctx context.Context, bucket, id, dst, src st
 	return part, nil
 }
 
-func (t *TestClient) CompleteMultipartUpload(ctx context.Context, bucket, id, key string, parts ...objval.Part) error {
+func (t *TestClient) CompleteMultipartUpload(_ context.Context, bucket, id, key string, parts ...objval.Part) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -268,7 +271,7 @@ func (t *TestClient) CompleteMultipartUpload(ctx context.Context, bucket, id, ke
 	return t.deleteKeysLocked(bucket, partPrefix(id, key), nil, nil)
 }
 
-func (t *TestClient) AbortMultipartUpload(ctx context.Context, bucket, id, key string) error {
+func (t *TestClient) AbortMultipartUpload(_ context.Context, bucket, id, key string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

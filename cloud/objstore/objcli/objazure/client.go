@@ -323,7 +323,7 @@ func (c *Client) iterateObjects(objects []*objval.ObjectAttrs, include, exclude 
 	return nil
 }
 
-func (c *Client) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
+func (c *Client) CreateMultipartUpload(_ context.Context, _, _ string) (string, error) {
 	return objcli.NoUploadID, nil
 }
 
@@ -486,7 +486,7 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key st
 	return handleError(bucket, key, err)
 }
 
-func (c *Client) AbortMultipartUpload(ctx context.Context, _, id, _ string) error {
+func (c *Client) AbortMultipartUpload(_ context.Context, _, id, _ string) error {
 	if id != objcli.NoUploadID {
 		return objcli.ErrExpectedNoUploadID
 	}
