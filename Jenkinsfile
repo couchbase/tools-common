@@ -95,7 +95,7 @@ pipeline {
                     //
                     // - 'reports/tests.xml'
                     // - 'reports/coverage.xml'
-                    sh "./scripts/cv/test.sh reports"
+                    sh "./scripts/cv/test.sh ${WORKSPACE}/reports"
                 }
             }
         }
