@@ -1,32 +1,29 @@
 # tools-common
 [![Go Reference](https://pkg.go.dev/badge/github.com/couchbase/tools-common.svg)](https://pkg.go.dev/github.com/couchbase/tools-common)
 
-Welcome to `tools-common`, this package contains various utilities used by the Go code maintained by the tools team.
+Welcome to `tools-common`, this library contains various utilities used across several projects at Couchbase.
 
 # Dependencies
-
-This package utilizes the [`go-sqlite3`](https://github.com/mattn/go-sqlite3) package which requires GCC to be
-installed, and CGO to be enabled (`CGO_ENABLED=1`). See the latest
-[README](https://github.com/mattn/go-sqlite3/blob/master/README.md) for the most up-to-date information.
+The library is broken down into independently versioned sub-modules which each define their own dependencies; see the
+module level `README.md` for specifics on dependencies.
 
 # Testing
 
-Running the unit testing requires a number of dependencies:
-- GCC (Latest version available via package manager)
+The `tools-common` library is broken down into separate modules, the unit testing for each module is run independently.
+
+Firstly, ensure all the dependencies are installed:
+
 - Go (1.18+)
 - Make (Latest version available via package manager)
+- Module specific dependencies (defined in the modules `README.md`)
 
-Once the required dependencies have been installed, testing can be done using the repository `Makefile`. Running `make
-test` will run all the available unit tests.
+Testing may then be run using the modules `Makefile`, running `make test` will run all the available unit tests where
+`make coverage` will also generate a coverage report that will be automatically opened in the default browser.
 
-Generating a coverage report from the unit testing may be done by running `make coverage`, this report will be
-automatically opened in the default browser.
+You may want to filter which tests are run; this may be at the package or test level. For example, to run the
+`TestContains` function in the `util/contains` package, `make PACKAGE='util/contains' TESTS='TestCoverage'` may be used.
 
-When running tests, you may want to filter which tests are run; this may be at the package or test level. To run all the
-tests in the `netutil` package, run `make PACKAGE=netutil test`. To run only tests which match a given regular
-expression, run `make TESTS=TestContains test`.
-
-Note that these variables may be used in conjunction and both also apply to the `coverage` target.
+The `PACKAGE` and `TESTS` variables may be used independently and also apply to the `coverage` target.
 
 # Contributing
 
