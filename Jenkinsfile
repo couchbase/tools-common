@@ -56,6 +56,9 @@ pipeline {
                     sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT_VERSION}/install.sh | sh -s -- -b ${GOBIN} ${GOLANGCI_LINT_VERSION}"
                     sh "golangci-lint --version"
 
+                    // A clone of 'jq' written in Go (required for merging coverage files)
+                    sh "go install github.com/itchyny/gojq/cmd/gojq@latest"
+
                     // Unit test reporting
                     sh "go install github.com/jstemmer/go-junit-report@latest"
 

@@ -54,5 +54,12 @@ done
 # Convert the test output to XML
 cat $REPORTS/*.raw | go-junit-report > $TARGET/tests.xml
 
+# Our CV machines don't have 'jq' so we use a local install of 'gojq'
+JQ="jq"
+
+if ! command -v $JQ &> /dev/null; then
+    JQ="gojq"
+fi
+
 # Merge the coverage files
-jq -n '{ Packages: [ inputs.Packages ] | add }' $(find $COVERAGE -name '*.json') | gocov-xml > $TARGET/coverage.xml
+$JQ -n '{ Packages: [ inputs.Packages ] | add }' $(find $COVERAGE -name '*.json') | gocov-xml > $TARGET/coverage.xml
