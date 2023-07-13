@@ -85,6 +85,25 @@ to proceed.
 In this section we will cover notes on the exact coding style to use for this codebase. Most of the style rules are
 enforced by the linters, so here we will only cover ones that are not.
 
+## Versioning
+
+The sub-modules in `tools-common` are versioned independently following the [semantic versioning](https://semver.org)
+scheme.
+
+The release process should be as follows:
+
+1. Create a commit which prepares the version by updating the `CHANGES.md` where relevant
+2. Generate the commands required to tag using `./scripts/versioning/tag.py <module> <mode>`
+3. Verify and run the output commands
+
+```sh
+$ ./scripts/versioning/tag.py fs major
+git tag -a fs/v1.0.0
+git push gerrit v1.0.0 --no-verify
+```
+
+The `./scripts/versioning/tag.py` script will perform some sanity checks on the provided version.
+
 ### Documenting
 
 - All exported functions should have a matching docstring.

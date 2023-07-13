@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/bin/bash -eux
+
+set -o pipefail
 
 # Allow users to pass in a target directory where output will be stored.
 #
@@ -6,7 +8,7 @@
 # - $TARGET/coverage.xml
 #
 # Uses the current working directory by default.
-TARGET=$1
+TARGET=${1:-$PWD}
 
 if [[ $TARGET == "" ]]; then
     TARGET=$PWD

@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/bin/bash -eux
+
+set -o pipefail
 
 for MOD in $(find . -name 'go.mod' | xargs dirname | grep -v 'scripts' | tr -d './'); do
     # Change into the module directory
