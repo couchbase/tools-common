@@ -87,6 +87,10 @@ enforced by the linters, so here we will only cover ones that are not.
 
 ## Versioning
 
+In this section we will cover the versioning of `tools-common` sub-modules.
+
+### Creating Tags
+
 The sub-modules in `tools-common` are versioned independently following the [semantic versioning](https://semver.org)
 scheme.
 
@@ -103,6 +107,16 @@ git push gerrit fs/v1.0.0 --no-verify
 ```
 
 The `./scripts/versioning/tag.py` script will perform some sanity checks on the provided version.
+
+### Dependency Order
+
+The order in which dependencies are bumped is important to ensure all sub-modules receive the relevant bug fixes. The
+order can be determine by using `./scripts/versioning/bump_order.py <module>`.
+
+```sh
+$ ./scripts/versioning/bump_order.py sync
+sync, types, databases, http, environment, couchbase, cloud
+```
 
 ### Documenting
 
