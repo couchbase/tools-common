@@ -99,7 +99,7 @@ The release process should be as follows:
 ```sh
 $ ./scripts/versioning/tag.py fs major
 git tag -a fs/v1.0.0
-git push gerrit v1.0.0 --no-verify
+git push gerrit fs/v1.0.0 --no-verify
 ```
 
 The `./scripts/versioning/tag.py` script will perform some sanity checks on the provided version.
