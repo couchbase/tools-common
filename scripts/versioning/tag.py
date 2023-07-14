@@ -49,5 +49,5 @@ elif mode == "patch":
     version = version.bump_patch()
 
 # Provide the commands to the user as it's less destructive
-print(f"git tag -a {module}/{version}")
-print(f"git push gerrit {version} --no-verify")
+print(f"git tag -a {module}/v{version}")
+print(f"git push gerrit v{version} --no-verify")
