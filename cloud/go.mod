@@ -9,16 +9,16 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.0.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.23
 	github.com/aws/aws-sdk-go v1.44.299
-	github.com/couchbase/tools-common/core v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/environment v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/errors v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/fs v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/functional v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/strings v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/sync v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/testing v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/types v0.0.0-00010101000000-000000000000
-	github.com/couchbase/tools-common/utils v0.0.0-00010101000000-000000000000
+	github.com/couchbase/tools-common/core v0.1.0
+	github.com/couchbase/tools-common/environment v0.1.0
+	github.com/couchbase/tools-common/errors v0.1.0
+	github.com/couchbase/tools-common/fs v0.1.0
+	github.com/couchbase/tools-common/functional v0.1.0
+	github.com/couchbase/tools-common/strings v0.1.0
+	github.com/couchbase/tools-common/sync v0.1.0
+	github.com/couchbase/tools-common/testing v0.1.0
+	github.com/couchbase/tools-common/types v0.1.0
+	github.com/couchbase/tools-common/utils v0.1.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/stretchr/testify v1.8.4
@@ -38,7 +38,7 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.0.0 // indirect
-	github.com/couchbase/tools-common/http v0.0.0-00010101000000-000000000000 // indirect
+	github.com/couchbase/tools-common/http v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -66,25 +66,4 @@ require (
 	google.golang.org/grpc v1.56.1 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-// Until v0.1.0 of each 'tools-common' module is released retain the current
-// behavior and use the local version.
-replace (
-	github.com/couchbase/tools-common/auth => ../auth
-	github.com/couchbase/tools-common/cbbs => ../cbbs
-	github.com/couchbase/tools-common/cloud => ../cloud
-	github.com/couchbase/tools-common/core => ../core
-	github.com/couchbase/tools-common/couchbase => ../coucbhase
-	github.com/couchbase/tools-common/databases => ../databases
-	github.com/couchbase/tools-common/environment => ../environment
-	github.com/couchbase/tools-common/errors => ../errors
-	github.com/couchbase/tools-common/fs => ../fs
-	github.com/couchbase/tools-common/functional => ../functional
-	github.com/couchbase/tools-common/http => ../http
-	github.com/couchbase/tools-common/strings => ../strings
-	github.com/couchbase/tools-common/sync => ../sync
-	github.com/couchbase/tools-common/testing => ../testing
-	github.com/couchbase/tools-common/types => ../types
-	github.com/couchbase/tools-common/utils => ../utils
 )

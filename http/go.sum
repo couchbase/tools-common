@@ -1,3 +1,7 @@
+github.com/couchbase/tools-common/errors v0.1.0 h1:XynokbsQqv5y0TmybwSqo9WPMkkeGEnpuJS3OxkOIPI=
+github.com/couchbase/tools-common/errors v0.1.0/go.mod h1:xh02F+yubD0XByPILF0K8vRhVhaPn8wElk1hrvGwaaM=
+github.com/couchbase/tools-common/types v0.1.0 h1:Ts78yWQPVxPcxBy2hK49wsBQXShWmJqcEEFaotwv+Ts=
+github.com/couchbase/tools-common/types v0.1.0/go.mod h1:rxQomFlSf0wGASKQT7EkAlQ+qBsSsBOKO+GRS1RGaG0=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
