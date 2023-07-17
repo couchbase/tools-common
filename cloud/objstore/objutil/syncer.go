@@ -14,7 +14,7 @@ import (
 	fsutil "github.com/couchbase/tools-common/fs/util"
 	"github.com/couchbase/tools-common/sync/hofp"
 	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/ratelimit"
+	"github.com/couchbase/tools-common/types/ratelimit"
 )
 
 // Syncer exposes the ability to sync files and directories to/from a remote cloud provider.

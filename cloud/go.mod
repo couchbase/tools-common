@@ -9,16 +9,16 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.0.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.23
 	github.com/aws/aws-sdk-go v1.44.299
-	github.com/couchbase/tools-common/core v0.1.0
-	github.com/couchbase/tools-common/environment v0.1.0
-	github.com/couchbase/tools-common/errors v0.1.0
-	github.com/couchbase/tools-common/fs v0.1.0
-	github.com/couchbase/tools-common/functional v0.1.0
-	github.com/couchbase/tools-common/strings v0.1.0
-	github.com/couchbase/tools-common/sync v0.1.0
-	github.com/couchbase/tools-common/testing v0.1.0
-	github.com/couchbase/tools-common/types v0.1.0
-	github.com/couchbase/tools-common/utils v0.1.0
+	github.com/couchbase/tools-common/core v1.0.0
+	github.com/couchbase/tools-common/environment v1.0.0
+	github.com/couchbase/tools-common/errors v1.0.0
+	github.com/couchbase/tools-common/fs v1.0.0
+	github.com/couchbase/tools-common/functional v1.0.0
+	github.com/couchbase/tools-common/strings v1.0.0
+	github.com/couchbase/tools-common/sync v1.0.0
+	github.com/couchbase/tools-common/testing v1.0.0
+	github.com/couchbase/tools-common/types v1.0.0
+	github.com/couchbase/tools-common/utils v1.0.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/stretchr/testify v1.8.4
@@ -38,7 +38,7 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.0.0 // indirect
-	github.com/couchbase/tools-common/http v0.1.0 // indirect
+	github.com/couchbase/tools-common/http v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

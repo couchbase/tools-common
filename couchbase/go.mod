@@ -3,16 +3,16 @@ module github.com/couchbase/tools-common/couchbase
 go 1.18
 
 require (
-	github.com/couchbase/tools-common/auth v0.1.0
-	github.com/couchbase/tools-common/core v0.1.0
-	github.com/couchbase/tools-common/environment v0.1.0
-	github.com/couchbase/tools-common/errors v0.1.0
-	github.com/couchbase/tools-common/http v0.1.0
-	github.com/couchbase/tools-common/strings v0.1.0
-	github.com/couchbase/tools-common/sync v0.1.0
-	github.com/couchbase/tools-common/testing v0.1.0
-	github.com/couchbase/tools-common/types v0.1.0
-	github.com/couchbase/tools-common/utils v0.1.0
+	github.com/couchbase/tools-common/auth v1.0.0
+	github.com/couchbase/tools-common/core v1.0.0
+	github.com/couchbase/tools-common/environment v1.0.0
+	github.com/couchbase/tools-common/errors v1.0.0
+	github.com/couchbase/tools-common/http v1.0.0
+	github.com/couchbase/tools-common/strings v1.0.0
+	github.com/couchbase/tools-common/sync v1.0.0
+	github.com/couchbase/tools-common/testing v1.0.0
+	github.com/couchbase/tools-common/types v1.0.0
+	github.com/couchbase/tools-common/utils v1.0.0
 	github.com/foxcpp/go-mockdns v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/json-iterator/go v1.1.12
