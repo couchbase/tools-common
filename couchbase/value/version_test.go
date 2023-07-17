@@ -85,9 +85,9 @@ func TestVersionNewer(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:   "UnknownTo7.1.0",
+			name:   "UnknownTo7.6.0",
 			first:  VersionUnknown,
-			second: Version7_1_0,
+			second: Version7_6_0,
 		},
 		{
 			name:   "UnknownToUnknown",

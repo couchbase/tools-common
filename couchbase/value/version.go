@@ -45,8 +45,11 @@ const (
 	// Version7_1_0 represents the 7.1.0 release of Couchbase Server (Neo).
 	Version7_1_0 = Version("7.1.0")
 
+	// Version7_6_0 represents the 7.6.0 release of Couchbase Server (Trinity).
+	Version7_6_0 = Version("7.6.0")
+
 	// VersionLatest represents the latest known version of Couchbase server, this may be an unreleased version.
-	VersionLatest = Version7_1_0
+	VersionLatest = Version7_6_0
 )
 
 // Older returns a boolean indicating whether the current version is older than the provided version.
