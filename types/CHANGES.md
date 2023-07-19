@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.1
+
+- Added a 'From' function to the 'ptr' package.
+
 ## v1.0.0
 
 - Moved 'ratelimit' package from 'utils/ratelimit' to 'types/ratelimit'.

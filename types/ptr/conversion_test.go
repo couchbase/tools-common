@@ -29,3 +29,8 @@ func TestTo(t *testing.T) {
 		require.Equal(t, *To(testConst), testVar)
 	})
 }
+
+func TestFrom(t *testing.T) {
+	require.Zero(t, From[int](nil))
+	require.Equal(t, 42, From(To(42)))
+}

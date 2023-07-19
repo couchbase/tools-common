@@ -8,3 +8,13 @@ package ptr
 func To[V any](v V) *V {
 	return &v
 }
+
+// From dereferences the given pointer or returns the default value if <nil>, this mimics lots of the utility functions
+// in the AWS SDK which do the same thing but were written before generics.
+func From[V any](v *V) V {
+	if v != nil {
+		return *v
+	}
+
+	return *new(V)
+}
