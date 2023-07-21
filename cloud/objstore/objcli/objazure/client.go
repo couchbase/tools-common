@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/system"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
@@ -88,7 +89,7 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 
 	attrs := objval.ObjectAttrs{
 		Key:          key,
-		Size:         *resp.ContentLength,
+		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
 	}
 
@@ -110,8 +111,8 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 
 	attrs := &objval.ObjectAttrs{
 		Key:          key,
-		ETag:         string(*resp.ETag),
-		Size:         *resp.ContentLength,
+		ETag:         (*string)(resp.ETag),
+		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
 	}
 
@@ -141,7 +142,7 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
-	if objerr.IsNotFoundError(err) || attrs != nil && attrs.Size == 0 {
+	if objerr.IsNotFoundError(err) || attrs != nil && ptr.From(attrs.Size) == 0 {
 		return c.PutObject(ctx, bucket, key, data)
 	}
 
@@ -296,7 +297,7 @@ func (c *Client) convertBlobsToObjectAttrs(prefixes []*string, blobs []*containe
 	for _, b := range blobs {
 		converted = append(converted, &objval.ObjectAttrs{
 			Key:          *b.Name,
-			Size:         *b.Properties.ContentLength,
+			Size:         b.Properties.ContentLength,
 			LastModified: b.Properties.LastModified,
 		})
 	}

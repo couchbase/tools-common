@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/maths"
 	"github.com/couchbase/tools-common/utils/system"
 
@@ -70,7 +71,7 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 
 	attrs := objval.ObjectAttrs{
 		Key:          key,
-		Size:         *resp.ContentLength,
+		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
 	}
 
@@ -95,8 +96,8 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 
 	attrs := &objval.ObjectAttrs{
 		Key:          key,
-		ETag:         *resp.ETag,
-		Size:         *resp.ContentLength,
+		ETag:         resp.ETag,
+		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
 	}
 
@@ -127,7 +128,7 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 		return fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
-	if attrs.Size < MinUploadSize {
+	if ptr.From(attrs.Size) < MinUploadSize {
 		return c.downloadAndAppend(ctx, bucket, attrs, data)
 	}
 
@@ -188,7 +189,16 @@ func (c *Client) createMPUThenCopyAndAppend(
 func (c *Client) copyAndAppend(
 	ctx context.Context, bucket, id string, attrs *objval.ObjectAttrs, data io.ReadSeeker,
 ) error {
-	copied, err := c.UploadPartCopy(ctx, bucket, id, attrs.Key, attrs.Key, 1, &objval.ByteRange{End: attrs.Size - 1})
+	copied, err := c.UploadPartCopy(
+		ctx,
+		bucket,
+		id,
+		attrs.Key,
+		attrs.Key,
+		1,
+		// The attributes uses here are obtained from 'GetObjectAttrs' so the 'Size' will be non-nil.
+		&objval.ByteRange{End: ptr.From(attrs.Size) - 1},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to copy source object: %w", err)
 	}
@@ -342,7 +352,7 @@ func (c *Client) handlePage(page *s3.ListObjectsV2Output, include, exclude []*re
 	}
 
 	for _, o := range page.Contents {
-		converted = append(converted, &objval.ObjectAttrs{Key: *o.Key, Size: *o.Size, LastModified: o.LastModified})
+		converted = append(converted, &objval.ObjectAttrs{Key: *o.Key, Size: o.Size, LastModified: o.LastModified})
 	}
 
 	for _, attrs := range converted {

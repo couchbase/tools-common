@@ -7,20 +7,35 @@ import (
 
 // ObjectAttrs represents the attributes usually attached to an object in the cloud.
 type ObjectAttrs struct {
-	// Object identity attributes
-	Key  string
-	ETag string // NOTE: Not populated during object iteration.
+	// Key is the identifier for the object; a unique path.
+	Key string
 
-	// Attributes about the object itself
+	// ETag is the HTTP entity tag for the object, each cloud provider uses this differently with different rules also
+	// applying to different scenarios (e.g. multipart uploads).
 	//
-	// NOTE: Not populated if 'IsDir' is true.
-	Size         int64
+	// NOTE: Not populated during object iteration.
+	ETag *string
+
+	// Size is the size or content length of the object in bytes.
+	//
+	// NOTE: May be conditionally populated by 'GetObject', for example when a chunked response is returned, this
+	// attribute will be <nil>.
+	Size *int64
+
+	// LastModified is the time the object was last updated (or created).
+	//
+	// NOTE: The semantics of this attribute may differ between cloud providers (e.g. an change of metadata might bump
+	// the last modified time).
 	LastModified *time.Time
 }
 
-// IsDir returns a boolean indicating whether this object is a virtual/synthetic directory stub.
+// IsDir returns a boolean indicating whether these attributes represent a synthetic directory, created by the library
+// when iterating objects using a 'delimiter'. When 'IsDir' returns 'true', only the 'Key' attribute will be populated.
+//
+// NOTE: This does not, and will not indicate whether the remote object is itself a directory stub; a zero length object
+// created by the AWS WebUI.
 func (o *ObjectAttrs) IsDir() bool {
-	return o.Size == 0 && o.LastModified == nil
+	return o.Size == nil && o.ETag == nil && o.LastModified == nil
 }
 
 // Object represents an object stored in the cloud, simply the attributes and it's body.

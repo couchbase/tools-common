@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	testutil "github.com/couchbase/tools-common/testing/util"
+	"github.com/couchbase/tools-common/types/ptr"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -73,7 +74,7 @@ func TestClientGetObject(t *testing.T) {
 	expected := &objval.Object{
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "key",
-			Size:         int64(len("value")),
+			Size:         ptr.To(int64(len("value"))),
 			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 		},
 	}
@@ -145,8 +146,8 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	expected := &objval.ObjectAttrs{
 		Key:          "key",
-		ETag:         "etag",
-		Size:         5,
+		ETag:         ptr.To("etag"),
+		Size:         ptr.To[int64](5),
 		LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 
@@ -798,17 +799,17 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key1",
-					Size:         64,
+					Size:         ptr.To[int64](64),
 					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
-					Size:         128,
+					Size:         ptr.To[int64](128),
 					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/key2",
-					Size:         256,
+					Size:         ptr.To[int64](256),
 					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
@@ -819,7 +820,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key1",
-					Size:         64,
+					Size:         ptr.To[int64](64),
 					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 				},
 			},
@@ -830,12 +831,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key1",
-					Size:         64,
+					Size:         ptr.To[int64](64),
 					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
-					Size:         128,
+					Size:         ptr.To[int64](128),
 					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
 				},
 			},
@@ -846,12 +847,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key1",
-					Size:         64,
+					Size:         ptr.To[int64](64),
 					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
-					Size:         128,
+					Size:         ptr.To[int64](128),
 					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
 				},
 			},
@@ -862,7 +863,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key2",
-					Size:         256,
+					Size:         ptr.To[int64](256),
 					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
@@ -873,7 +874,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key2",
-					Size:         256,
+					Size:         ptr.To[int64](256),
 					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
@@ -884,7 +885,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			all: []*objval.ObjectAttrs{
 				{
 					Key:          "/path/to/key2",
-					Size:         256,
+					Size:         ptr.To[int64](256),
 					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
 				},
 			},

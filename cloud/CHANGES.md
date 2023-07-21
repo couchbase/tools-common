@@ -1,5 +1,12 @@
 # Changes
 
+## v2.0.0
+
+- BREAKING: Made `ObjectAttrs.Size` a pointer given it may be conditionally
+  populated by `GetObject` (e.g. when the remote server is using chunked
+  encoding).
+- Improved documentation around the `ObjectAttrs.IsDir` function.
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to

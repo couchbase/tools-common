@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
+	"github.com/couchbase/tools-common/types/ptr"
 )
 
 // TestClient implementation of the 'Client' interface which stores state in memory, and can be used to avoid having to
@@ -169,7 +170,7 @@ func (t *TestClient) IterateObjects(_ context.Context, bucket, prefix, delimiter
 		// If this is a nested key, convert it into a directory stub
 		if delimiter != "" && strings.Count(trimmed, delimiter) > 1 {
 			attrs.Key = rootDirectory(trimmed)
-			attrs.Size = 0
+			attrs.Size = ptr.To[int64](0)
 			attrs.LastModified = nil
 		}
 
@@ -193,7 +194,7 @@ func (t *TestClient) ListParts(ctx context.Context, bucket, id, key string) ([]o
 
 	fn := func(attrs *objval.ObjectAttrs) error {
 		if strings.HasPrefix(attrs.Key, prefix) {
-			parts = append(parts, objval.Part{ID: attrs.Key, Size: attrs.Size})
+			parts = append(parts, objval.Part{ID: attrs.Key, Size: ptr.From(attrs.Size)})
 		}
 
 		return nil
@@ -311,8 +312,8 @@ func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) str
 
 	attrs := objval.ObjectAttrs{
 		Key:          key,
-		ETag:         strings.ReplaceAll(uuid.NewString(), "-", ""),
-		Size:         int64(len(data)),
+		ETag:         ptr.To(strings.ReplaceAll(uuid.NewString(), "-", "")),
+		Size:         ptr.To(int64(len(data))),
 		LastModified: &now,
 	}
 

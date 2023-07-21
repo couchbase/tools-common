@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/tools-common/strings/format"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/freelist"
+	"github.com/couchbase/tools-common/types/ptr"
 )
 
 // PartCompleteFunc is called once a part of the zip file has been uploaded. size is the size of the part uploaded.
@@ -169,12 +170,14 @@ func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Wr
 			return nil
 		}
 
-		if err := download(ctx, opts, logger, attrs.Key, attrs.Size, zipWriter); err != nil {
+		size := ptr.From(attrs.Size)
+
+		if err := download(ctx, opts, logger, attrs.Key, size, zipWriter); err != nil {
 			return err
 		}
 
 		if cb != nil {
-			cb(attrs.Size)
+			cb(size)
 		}
 
 		return nil
@@ -271,13 +274,7 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 
 // calculateSize calculates the total size of all objects with the given prefix.
 func calculateSize(opts CompressObjectsOptions) (int64, error) {
-	var (
-		total int64
-		fn    = func(attrs *objval.ObjectAttrs) error {
-			total += attrs.Size
-			return nil
-		}
-	)
+	var total int64
 
 	err := opts.Client.IterateObjects(opts.Context,
 		opts.SourceBucket,
@@ -285,7 +282,7 @@ func calculateSize(opts CompressObjectsOptions) (int64, error) {
 		opts.Delimiter,
 		opts.Include,
 		opts.Exclude,
-		fn,
+		func(attrs *objval.ObjectAttrs) error { total += ptr.From(attrs.Size); return nil },
 	)
 	if err != nil {
 		return 0, fmt.Errorf("error whilst iterating objects: %w", err)

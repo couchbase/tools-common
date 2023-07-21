@@ -63,8 +63,8 @@ github.com/couchbase/tools-common/sync v1.0.0 h1:J+xuTE6qom/eZyldaFJ3txiCZJcAbfB
 github.com/couchbase/tools-common/sync v1.0.0/go.mod h1:sWTZmqkYhjljGKG1xGj5OBm8W7Yi5y/EvYESkSfV7RM=
 github.com/couchbase/tools-common/testing v1.0.0 h1:FHa/rwTunvb9+j/4+DT0RSaXg/fWW6XAfj8jyGu5e5Y=
 github.com/couchbase/tools-common/testing v1.0.0/go.mod h1:x1TTvkYyXSle7ZpTkyvzEhKCxthvTEaOsgCJcpKgyto=
-github.com/couchbase/tools-common/types v1.0.0 h1:C9MjHmTPcZyPo2Yp9Dt86WeZH+2XQgydorCC9jb+/dQ=
-github.com/couchbase/tools-common/types v1.0.0/go.mod h1:r700V2xUuJqBGNG2aWbQYn5S0sJdqO3TLIa2AIQVaGU=
+github.com/couchbase/tools-common/types v1.1.0 h1:ac7PoGD/jfBKtZD3UPDGFu+AmuKSViM+vn4vHKMNpZ8=
+github.com/couchbase/tools-common/types v1.1.0/go.mod h1:r700V2xUuJqBGNG2aWbQYn5S0sJdqO3TLIa2AIQVaGU=
 github.com/couchbase/tools-common/utils v1.0.0 h1:6mWXqWWj7aM0Kp2LWpSKEu9pLAYm7il3gWdqpvxnJV4=
 github.com/couchbase/tools-common/utils v1.0.0/go.mod h1:i6cN5Z5hB9vQRLxe2j1v6Nu8bv+pKl9BFXjbQUHSah8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

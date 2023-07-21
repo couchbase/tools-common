@@ -23,6 +23,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/system"
 )
 
@@ -74,7 +75,7 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 
 	attrs := objval.ObjectAttrs{
 		Key:          key,
-		Size:         remote.Size,
+		Size:         ptr.To(remote.Size),
 		LastModified: aws.Time(remote.LastModified),
 	}
 
@@ -94,8 +95,8 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 
 	attrs := &objval.ObjectAttrs{
 		Key:          key,
-		ETag:         remote.Etag,
-		Size:         remote.Size,
+		ETag:         ptr.To(remote.Etag),
+		Size:         ptr.To(remote.Size),
 		LastModified: &remote.Updated,
 	}
 
@@ -135,7 +136,7 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
-	if objerr.IsNotFoundError(err) || attrs.Size == 0 {
+	if objerr.IsNotFoundError(err) || ptr.From(attrs.Size) == 0 {
 		return c.PutObject(ctx, bucket, key, data)
 	}
 
@@ -153,7 +154,7 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	part := objval.Part{ID: key, Number: 1, Size: attrs.Size}
+	part := objval.Part{ID: key, Number: 1, Size: ptr.From(attrs.Size)}
 
 	err = c.CompleteMultipartUpload(ctx, bucket, id, key, part, intermediate)
 	if err != nil {
@@ -248,14 +249,14 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 
 		var (
 			key     = remote.Prefix
-			size    int64
+			size    *int64
 			updated *time.Time
 		)
 
 		// If "key" is empty this isn't a directory stub, treat it as a normal object
 		if key == "" {
 			key = remote.Name
-			size = remote.Size
+			size = ptr.To(remote.Size)
 			updated = &remote.Updated
 		}
 
@@ -287,7 +288,7 @@ func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objva
 	fn := func(attrs *objval.ObjectAttrs) error {
 		parts = append(parts, objval.Part{
 			ID:   attrs.Key,
-			Size: attrs.Size,
+			Size: ptr.From(attrs.Size),
 		})
 
 		return nil
@@ -337,7 +338,7 @@ func (c *Client) UploadPartCopy(
 	}
 
 	// If the user has provided a byte range, ensure that it's for the entire object
-	if br != nil && !(br.Start == 0 && br.End == attrs.Size-1) {
+	if br != nil && !(br.Start == 0 && br.End == ptr.From(attrs.Size)-1) {
 		return objval.Part{}, objerr.ErrUnsupportedOperation
 	}
 
@@ -354,7 +355,7 @@ func (c *Client) UploadPartCopy(
 		return objval.Part{}, handleError(bucket, intermediate, err)
 	}
 
-	return objval.Part{ID: intermediate, Size: attrs.Size}, nil
+	return objval.Part{ID: intermediate, Size: ptr.From(attrs.Size)}, nil
 }
 
 func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, _, key string, parts ...objval.Part) error {

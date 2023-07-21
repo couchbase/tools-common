@@ -71,7 +71,7 @@ func TestClientGetObject(t *testing.T) {
 	expected := &objval.Object{
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "blob",
-			Size:         42,
+			Size:         ptr.To[int64](42),
 			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
@@ -105,7 +105,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 	expected := &objval.Object{
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "blob",
-			Size:         42,
+			Size:         ptr.To[int64](42),
 			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
@@ -140,8 +140,8 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	expected := &objval.ObjectAttrs{
 		Key:          "blob",
-		ETag:         "etag",
-		Size:         42,
+		ETag:         ptr.To("etag"),
+		Size:         ptr.To[int64](42),
 		LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
 	}
 

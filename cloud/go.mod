@@ -17,7 +17,7 @@ require (
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/couchbase/tools-common/sync v1.0.0
 	github.com/couchbase/tools-common/testing v1.0.0
-	github.com/couchbase/tools-common/types v1.0.0
+	github.com/couchbase/tools-common/types v1.1.0
 	github.com/couchbase/tools-common/utils v1.0.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0

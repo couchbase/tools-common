@@ -19,6 +19,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/functional/slices"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
+	"github.com/couchbase/tools-common/types/ptr"
 )
 
 const partSize = 1024
@@ -237,7 +238,7 @@ func TestCompressUploadUploadError(t *testing.T) {
 		) error {
 			_ = fn(&objval.ObjectAttrs{
 				Key:  "foo",
-				Size: size,
+				Size: ptr.To[int64](size),
 			})
 
 			return nil

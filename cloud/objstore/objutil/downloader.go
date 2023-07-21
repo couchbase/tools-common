@@ -8,6 +8,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/maths"
 )
 
@@ -85,7 +86,7 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
-	return &objval.ByteRange{End: attrs.Size - 1}, nil
+	return &objval.ByteRange{End: ptr.From(attrs.Size) - 1}, nil
 }
 
 // download the given byte range using multiple concurrent requests.
