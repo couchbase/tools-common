@@ -229,13 +229,20 @@ func (t *TestClient) UploadPart(
 	return part, nil
 }
 
-func (t *TestClient) UploadPartCopy(_ context.Context, bucket, id, dst, src string, number int,
+func (t *TestClient) UploadPartCopy(
+	_ context.Context,
+	dstBucket,
+	id,
+	dstKey,
+	srcBucket,
+	srcKey string,
+	number int,
 	br *objval.ByteRange,
 ) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, err := t.getObjectRLocked(bucket, src)
+	object, err := t.getObjectRLocked(srcBucket, srcKey)
 	if err != nil {
 		return objval.Part{}, err
 	}
@@ -244,7 +251,7 @@ func (t *TestClient) UploadPartCopy(_ context.Context, bucket, id, dst, src stri
 	copy(body, object.Body)
 
 	part := objval.Part{
-		ID:     t.putObjectLocked(bucket, partKey(id, dst), bytes.NewReader(body)),
+		ID:     t.putObjectLocked(dstBucket, partKey(id, dstKey), bytes.NewReader(body)),
 		Number: number,
 		Size:   int64(len(body)),
 	}

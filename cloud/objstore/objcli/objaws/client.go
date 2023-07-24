@@ -187,13 +187,17 @@ func (c *Client) createMPUThenCopyAndAppend(
 // copyAndAppend copies all the data from the source object, then uploads a new part and completes the multipart upload.
 // This has the affect of appending data to the object, without having to download, and re-upload.
 func (c *Client) copyAndAppend(
-	ctx context.Context, bucket, id string, attrs *objval.ObjectAttrs, data io.ReadSeeker,
+	ctx context.Context,
+	bucket, id string,
+	attrs *objval.ObjectAttrs,
+	data io.ReadSeeker,
 ) error {
 	copied, err := c.UploadPartCopy(
 		ctx,
 		bucket,
 		id,
 		attrs.Key,
+		bucket,
 		attrs.Key,
 		1,
 		// The attributes uses here are obtained from 'GetObjectAttrs' so the 'Size' will be non-nil.
@@ -437,17 +441,24 @@ func (c *Client) UploadPart(
 }
 
 func (c *Client) UploadPartCopy(
-	ctx context.Context, bucket, id, dst, src string, number int, br *objval.ByteRange,
+	ctx context.Context,
+	dstBucket,
+	id,
+	dstKey,
+	srcBucket,
+	srcKey string,
+	number int,
+	br *objval.ByteRange,
 ) (objval.Part, error) {
 	if err := br.Valid(true); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
 	input := &s3.UploadPartCopyInput{
-		Bucket:          aws.String(bucket),
-		CopySource:      aws.String(path.Join(bucket, src)),
+		Bucket:          aws.String(dstBucket),
+		CopySource:      aws.String(path.Join(srcBucket, srcKey)),
 		CopySourceRange: aws.String(br.ToRangeHeader()),
-		Key:             aws.String(dst),
+		Key:             aws.String(dstKey),
 		PartNumber:      aws.Int64(int64(number)),
 		UploadId:        aws.String(id),
 	}

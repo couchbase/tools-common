@@ -403,8 +403,16 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 					return blockblob.StageBlockFromURLResponse{}, nil
 				})
 
-			part, err := client.UploadPartCopy(context.Background(), "container", objcli.NoUploadID, "dst", "src", 42,
-				test.br)
+			part, err := client.UploadPartCopy(
+				context.Background(),
+				"container",
+				objcli.NoUploadID,
+				"dst",
+				"container",
+				"src",
+				42,
+				test.br,
+			)
 			require.NoError(t, err)
 			require.NotZero(t, part.ID)
 
@@ -416,25 +424,27 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 
 func TestClientUploadPartCopy(t *testing.T) {
 	var (
-		ctrl       = gomock.NewController(t)
-		sAPI       = NewMockserviceAPI(ctrl)
-		cAPI       = NewMockcontainerAPI(ctrl)
-		srcAPI     = NewMockblockBlobAPI(ctrl)
-		srcBlobAPI = NewMockblobAPI(ctrl)
-		dstAPI     = NewMockblockBlobAPI(ctrl)
+		ctrl            = gomock.NewController(t)
+		sAPI            = NewMockserviceAPI(ctrl)
+		srcContainerAPI = NewMockcontainerAPI(ctrl)
+		dstContainerAPI = NewMockcontainerAPI(ctrl)
+		srcBlockBlobAPI = NewMockblockBlobAPI(ctrl)
+		srcBlobAPI      = NewMockblobAPI(ctrl)
+		dstBlockBlobAPI = NewMockblockBlobAPI(ctrl)
 	)
 
-	sAPI.EXPECT().NewContainerClient("container").Return(cAPI).Times(3)
-	cAPI.EXPECT().NewBlockBlobClient("src").Return(srcAPI)
-	cAPI.EXPECT().NewBlockBlobClient("dst").Return(dstAPI)
-	cAPI.EXPECT().NewBlobClient("src").Return(srcBlobAPI)
+	sAPI.EXPECT().NewContainerClient("srcContainer").Return(srcContainerAPI).Times(2)
+	sAPI.EXPECT().NewContainerClient("dstContainer").Return(dstContainerAPI)
+	srcContainerAPI.EXPECT().NewBlockBlobClient("srcKey").Return(srcBlockBlobAPI)
+	dstContainerAPI.EXPECT().NewBlockBlobClient("dstKey").Return(dstBlockBlobAPI)
+	srcContainerAPI.EXPECT().NewBlobClient("srcKey").Return(srcBlobAPI)
 
 	srcBlobAPI.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New(sasErrString))
-	srcAPI.EXPECT().URL().Return("example.com")
+	srcBlockBlobAPI.EXPECT().URL().Return("example.com")
 
 	client := Client{serviceAPI: sAPI}
 
-	dstAPI.
+	dstBlockBlobAPI.
 		EXPECT().
 		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
@@ -448,7 +458,16 @@ func TestClientUploadPartCopy(t *testing.T) {
 			return blockblob.StageBlockFromURLResponse{}, nil
 		})
 
-	part, err := client.UploadPartCopy(context.Background(), "container", objcli.NoUploadID, "dst", "src", 42, nil)
+	part, err := client.UploadPartCopy(
+		context.Background(),
+		"dstContainer",
+		objcli.NoUploadID,
+		"dstKey",
+		"srcContainer",
+		"srcKey",
+		42,
+		nil,
+	)
 	require.NoError(t, err)
 	require.NotZero(t, part.ID)
 
@@ -459,11 +478,13 @@ func TestClientUploadPartCopy(t *testing.T) {
 func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(context.Background(),
-		"bucket",
+	_, err := client.UploadPartCopy(
+		context.Background(),
+		"dstContainer",
 		objcli.NoUploadID,
-		"dst",
-		"src",
+		"dstKey",
+		"srcContainer",
+		"srcKey",
 		42,
 		&objval.ByteRange{Start: 128, End: 64},
 	)
@@ -476,7 +497,16 @@ func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {
 func TestClientUploadPartCopyWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(context.Background(), "bucket", "id", "dst", "src", 42, nil)
+	_, err := client.UploadPartCopy(
+		context.Background(),
+		"dstContainer",
+		"id",
+		"dstKey",
+		"srcContainer",
+		"srcKey",
+		42,
+		nil,
+	)
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 

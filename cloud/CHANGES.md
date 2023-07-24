@@ -6,6 +6,8 @@
   populated by `GetObject` (e.g. when the remote server is using chunked
   encoding).
 - Improved documentation around the `ObjectAttrs.IsDir` function.
+- BREAKING: The 'UploadPartCopy' function now accepts a dst/src bucket allowing
+  copying between buckets.
 
 ## v1.0.0
 

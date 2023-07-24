@@ -38,9 +38,11 @@ func (r *RateLimitedClient) Provider() objval.Provider {
 	return r.c.Provider()
 }
 
-func (r *RateLimitedClient) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object,
-	error,
-) {
+func (r *RateLimitedClient) GetObject(
+	ctx context.Context,
+	bucket, key string,
+	br *objval.ByteRange,
+) (*objval.Object, error) {
 	obj, err := r.c.GetObject(ctx, bucket, key, br)
 	if err != nil {
 		return nil, err
@@ -85,16 +87,26 @@ func (r *RateLimitedClient) ListParts(ctx context.Context, bucket, id, key strin
 	return r.c.ListParts(ctx, bucket, id, key)
 }
 
-func (r *RateLimitedClient) UploadPart(ctx context.Context, bucket, id, key string, number int,
+func (r *RateLimitedClient) UploadPart(
+	ctx context.Context,
+	bucket, id, key string,
+	number int,
 	body io.ReadSeeker,
 ) (objval.Part, error) {
 	return r.c.UploadPart(ctx, bucket, id, key, number, ratelimit.NewRateLimitedReadSeeker(ctx, body, r.rl))
 }
 
-func (r *RateLimitedClient) UploadPartCopy(ctx context.Context, bucket, id, dst, src string, number int,
+func (r *RateLimitedClient) UploadPartCopy(
+	ctx context.Context,
+	dstBucket,
+	id,
+	dstKey,
+	srcBucket,
+	srcKey string,
+	number int,
 	br *objval.ByteRange,
 ) (objval.Part, error) {
-	return r.c.UploadPartCopy(ctx, bucket, id, dst, src, number, br)
+	return r.c.UploadPartCopy(ctx, dstBucket, id, dstKey, srcBucket, srcKey, number, br)
 }
 
 func (r *RateLimitedClient) CompleteMultipartUpload(ctx context.Context, bucket, id, key string,

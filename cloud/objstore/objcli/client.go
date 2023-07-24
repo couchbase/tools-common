@@ -78,7 +78,14 @@ type Client interface {
 	//
 	// NOTE: Not all cloud providers support providing a byte range.
 	UploadPartCopy(
-		ctx context.Context, bucket, id, dst, src string, number int, br *objval.ByteRange,
+		ctx context.Context,
+		dstBucket,
+		id,
+		dstKey,
+		srcBucket,
+		srcKey string,
+		number int,
+		br *objval.ByteRange,
 	) (objval.Part, error)
 
 	// CompleteMultipartUpload completes the multipart upload with the given id, the given parts should be provided in

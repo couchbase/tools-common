@@ -155,7 +155,7 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	existing, err := c.UploadPartCopy(ctx, bucket, id, key, key, objcli.NoPartNumber, nil)
+	existing, err := c.UploadPartCopy(ctx, bucket, id, key, bucket, key, objcli.NoPartNumber, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get existing object part: %w", err)
 	}
@@ -399,7 +399,14 @@ func (c *Client) UploadPart(
 }
 
 func (c *Client) UploadPartCopy(
-	ctx context.Context, bucket, id, dst, src string, number int, br *objval.ByteRange,
+	ctx context.Context,
+	dstBucket,
+	id,
+	dstKey,
+	srcBucket,
+	srcKey string,
+	number int,
+	br *objval.ByteRange,
 ) (objval.Part, error) {
 	if id != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
@@ -416,12 +423,12 @@ func (c *Client) UploadPartCopy(
 
 	blockID := base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 
-	srcURL, err := c.getUploadPartCopySrcURL(bucket, src)
+	srcURL, err := c.getUploadPartCopySrcURL(srcBucket, srcKey)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to get the source part URL: %w", err)
 	}
 
-	dstClient := c.getBlobBlockClient(bucket, dst)
+	dstClient := c.getBlobBlockClient(dstBucket, dstKey)
 
 	_, err = dstClient.StageBlockFromURL(
 		ctx,
@@ -430,7 +437,7 @@ func (c *Client) UploadPartCopy(
 		&blockblob.StageBlockFromURLOptions{Range: blob.HTTPRange{Offset: offset, Count: length}},
 	)
 	if err != nil {
-		return objval.Part{}, handleError(bucket, dst, err)
+		return objval.Part{}, handleError(dstBucket, dstKey, err)
 	}
 
 	return objval.Part{ID: blockID, Number: number, Size: length}, nil

@@ -1081,10 +1081,10 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 	fn := func(input *s3.UploadPartCopyInput) bool {
 		var (
-			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			src    = input.CopySource != nil && *input.CopySource == "bucket/key2"
+			bucket = input.Bucket != nil && *input.Bucket == "dstBucket"
+			src    = input.CopySource != nil && *input.CopySource == "srcBucket/key1"
 			rnge   = input.CopySourceRange != nil && *input.CopySourceRange == "bytes=64-128"
-			key    = input.Key != nil && *input.Key == "key1"
+			key    = input.Key != nil && *input.Key == "key2"
 			number = input.PartNumber != nil && *input.PartNumber == 1
 			id     = input.UploadId != nil && *input.UploadId == "id"
 		)
@@ -1100,8 +1100,16 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	part, err := client.UploadPartCopy(context.Background(), "bucket", "id", "key1", "key2", 1,
-		&objval.ByteRange{Start: 64, End: 128})
+	part, err := client.UploadPartCopy(
+		context.Background(),
+		"dstBucket",
+		"id",
+		"key2",
+		"srcBucket",
+		"key1",
+		1,
+		&objval.ByteRange{Start: 64, End: 128},
+	)
 	require.NoError(t, err)
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 65}, part)
 
@@ -1112,8 +1120,16 @@ func TestClientUploadPartCopy(t *testing.T) {
 func TestClientUploadPartCopyInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(context.Background(), "bucket", "id", "dst", "src", 1,
-		&objval.ByteRange{Start: 128, End: 64})
+	_, err := client.UploadPartCopy(
+		context.Background(),
+		"dstBucket",
+		"id",
+		"key2",
+		"srcBucket",
+		"key1",
+		1,
+		&objval.ByteRange{Start: 128, End: 64},
+	)
 
 	var invalidByteRange *objval.InvalidByteRangeError
 

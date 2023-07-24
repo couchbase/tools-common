@@ -324,15 +324,19 @@ func (c *Client) UploadPart(
 // be done by either not providing a byte range, or providing a byte range for the entire object.
 func (c *Client) UploadPartCopy(
 	ctx context.Context,
-	bucket, id, dst, src string,
-	_ int,
+	dstBucket,
+	id,
+	dstKey,
+	srcBucket,
+	srcKey string,
+	number int,
 	br *objval.ByteRange,
 ) (objval.Part, error) {
 	if err := br.Valid(false); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
-	attrs, err := c.GetObjectAttrs(ctx, bucket, src)
+	attrs, err := c.GetObjectAttrs(ctx, srcBucket, srcKey)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to get object attributes: %w", err)
 	}
@@ -343,19 +347,19 @@ func (c *Client) UploadPartCopy(
 	}
 
 	var (
-		intermediate = partKey(id, dst)
-		srcHdle      = c.serviceAPI.Bucket(bucket).Object(src)
+		intermediate = partKey(id, dstKey)
+		srcHdle      = c.serviceAPI.Bucket(srcBucket).Object(srcKey)
 		// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 		// destination object, always retry.
-		dstHdle = c.serviceAPI.Bucket(bucket).Object(intermediate).Retryer(storage.WithPolicy(storage.RetryAlways))
+		dstHdle = c.serviceAPI.Bucket(dstBucket).Object(intermediate).Retryer(storage.WithPolicy(storage.RetryAlways))
 	)
 
 	_, err = dstHdle.CopierFrom(srcHdle).Run(ctx)
 	if err != nil {
-		return objval.Part{}, handleError(bucket, intermediate, err)
+		return objval.Part{}, handleError(dstBucket, intermediate, err)
 	}
 
-	return objval.Part{ID: intermediate, Size: ptr.From(attrs.Size)}, nil
+	return objval.Part{ID: intermediate, Number: number, Size: ptr.From(attrs.Size)}, nil
 }
 
 func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, _, key string, parts ...objval.Part) error {

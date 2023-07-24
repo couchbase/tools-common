@@ -948,18 +948,20 @@ func TestClientUploadPartCopy(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				msAPI  = &mockServiceAPI{}
-				mbAPI  = &mockBucketAPI{}
+				msbAPI = &mockBucketAPI{}
+				mdbAPI = &mockBucketAPI{}
 				msoAPI = &mockObjectAPI{}
 				mdoAPI = &mockObjectAPI{}
 				mcAPI  = &mockCopierAPI{}
 			)
 
-			msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+			msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "srcBucket" })).Return(msbAPI)
+			msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "dstBucket" })).Return(mdbAPI)
 
-			mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "src" })).Return(msoAPI)
+			msbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "srcKey" })).Return(msoAPI)
 
-			mbAPI.On("Object", mock.MatchedBy(func(key string) bool {
-				return strings.HasPrefix(key, "dst-mpu-")
+			mdbAPI.On("Object", mock.MatchedBy(func(key string) bool {
+				return strings.HasPrefix(key, "dstKey-mpu-")
 			})).Return(mdoAPI)
 
 			mdoAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
@@ -971,7 +973,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 			mcAPI.On("Run", mock.Anything).Return(nil, nil)
 
 			output := &storage.ObjectAttrs{
-				Name:    "key",
+				Name:    "srcKey",
 				Etag:    "etag",
 				Size:    5,
 				Updated: (time.Time{}).Add(24 * time.Hour),
@@ -981,7 +983,16 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 			client := &Client{serviceAPI: msAPI}
 
-			_, err := client.UploadPartCopy(context.Background(), "bucket", "id", "dst", "src", 1, test.br)
+			_, err := client.UploadPartCopy(
+				context.Background(),
+				"dstBucket",
+				"id",
+				"dstKey",
+				"srcBucket",
+				"srcKey",
+				1,
+				test.br,
+			)
 			if test.invalid {
 				require.ErrorIs(t, err, objerr.ErrUnsupportedOperation)
 
@@ -993,8 +1004,11 @@ func TestClientUploadPartCopy(t *testing.T) {
 			msAPI.AssertExpectations(t)
 			msAPI.AssertNumberOfCalls(t, "Bucket", 3)
 
-			mbAPI.AssertExpectations(t)
-			mbAPI.AssertNumberOfCalls(t, "Object", 3)
+			msbAPI.AssertExpectations(t)
+			msbAPI.AssertNumberOfCalls(t, "Object", 2)
+
+			mdbAPI.AssertExpectations(t)
+			msbAPI.AssertNumberOfCalls(t, "Object", 2)
 
 			msoAPI.AssertExpectations(t)
 			msoAPI.AssertNumberOfCalls(t, "Attrs", 1)
