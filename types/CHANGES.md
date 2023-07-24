@@ -1,6 +1,6 @@
 # Changes
 
-## v1.0.1
+## v1.1.0
 
 - Added a 'From' function to the 'ptr' package.
 
