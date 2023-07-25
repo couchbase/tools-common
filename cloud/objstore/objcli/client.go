@@ -36,6 +36,12 @@ type Client interface {
 	// NOTE: The body is required to be a 'ReadSeeker' to support checksum calculation/validation.
 	PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error
 
+	// CopyObject copies an object from one location to another, this may be within the same bucket.
+	//
+	// NOTE: Most cloud providers enforce a upper bound on the size of objects that can be copied (5GB) see
+	// `objutil.CopyObject` for an implementation that supports larger objects.
+	CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error
+
 	// AppendToObject appends the provided data to the object with the given key, this is a binary concatenation.
 	//
 	// NOTE: If the given object does not already exist, it will be created.

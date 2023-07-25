@@ -132,6 +132,19 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.Read
 	return handleError(bucket, key, writer.Close())
 }
 
+func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+	var (
+		srcHdle = c.serviceAPI.Bucket(srcBucket).Object(srcKey)
+		// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
+		// destination object, always retry.
+		dstHdle = c.serviceAPI.Bucket(dstBucket).Object(dstKey).Retryer(storage.WithPolicy(storage.RetryAlways))
+	)
+
+	_, err := dstHdle.CopierFrom(srcHdle).Run(ctx)
+
+	return handleError("", "", err)
+}
+
 func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
 	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
 

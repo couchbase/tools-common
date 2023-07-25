@@ -8,6 +8,7 @@
 - Improved documentation around the `ObjectAttrs.IsDir` function.
 - BREAKING: The 'UploadPartCopy' function now accepts a dst/src bucket allowing
   copying between buckets.
+- Added a `CopyObject` function to the `objcli.Client` interface.
 
 ## v1.0.0
 

@@ -138,6 +138,19 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.Read
 	return handleError(bucket, key, err)
 }
 
+func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+	dstClient := c.serviceAPI.NewContainerClient(dstBucket).NewBlobClient(dstKey)
+
+	srcURL, err := c.getSASURL(srcBucket, srcKey)
+	if err != nil {
+		return fmt.Errorf("failed to get the source object URL: %w", err)
+	}
+
+	_, err = dstClient.CopyFromURL(ctx, srcURL, &blob.CopyFromURLOptions{})
+
+	return handleError("", "", err)
+}
+
 func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
 	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
 
@@ -423,7 +436,7 @@ func (c *Client) UploadPartCopy(
 
 	blockID := base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 
-	srcURL, err := c.getUploadPartCopySrcURL(srcBucket, srcKey)
+	srcURL, err := c.getSASURL(srcBucket, srcKey)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to get the source part URL: %w", err)
 	}
@@ -443,7 +456,7 @@ func (c *Client) UploadPartCopy(
 	return objval.Part{ID: blockID, Number: number, Size: length}, nil
 }
 
-func (c *Client) getUploadPartCopySrcURL(bucket, src string) (string, error) {
+func (c *Client) getSASURL(bucket, src string) (string, error) {
 	var (
 		srcContainerClient = c.serviceAPI.NewContainerClient(bucket)
 		srcClient          = srcContainerClient.NewBlobClient(src)

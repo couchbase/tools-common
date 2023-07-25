@@ -92,6 +92,20 @@ func (t *TestClient) PutObject(_ context.Context, bucket, key string, body io.Re
 	return nil
 }
 
+func (t *TestClient) CopyObject(_ context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	src, err := t.getObjectRLocked(srcBucket, srcKey)
+	if err != nil {
+		return err
+	}
+
+	_ = t.putObjectLocked(dstBucket, dstKey, bytes.NewReader(src.Body))
+
+	return nil
+}
+
 func (t *TestClient) AppendToObject(_ context.Context, bucket, key string, data io.ReadSeeker) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()

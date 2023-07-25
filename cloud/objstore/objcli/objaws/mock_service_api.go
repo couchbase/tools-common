@@ -82,6 +82,39 @@ func (_m *mockServiceAPI) CompleteMultipartUploadWithContext(_a0 context.Context
 	return r0, r1
 }
 
+// CopyObjectWithContext provides a mock function with given fields: _a0, _a1, _a2
+func (_m *mockServiceAPI) CopyObjectWithContext(_a0 context.Context, _a1 *s3.CopyObjectInput, _a2 ...request.Option) (*s3.CopyObjectOutput, error) {
+	_va := make([]interface{}, len(_a2))
+	for _i := range _a2 {
+		_va[_i] = _a2[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, _a0, _a1)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *s3.CopyObjectOutput
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *s3.CopyObjectInput, ...request.Option) (*s3.CopyObjectOutput, error)); ok {
+		return rf(_a0, _a1, _a2...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *s3.CopyObjectInput, ...request.Option) *s3.CopyObjectOutput); ok {
+		r0 = rf(_a0, _a1, _a2...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*s3.CopyObjectOutput)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *s3.CopyObjectInput, ...request.Option) error); ok {
+		r1 = rf(_a0, _a1, _a2...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateMultipartUploadWithContext provides a mock function with given fields: _a0, _a1, _a2
 func (_m *mockServiceAPI) CreateMultipartUploadWithContext(_a0 context.Context, _a1 *s3.CreateMultipartUploadInput, _a2 ...request.Option) (*s3.CreateMultipartUploadOutput, error) {
 	_va := make([]interface{}, len(_a2))

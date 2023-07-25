@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"path"
 	"regexp"
 
@@ -114,6 +115,18 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.Read
 	_, err := c.serviceAPI.PutObjectWithContext(ctx, input)
 
 	return handleError(input.Bucket, input.Key, err)
+}
+
+func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+	input := &s3.CopyObjectInput{
+		Bucket:     aws.String(dstBucket),
+		Key:        aws.String(dstKey),
+		CopySource: aws.String(url.PathEscape(srcBucket + "/" + srcKey)),
+	}
+
+	_, err := c.serviceAPI.CopyObjectWithContext(ctx, input)
+
+	return handleError(nil, nil, err)
 }
 
 func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {

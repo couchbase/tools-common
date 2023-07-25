@@ -37,6 +37,7 @@ type serviceAPI interface {
 	) error
 
 	PutObjectWithContext(context.Context, *s3.PutObjectInput, ...request.Option) (*s3.PutObjectOutput, error)
+	CopyObjectWithContext(context.Context, *s3.CopyObjectInput, ...request.Option) (*s3.CopyObjectOutput, error)
 	UploadPartWithContext(context.Context, *s3.UploadPartInput, ...request.Option) (*s3.UploadPartOutput, error)
 
 	UploadPartCopyWithContext(

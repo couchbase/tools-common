@@ -157,6 +157,21 @@ func (m *MockblobAPI) EXPECT() *MockblobAPIMockRecorder {
 	return m.recorder
 }
 
+// CopyFromURL mocks base method.
+func (m *MockblobAPI) CopyFromURL(ctx context.Context, copySource string, o *blob.CopyFromURLOptions) (blob.CopyFromURLResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CopyFromURL", ctx, copySource, o)
+	ret0, _ := ret[0].(blob.CopyFromURLResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CopyFromURL indicates an expected call of CopyFromURL.
+func (mr *MockblobAPIMockRecorder) CopyFromURL(ctx, copySource, o interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyFromURL", reflect.TypeOf((*MockblobAPI)(nil).CopyFromURL), ctx, copySource, o)
+}
+
 // GetSASURL mocks base method.
 func (m *MockblobAPI) GetSASURL(permissions sas.BlobPermissions, expiry time.Time, options *blob.GetSASURLOptions) (string, error) {
 	m.ctrl.T.Helper()

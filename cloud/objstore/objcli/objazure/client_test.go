@@ -21,6 +21,7 @@ import (
 
 	"github.com/couchbase/tools-common/cloud/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/ptr"
 )
 
@@ -195,6 +196,49 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		DoAndReturn(fn)
 
 	require.NoError(t, client.AppendToObject(context.Background(), "container", "blob", strings.NewReader("value")))
+}
+
+func TestClientCopyObject(t *testing.T) {
+	var (
+		ctrl  = gomock.NewController(t)
+		sAPI  = NewMockserviceAPI(ctrl)
+		scAPI = NewMockcontainerAPI(ctrl)
+		dcAPI = NewMockcontainerAPI(ctrl)
+		dbAPI = NewMockblobAPI(ctrl)
+	)
+
+	sAPI.EXPECT().NewContainerClient("srcContainer").Return(scAPI)
+	sAPI.EXPECT().NewContainerClient("dstContainer").Return(dcAPI)
+
+	scAPI.EXPECT().NewBlobClient("srcBlob").Return(dbAPI)
+	dcAPI.EXPECT().NewBlobClient("dstBlob").Return(dbAPI)
+
+	dbAPI.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("example.com", nil)
+
+	client := &Client{serviceAPI: sAPI}
+
+	fn := func(
+		ctx context.Context,
+		copySource string,
+		opts *blob.CopyFromURLOptions,
+	) (blob.CopyFromURLResponse, error) {
+		return blob.CopyFromURLResponse{}, nil
+	}
+
+	dbAPI.
+		EXPECT().
+		CopyFromURL(matchers.Context, gomock.Any(), gomock.Any()).
+		DoAndReturn(fn)
+
+	err := client.CopyObject(
+		context.Background(),
+		"dstContainer",
+		"dstBlob",
+		"srcContainer",
+		"srcBlob",
+	)
+
+	require.NoError(t, err)
 }
 
 func TestClientAppendToObject(t *testing.T) {

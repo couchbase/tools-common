@@ -58,6 +58,7 @@ func (c containerClient) NewListBlobsHierarchyPager(
 }
 
 type blobAPI interface {
+	CopyFromURL(ctx context.Context, copySource string, o *blob.CopyFromURLOptions) (blob.CopyFromURLResponse, error)
 	GetSASURL(permissions sas.BlobPermissions, expiry time.Time, options *blob.GetSASURLOptions) (string, error)
 }
 

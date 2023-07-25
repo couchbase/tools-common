@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -215,6 +216,30 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
 	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
+}
+
+func TestClientCopyObject(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.CopyObjectInput) bool {
+		var (
+			bucket = ptr.From(input.Bucket) == "dstBucket"
+			key    = ptr.From(input.Key) == "dstKey"
+			source = ptr.From(input.CopySource) == url.PathEscape("srcBucket/srcKey")
+		)
+
+		return bucket && key && source
+	}
+
+	api.On("CopyObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(&s3.CopyObjectOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.CopyObject(context.Background(), "dstBucket", "dstKey", "srcBucket", "srcKey")
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "CopyObjectWithContext", 1)
 }
 
 func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {

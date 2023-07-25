@@ -67,6 +67,20 @@ func (_m *MockClient) CompleteMultipartUpload(ctx context.Context, bucket, id, k
 	return r0
 }
 
+// CopyObject provides a mock function with given fields: ctx, dstBucket, dstKey, srcBucket, srcKey
+func (_m *MockClient) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+	ret := _m.Called(ctx, dstBucket, dstKey, srcBucket, srcKey)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
+		r0 = rf(ctx, dstBucket, dstKey, srcBucket, srcKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // CreateMultipartUpload provides a mock function with given fields: ctx, bucket, key
 func (_m *MockClient) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
 	ret := _m.Called(ctx, bucket, key)
