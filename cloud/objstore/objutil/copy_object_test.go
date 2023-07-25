@@ -42,10 +42,10 @@ func TestCopyObject(t *testing.T) {
 
 			options := CopyObjectOptions{
 				Client:            client,
-				SourceBucket:      "srcBucket",
-				SourceKey:         "srcKey",
 				DestinationBucket: "dstBucket",
 				DestinationKey:    "dstKey",
+				SourceBucket:      "srcBucket",
+				SourceKey:         "srcKey",
 			}
 
 			err = CopyObject(options)
@@ -53,7 +53,6 @@ func TestCopyObject(t *testing.T) {
 
 			dst, err := client.GetObject(context.Background(), "dstBucket", "dstKey", nil)
 			require.NoError(t, err)
-
 			require.Equal(t, body, testutil.ReadAll(t, dst.Body))
 		})
 	}

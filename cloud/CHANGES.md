@@ -10,6 +10,7 @@
   copying between buckets.
 - Added a `CopyObject` function to the `objcli.Client` interface.
 - Added a `CopyObject` function to `objutil`.
+- Added a `CopyObjects` function to `objutil`.
 
 ## v1.0.0
 

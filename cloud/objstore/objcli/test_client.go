@@ -184,7 +184,8 @@ func (t *TestClient) IterateObjects(_ context.Context, bucket, prefix, delimiter
 		// If this is a nested key, convert it into a directory stub
 		if delimiter != "" && strings.Count(trimmed, delimiter) > 1 {
 			attrs.Key = rootDirectory(trimmed)
-			attrs.Size = ptr.To[int64](0)
+			attrs.ETag = nil
+			attrs.Size = nil
 			attrs.LastModified = nil
 		}
 
