@@ -38,8 +38,8 @@ type Client interface {
 
 	// CopyObject copies an object from one location to another, this may be within the same bucket.
 	//
-	// NOTE: Most cloud providers enforce a upper bound on the size of objects that can be copied (5GB) see
-	// `objutil.CopyObject` for an implementation that supports larger objects.
+	// NOTE: Each cloud provider has limitations on the max size for copied objects therefore using this function
+	// directly is not recommend; see 'objutil.CopyObject' which handles these nuances.
 	CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error
 
 	// AppendToObject appends the provided data to the object with the given key, this is a binary concatenation.

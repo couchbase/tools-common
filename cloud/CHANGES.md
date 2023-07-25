@@ -9,6 +9,7 @@
 - BREAKING: The 'UploadPartCopy' function now accepts a dst/src bucket allowing
   copying between buckets.
 - Added a `CopyObject` function to the `objcli.Client` interface.
+- Added a `CopyObject` function to `objutil`.
 
 ## v1.0.0
 
