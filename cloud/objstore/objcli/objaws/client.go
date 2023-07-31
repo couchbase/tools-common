@@ -57,12 +57,12 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 	}
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(opts.Bucket),
-		Key:    aws.String(opts.Key),
+		Bucket: ptr.To(opts.Bucket),
+		Key:    ptr.To(opts.Key),
 	}
 
 	if opts.ByteRange != nil {
-		input.Range = aws.String(opts.ByteRange.ToRangeHeader())
+		input.Range = ptr.To(opts.ByteRange.ToRangeHeader())
 	}
 
 	resp, err := c.serviceAPI.GetObjectWithContext(ctx, input)
@@ -86,8 +86,8 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 
 func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsOptions) (*objval.ObjectAttrs, error) {
 	input := &s3.HeadObjectInput{
-		Bucket: aws.String(opts.Bucket),
-		Key:    aws.String(opts.Key),
+		Bucket: ptr.To(opts.Bucket),
+		Key:    ptr.To(opts.Key),
 	}
 
 	resp, err := c.serviceAPI.HeadObjectWithContext(ctx, input)
@@ -108,8 +108,8 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
 	input := &s3.PutObjectInput{
 		Body:   opts.Body,
-		Bucket: aws.String(opts.Bucket),
-		Key:    aws.String(opts.Key),
+		Bucket: ptr.To(opts.Bucket),
+		Key:    ptr.To(opts.Key),
 	}
 
 	_, err := c.serviceAPI.PutObjectWithContext(ctx, input)
@@ -119,9 +119,9 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 
 func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
 	input := &s3.CopyObjectInput{
-		Bucket:     aws.String(opts.DestinationBucket),
-		Key:        aws.String(opts.DestinationKey),
-		CopySource: aws.String(url.PathEscape(opts.SourceBucket + "/" + opts.SourceKey)),
+		Bucket:     ptr.To(opts.DestinationBucket),
+		Key:        ptr.To(opts.DestinationKey),
+		CopySource: ptr.To(url.PathEscape(opts.SourceBucket + "/" + opts.SourceKey)),
 	}
 
 	_, err := c.serviceAPI.CopyObjectWithContext(ctx, input)
@@ -319,8 +319,8 @@ func (c *Client) deleteDirectory(
 	}
 
 	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-		Prefix: aws.String(prefix),
+		Bucket: ptr.To(bucket),
+		Prefix: ptr.To(prefix),
 	}
 
 	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
@@ -342,12 +342,12 @@ func (c *Client) deleteObjects(ctx context.Context, bucket string, keys ...strin
 	}
 
 	input := &s3.DeleteObjectsInput{
-		Bucket: aws.String(bucket),
-		Delete: &s3.Delete{Quiet: aws.Bool(true)},
+		Bucket: ptr.To(bucket),
+		Delete: &s3.Delete{Quiet: ptr.To(true)},
 	}
 
 	for _, key := range keys {
-		input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: aws.String(key)})
+		input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: ptr.To(key)})
 	}
 
 	resp, err := c.serviceAPI.DeleteObjectsWithContext(ctx, input)
@@ -377,9 +377,9 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 	}
 
 	input := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(opts.Bucket),
-		Prefix:    aws.String(opts.Prefix),
-		Delimiter: aws.String(opts.Delimiter),
+		Bucket:    ptr.To(opts.Bucket),
+		Prefix:    ptr.To(opts.Prefix),
+		Delimiter: ptr.To(opts.Delimiter),
 	}
 
 	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
@@ -423,8 +423,8 @@ func (c *Client) handlePage(
 
 func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMultipartUploadOptions) (string, error) {
 	input := &s3.CreateMultipartUploadInput{
-		Bucket: aws.String(opts.Bucket),
-		Key:    aws.String(opts.Key),
+		Bucket: ptr.To(opts.Bucket),
+		Key:    ptr.To(opts.Key),
 	}
 
 	resp, err := c.serviceAPI.CreateMultipartUploadWithContext(ctx, input)
@@ -439,9 +439,9 @@ func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([
 	parts := make([]objval.Part, 0)
 
 	input := &s3.ListPartsInput{
-		Bucket:   aws.String(opts.Bucket),
-		UploadId: aws.String(opts.UploadID),
-		Key:      aws.String(opts.Key),
+		Bucket:   ptr.To(opts.Bucket),
+		UploadId: ptr.To(opts.UploadID),
+		Key:      ptr.To(opts.Key),
 	}
 
 	err := c.serviceAPI.ListPartsPagesWithContext(ctx, input, func(page *s3.ListPartsOutput, _ bool) bool {
@@ -471,11 +471,11 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 
 	input := &s3.UploadPartInput{
 		Body:          opts.Body,
-		Bucket:        aws.String(opts.Bucket),
-		ContentLength: aws.Int64(size),
-		Key:           aws.String(opts.Key),
-		PartNumber:    aws.Int64(int64(opts.Number)),
-		UploadId:      aws.String(opts.UploadID),
+		Bucket:        ptr.To(opts.Bucket),
+		ContentLength: ptr.To(size),
+		Key:           ptr.To(opts.Key),
+		PartNumber:    ptr.To(int64(opts.Number)),
+		UploadId:      ptr.To(opts.UploadID),
 	}
 
 	output, err := c.serviceAPI.UploadPartWithContext(ctx, input)
@@ -492,12 +492,12 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 	}
 
 	input := &s3.UploadPartCopyInput{
-		Bucket:          aws.String(opts.DestinationBucket),
-		CopySource:      aws.String(path.Join(opts.SourceBucket, opts.SourceKey)),
-		CopySourceRange: aws.String(opts.ByteRange.ToRangeHeader()),
-		Key:             aws.String(opts.DestinationKey),
-		PartNumber:      aws.Int64(int64(opts.Number)),
-		UploadId:        aws.String(opts.UploadID),
+		Bucket:          ptr.To(opts.DestinationBucket),
+		CopySource:      ptr.To(path.Join(opts.SourceBucket, opts.SourceKey)),
+		CopySourceRange: ptr.To(opts.ByteRange.ToRangeHeader()),
+		Key:             ptr.To(opts.DestinationKey),
+		PartNumber:      ptr.To(int64(opts.Number)),
+		UploadId:        ptr.To(opts.UploadID),
 	}
 
 	output, err := c.serviceAPI.UploadPartCopyWithContext(ctx, input)
@@ -518,13 +518,13 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 	converted := make([]*s3.CompletedPart, len(opts.Parts))
 
 	for index, part := range opts.Parts {
-		converted[index] = &s3.CompletedPart{ETag: aws.String(part.ID), PartNumber: aws.Int64(int64(part.Number))}
+		converted[index] = &s3.CompletedPart{ETag: ptr.To(part.ID), PartNumber: ptr.To(int64(part.Number))}
 	}
 
 	input := &s3.CompleteMultipartUploadInput{
-		Bucket:          aws.String(opts.Bucket),
-		Key:             aws.String(opts.Key),
-		UploadId:        aws.String(opts.UploadID),
+		Bucket:          ptr.To(opts.Bucket),
+		Key:             ptr.To(opts.Key),
+		UploadId:        ptr.To(opts.UploadID),
 		MultipartUpload: &s3.CompletedMultipartUpload{Parts: converted},
 	}
 
@@ -535,9 +535,9 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 
 func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMultipartUploadOptions) error {
 	input := &s3.AbortMultipartUploadInput{
-		Bucket:   aws.String(opts.Bucket),
-		Key:      aws.String(opts.Key),
-		UploadId: aws.String(opts.UploadID),
+		Bucket:   ptr.To(opts.Bucket),
+		Key:      ptr.To(opts.Key),
+		UploadId: ptr.To(opts.UploadID),
 	}
 
 	_, err := c.serviceAPI.AbortMultipartUploadWithContext(ctx, input)

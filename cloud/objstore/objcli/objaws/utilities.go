@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sns"
 
 	"github.com/couchbase/tools-common/cloud/objstore/objerr"
+	"github.com/couchbase/tools-common/types/ptr"
 )
 
 // handleError converts an error relating accessing an object via its key into a user friendly error where possible.
@@ -25,13 +26,13 @@ func handleError(bucket, key *string, err error) error {
 		return objerr.ErrUnauthorized
 	case s3.ErrCodeNoSuchKey, sns.ErrCodeNotFoundException:
 		if key == nil {
-			key = aws.String("<empty key name>")
+			key = ptr.To("<empty key name>")
 		}
 
 		return &objerr.NotFoundError{Type: "key", Name: *key}
 	case s3.ErrCodeNoSuchBucket:
 		if bucket == nil {
-			bucket = aws.String("<empty bucket name>")
+			bucket = ptr.To("<empty bucket name>")
 		}
 
 		return &objerr.NotFoundError{Type: "bucket", Name: *bucket}

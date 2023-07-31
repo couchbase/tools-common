@@ -19,7 +19,6 @@ import (
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/ptr"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -58,8 +57,8 @@ func TestClientGetObject(t *testing.T) {
 
 	output := &s3.GetObjectOutput{
 		Body:          io.NopCloser(strings.NewReader("value")),
-		ContentLength: aws.Int64(int64(len("value"))),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ContentLength: ptr.To(int64(len("value"))),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("GetObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -79,7 +78,7 @@ func TestClientGetObject(t *testing.T) {
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "key",
 			Size:         ptr.To(int64(len("value"))),
-			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		},
 	}
 
@@ -98,8 +97,8 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 
 	output := &s3.GetObjectOutput{
 		Body:          io.NopCloser(strings.NewReader("value")),
-		ContentLength: aws.Int64(int64(len("value"))),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ContentLength: ptr.To(int64(len("value"))),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("GetObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -144,9 +143,9 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	}
 
 	output := &s3.HeadObjectOutput{
-		ETag:          aws.String("etag"),
-		ContentLength: aws.Int64(5),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ETag:          ptr.To("etag"),
+		ContentLength: ptr.To[int64](5),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -163,7 +162,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		Key:          "key",
 		ETag:         ptr.To("etag"),
 		Size:         ptr.To[int64](5),
-		LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -283,9 +282,9 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 	}
 
 	output1 := &s3.HeadObjectOutput{
-		ETag:          aws.String("etag"),
-		ContentLength: aws.Int64(int64(len("value"))),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ETag:          ptr.To("etag"),
+		ContentLength: ptr.To(int64(len("value"))),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
@@ -301,9 +300,9 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 
 	output2 := &s3.GetObjectOutput{
 		Body:          io.NopCloser(strings.NewReader("value")),
-		ETag:          aws.String("etag"),
-		ContentLength: aws.Int64(int64(len("value"))),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ETag:          ptr.To("etag"),
+		ContentLength: ptr.To(int64(len("value"))),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("GetObjectWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
@@ -348,9 +347,9 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	}
 
 	output1 := &s3.HeadObjectOutput{
-		ETag:          aws.String("etag"),
-		ContentLength: aws.Int64(MinUploadSize),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ETag:          ptr.To("etag"),
+		ContentLength: ptr.To[int64](MinUploadSize),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
@@ -365,7 +364,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	}
 
 	output2 := &s3.CreateMultipartUploadOutput{
-		UploadId: aws.String("id"),
+		UploadId: ptr.To("id"),
 	}
 
 	api.On("CreateMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
@@ -384,7 +383,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	}
 
 	output3 := &s3.UploadPartCopyOutput{
-		CopyPartResult: &s3.CopyPartResult{ETag: aws.String("etag1")},
+		CopyPartResult: &s3.CopyPartResult{ETag: ptr.To("etag1")},
 	}
 
 	api.On("UploadPartCopyWithContext", matchers.Context, mock.MatchedBy(fn3)).Return(output3, nil)
@@ -402,7 +401,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	}
 
 	output4 := &s3.UploadPartOutput{
-		ETag: aws.String("etag2"),
+		ETag: ptr.To("etag2"),
 	}
 
 	api.On("UploadPartWithContext", matchers.Context, mock.MatchedBy(fn4)).Return(output4, nil)
@@ -413,8 +412,8 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 			key    = input.Key != nil && *input.Key == "key"
 			id     = input.UploadId != nil && *input.UploadId == "id"
 			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []*s3.CompletedPart{
-				{ETag: aws.String("etag1"), PartNumber: aws.Int64(1)},
-				{ETag: aws.String("etag2"), PartNumber: aws.Int64(2)},
+				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int64](1)},
+				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int64](2)},
 			})
 		)
 
@@ -453,9 +452,9 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 	}
 
 	output1 := &s3.HeadObjectOutput{
-		ETag:          aws.String("etag"),
-		ContentLength: aws.Int64(MinUploadSize),
-		LastModified:  aws.Time((time.Time{}).Add(24 * time.Hour)),
+		ETag:          ptr.To("etag"),
+		ContentLength: ptr.To[int64](MinUploadSize),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
@@ -470,7 +469,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 	}
 
 	output2 := &s3.CreateMultipartUploadOutput{
-		UploadId: aws.String("id"),
+		UploadId: ptr.To("id"),
 	}
 
 	api.On("CreateMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
@@ -536,9 +535,9 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
 			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
 			objects = input.Delete != nil && reflect.DeepEqual(input.Delete.Objects, []*s3.ObjectIdentifier{
-				{Key: aws.String("key1")},
-				{Key: aws.String("key2")},
-				{Key: aws.String("key3")},
+				{Key: ptr.To("key1")},
+				{Key: ptr.To("key2")},
+				{Key: ptr.To("key3")},
 			})
 		)
 
@@ -611,7 +610,7 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 	api := &mockServiceAPI{}
 
 	output := &s3.DeleteObjectsOutput{
-		Errors: []*s3.Error{{Code: aws.String(s3.ErrCodeNoSuchKey), Message: aws.String("")}},
+		Errors: []*s3.Error{{Code: ptr.To(s3.ErrCodeNoSuchKey), Message: ptr.To("")}},
 	}
 
 	api.On("DeleteObjectsWithContext", matchers.Context, mock.Anything).Return(output, nil)
@@ -643,14 +642,14 @@ func TestClientDeleteDirectory(t *testing.T) {
 	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
 		contents := []*s3.Object{
 			{
-				Key:          aws.String("/path/to/key1"),
-				Size:         aws.Int64(64),
-				LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+				Key:          ptr.To("/path/to/key1"),
+				Size:         ptr.To[int64](64),
+				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			},
 			{
-				Key:          aws.String("/path/to/key2"),
-				Size:         aws.Int64(128),
-				LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+				Key:          ptr.To("/path/to/key2"),
+				Size:         ptr.To[int64](128),
+				LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 			},
 		}
 
@@ -693,14 +692,14 @@ func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
 	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
 		contents := []*s3.Object{
 			{
-				Key:          aws.String("/path/to/key1"),
-				Size:         aws.Int64(64),
-				LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+				Key:          ptr.To("/path/to/key1"),
+				Size:         ptr.To[int64](64),
+				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			},
 			{
-				Key:          aws.String("/path/to/key2"),
-				Size:         aws.Int64(128),
-				LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+				Key:          ptr.To("/path/to/key2"),
+				Size:         ptr.To[int64](128),
+				LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 			},
 		}
 
@@ -780,14 +779,14 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 		fn(&s3.ListObjectsV2Output{
 			CommonPrefixes: []*s3.CommonPrefix{
 				{
-					Prefix: aws.String("/path/to/key1"),
+					Prefix: ptr.To("/path/to/key1"),
 				},
 			},
 			Contents: []*s3.Object{
 				{
-					Key:          aws.String("/path/to/key1"),
-					Size:         aws.Int64(64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					Key:          ptr.To("/path/to/key1"),
+					Size:         ptr.To[int64](64),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 			},
 		}, true)
@@ -844,9 +843,9 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
 		fn(&s3.ListObjectsV2Output{Contents: []*s3.Object{
 			{
-				Key:          aws.String("/path/to/key1"),
-				Size:         aws.Int64(64),
-				LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+				Key:          ptr.To("/path/to/key1"),
+				Size:         ptr.To[int64](64),
+				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			},
 		}}, true)
 
@@ -884,17 +883,17 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
-					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -905,7 +904,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 			},
 		},
@@ -916,12 +915,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
-					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 				},
 			},
 		},
@@ -932,12 +931,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
-					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 				},
 			},
 		},
@@ -948,7 +947,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -959,7 +958,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -970,7 +969,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -992,19 +991,19 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
 				fn(&s3.ListObjectsV2Output{Contents: []*s3.Object{
 					{
-						Key:          aws.String("/path/to/key1"),
-						Size:         aws.Int64(64),
-						LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+						Key:          ptr.To("/path/to/key1"),
+						Size:         ptr.To[int64](64),
+						LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 					},
 					{
-						Key:          aws.String("/path/to/another/key1"),
-						Size:         aws.Int64(128),
-						LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+						Key:          ptr.To("/path/to/another/key1"),
+						Size:         ptr.To[int64](128),
+						LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 					},
 					{
-						Key:          aws.String("/path/to/key2"),
-						Size:         aws.Int64(256),
-						LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+						Key:          ptr.To("/path/to/key2"),
+						Size:         ptr.To[int64](256),
+						LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 					},
 				}}, true)
 
@@ -1050,7 +1049,7 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 	}
 
 	output := &s3.CreateMultipartUploadOutput{
-		UploadId: aws.String("id"),
+		UploadId: ptr.To("id"),
 	}
 
 	api.On("CreateMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn), mock.Anything).
@@ -1085,12 +1084,12 @@ func TestClientListParts(t *testing.T) {
 	fn2 := func(fn func(page *s3.ListPartsOutput, _ bool) bool) bool {
 		parts := []*s3.Part{
 			{
-				ETag: aws.String("etag1"),
-				Size: aws.Int64(64),
+				ETag: ptr.To("etag1"),
+				Size: ptr.To[int64](64),
 			},
 			{
-				ETag: aws.String("etag2"),
-				Size: aws.Int64(128),
+				ETag: ptr.To("etag2"),
+				Size: ptr.To[int64](128),
 			},
 		}
 
@@ -1162,7 +1161,7 @@ func TestClientUploadPart(t *testing.T) {
 	}
 
 	output := &s3.UploadPartOutput{
-		ETag: aws.String("etag"),
+		ETag: ptr.To("etag"),
 	}
 
 	api.On("UploadPartWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -1200,7 +1199,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 	}
 
 	output := &s3.UploadPartCopyOutput{
-		CopyPartResult: &s3.CopyPartResult{ETag: aws.String("etag")},
+		CopyPartResult: &s3.CopyPartResult{ETag: ptr.To("etag")},
 	}
 
 	api.On("UploadPartCopyWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -1250,8 +1249,8 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 			key    = input.Key != nil && *input.Key == "key"
 			id     = input.UploadId != nil && *input.UploadId == "id"
 			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []*s3.CompletedPart{
-				{ETag: aws.String("etag1"), PartNumber: aws.Int64(1)},
-				{ETag: aws.String("etag2"), PartNumber: aws.Int64(2)},
+				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int64](1)},
+				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int64](2)},
 			})
 		)
 

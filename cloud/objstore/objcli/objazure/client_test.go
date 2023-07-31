@@ -15,7 +15,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
-	"github.com/aws/aws-sdk-go/aws"
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -52,8 +51,8 @@ func TestClientGetObject(t *testing.T) {
 
 	output := blob.DownloadStreamResponse{}
 
-	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
-	output.ContentLength = aws.Int64(42)
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.ContentLength = ptr.To[int64](42)
 	output.Body = io.NopCloser(strings.NewReader("value"))
 
 	bAPI.
@@ -76,7 +75,7 @@ func TestClientGetObject(t *testing.T) {
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "blob",
 			Size:         ptr.To[int64](42),
-			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
 	}
@@ -89,8 +88,8 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 
 	output := blob.DownloadStreamResponse{}
 
-	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
-	output.ContentLength = aws.Int64(42)
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.ContentLength = ptr.To[int64](42)
 	output.Body = io.NopCloser(strings.NewReader("value"))
 
 	bAPI.
@@ -114,7 +113,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "blob",
 			Size:         ptr.To[int64](42),
-			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
 	}
@@ -141,9 +140,9 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	output := blob.GetPropertiesResponse{}
 
-	output.ContentLength = aws.Int64(42)
+	output.ContentLength = ptr.To[int64](42)
 	output.ETag = ptr.To(azcore.ETag("etag"))
-	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
 
 	bAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
 
@@ -157,7 +156,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		Key:          "blob",
 		ETag:         ptr.To("etag"),
 		Size:         ptr.To[int64](42),
-		LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -268,9 +267,9 @@ func TestClientAppendToObject(t *testing.T) {
 
 	output := blob.GetPropertiesResponse{}
 
-	output.ContentLength = aws.Int64(42)
+	output.ContentLength = ptr.To[int64](42)
 	output.ETag = ptr.To(azcore.ETag("etag"))
-	output.LastModified = aws.Time((time.Time{}).Add(24 * time.Hour))
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
 
 	blobClient := NewMockblobAPI(cAPI.ctrl)
 	cAPI.EXPECT().NewBlobClient(gomock.Any()).Return(blobClient)
@@ -381,12 +380,12 @@ func TestClientListParts(t *testing.T) {
 	output.BlockList = blockblob.BlockList{
 		UncommittedBlocks: []*blockblob.Block{
 			{
-				Name: aws.String("block3"),
-				Size: aws.Int64(256),
+				Name: ptr.To("block3"),
+				Size: ptr.To[int64](256),
 			},
 			{
-				Name: aws.String("block4"),
-				Size: aws.Int64(512),
+				Name: ptr.To("block4"),
+				Size: ptr.To[int64](512),
 			},
 		},
 	}

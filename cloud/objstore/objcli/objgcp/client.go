@@ -75,7 +75,7 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 	attrs := objval.ObjectAttrs{
 		Key:          opts.Key,
 		Size:         ptr.To(remote.Size),
-		LastModified: aws.Time(remote.LastModified),
+		LastModified: ptr.To(remote.LastModified),
 	}
 
 	object := &objval.Object{

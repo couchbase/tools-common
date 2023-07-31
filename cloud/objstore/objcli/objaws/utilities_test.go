@@ -11,43 +11,44 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/couchbase/tools-common/cloud/objstore/objerr"
+	"github.com/couchbase/tools-common/types/ptr"
 )
 
 func TestHandleError(t *testing.T) {
 	var notFound *objerr.NotFoundError
 
-	err := handleError(aws.String("bucket1"), aws.String("key1"), nil)
+	err := handleError(ptr.To("bucket1"), ptr.To("key1"), nil)
 	require.NoError(t, err)
 
 	// Not handled specifically but should not be <nil>
-	err = handleError(aws.String("bucket1"), aws.String("key1"), &mockError{inner: s3.ErrCodeNoSuchUpload})
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &mockError{inner: s3.ErrCodeNoSuchUpload})
 	require.Error(t, err)
 
-	err = handleError(aws.String("bucket1"), aws.String("key1"), &mockError{inner: "InvalidAccessKeyId"})
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &mockError{inner: "InvalidAccessKeyId"})
 	require.ErrorIs(t, err, objerr.ErrUnauthenticated)
 
-	err = handleError(aws.String("bucket1"), aws.String("key1"), &mockError{inner: "SignatureDoesNotMatch"})
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &mockError{inner: "SignatureDoesNotMatch"})
 	require.ErrorIs(t, err, objerr.ErrUnauthenticated)
 
-	err = handleError(aws.String("bucket1"), aws.String("key1"), &mockError{inner: "AccessDenied"})
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &mockError{inner: "AccessDenied"})
 	require.ErrorIs(t, err, objerr.ErrUnauthorized)
 
-	err = handleError(aws.String("bucket1"), aws.String("key1"), &mockError{inner: s3.ErrCodeNoSuchKey})
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &mockError{inner: s3.ErrCodeNoSuchKey})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "key", notFound.Type)
 	require.Equal(t, "key1", notFound.Name)
 
-	err = handleError(aws.String("bucket1"), nil, &mockError{inner: s3.ErrCodeNoSuchKey})
+	err = handleError(ptr.To("bucket1"), nil, &mockError{inner: s3.ErrCodeNoSuchKey})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "key", notFound.Type)
 	require.Equal(t, "<empty key name>", notFound.Name)
 
-	err = handleError(aws.String("bucket1"), aws.String("key1"), &mockError{inner: s3.ErrCodeNoSuchBucket})
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &mockError{inner: s3.ErrCodeNoSuchBucket})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "bucket", notFound.Type)
 	require.Equal(t, "bucket1", notFound.Name)
 
-	err = handleError(nil, aws.String("key1"), &mockError{inner: s3.ErrCodeNoSuchBucket})
+	err = handleError(nil, ptr.To("key1"), &mockError{inner: s3.ErrCodeNoSuchBucket})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "bucket", notFound.Type)
 	require.Equal(t, "<empty bucket name>", notFound.Name)

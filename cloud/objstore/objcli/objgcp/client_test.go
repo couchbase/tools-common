@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -76,7 +75,7 @@ func TestClientGetObject(t *testing.T) {
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "key",
 			Size:         ptr.To[int64](42),
-			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		},
 		Body: mrAPI,
 	}
@@ -135,7 +134,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 		ObjectAttrs: objval.ObjectAttrs{
 			Key:          "key",
 			Size:         ptr.To[int64](64),
-			LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		},
 		Body: mrAPI,
 	}
@@ -201,7 +200,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		Key:          "key",
 		ETag:         ptr.To("etag"),
 		Size:         ptr.To[int64](5),
-		LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -702,17 +701,17 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
-					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -723,7 +722,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 			},
 		},
@@ -734,12 +733,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
-					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 				},
 			},
 		},
@@ -750,12 +749,12 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
-					LastModified: aws.Time((time.Time{}).Add(24 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
-					LastModified: aws.Time((time.Time{}).Add(48 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
 				},
 			},
 		},
@@ -766,7 +765,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -777,7 +776,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
@@ -788,7 +787,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
-					LastModified: aws.Time((time.Time{}).Add(72 * time.Hour)),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
 				},
 			},
 		},
