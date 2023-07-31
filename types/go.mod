@@ -3,7 +3,6 @@ module github.com/couchbase/tools-common/types
 go 1.18
 
 require (
-	github.com/aws/aws-sdk-go v1.44.299
 	github.com/couchbase/tools-common/sync v1.0.0
 	github.com/couchbase/tools-common/utils v1.0.0
 	github.com/stretchr/testify v1.8.4
