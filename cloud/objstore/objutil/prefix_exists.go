@@ -45,15 +45,12 @@ func PrefixExists(opts PrefixExistsOptions) (bool, error) {
 
 	sentinal := errors.New("stop")
 
-	err := opts.Client.IterateObjects(
-		opts.Context,
-		opts.Bucket,
-		opts.Prefix,
-		"/",
-		nil,
-		nil,
-		func(attrs *objval.ObjectAttrs) error { return sentinal },
-	)
+	err := opts.Client.IterateObjects(opts.Context, objcli.IterateObjectsOptions{
+		Bucket:    opts.Bucket,
+		Prefix:    opts.Prefix,
+		Delimiter: "/",
+		Func:      func(attrs *objval.ObjectAttrs) error { return sentinal },
+	})
 
 	if err != nil && err != sentinal {
 		return false, fmt.Errorf("failed to iterate objects: %w", err)

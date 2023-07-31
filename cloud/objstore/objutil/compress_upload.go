@@ -145,7 +145,10 @@ func download(
 		return fmt.Errorf("could not create file in zip: %w", err)
 	}
 
-	obj, err := opts.Client.GetObject(ctx, opts.SourceBucket, key, nil)
+	obj, err := opts.Client.GetObject(ctx, objcli.GetObjectOptions{
+		Bucket: opts.SourceBucket,
+		Key:    key,
+	})
 	if err != nil {
 		return fmt.Errorf("could not get object '%s': %w", key, err)
 	}
@@ -183,14 +186,14 @@ func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Wr
 		return nil
 	}
 
-	err := opts.Client.IterateObjects(ctx,
-		opts.SourceBucket,
-		opts.Prefix,
-		opts.Delimiter,
-		opts.Include,
-		opts.Exclude,
-		fn,
-	)
+	err := opts.Client.IterateObjects(ctx, objcli.IterateObjectsOptions{
+		Bucket:    opts.SourceBucket,
+		Prefix:    opts.Prefix,
+		Delimiter: opts.Delimiter,
+		Include:   opts.Include,
+		Exclude:   opts.Exclude,
+		Func:      fn,
+	})
 	if err != nil {
 		return fmt.Errorf("error whilst iterating objects: %w", err)
 	}
@@ -234,7 +237,7 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 		Bucket:         opts.DestinationBucket,
 		Key:            opts.Destination,
 		OnPartComplete: onComplete,
-		Options:        Options{PartSize: opts.PartSize, Context: ctx},
+		Options:        Options{Context: ctx, PartSize: opts.PartSize},
 	})
 	if err != nil {
 		return fmt.Errorf("could not create uploader: %w", err)
@@ -276,14 +279,14 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 func calculateSize(opts CompressObjectsOptions) (int64, error) {
 	var total int64
 
-	err := opts.Client.IterateObjects(opts.Context,
-		opts.SourceBucket,
-		opts.Prefix,
-		opts.Delimiter,
-		opts.Include,
-		opts.Exclude,
-		func(attrs *objval.ObjectAttrs) error { total += ptr.From(attrs.Size); return nil },
-	)
+	err := opts.Client.IterateObjects(opts.Context, objcli.IterateObjectsOptions{
+		Bucket:    opts.SourceBucket,
+		Prefix:    opts.Prefix,
+		Delimiter: opts.Delimiter,
+		Include:   opts.Include,
+		Exclude:   opts.Exclude,
+		Func:      func(attrs *objval.ObjectAttrs) error { total += ptr.From(attrs.Size); return nil },
+	})
 	if err != nil {
 		return 0, fmt.Errorf("error whilst iterating objects: %w", err)
 	}

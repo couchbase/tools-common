@@ -1,6 +1,7 @@
 package objutil
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -47,37 +48,46 @@ func CopyObject(opts CopyObjectOptions) error {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
-	// Copy the variables to shorter variable name, using directly via the options structure lengthens lines too much
-	var (
-		ctx       = opts.Context
-		client    = opts.Client
-		dstBucket = opts.DestinationBucket
-		dstKey    = opts.DestinationKey
-		srcBucket = opts.SourceBucket
-		srcKey    = opts.SourceKey
-		partSize  = opts.PartSize
-	)
-
-	attrs, err := client.GetObjectAttrs(ctx, srcBucket, srcKey)
+	attrs, err := opts.Client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket: opts.SourceBucket,
+		Key:    opts.SourceKey,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
 	var (
 		size = ptr.From(attrs.Size)
-		max  = maxSingleOperationCopySize(client.Provider())
+		max  = maxSingleOperationCopySize(opts.Client.Provider())
 	)
 
 	// If we're able to perform this operation with a single request, do that instead.
 	if size <= max {
-		return client.CopyObject(ctx, dstBucket, dstKey, srcBucket, srcKey)
+		copts := objcli.CopyObjectOptions{
+			DestinationBucket: opts.DestinationBucket,
+			DestinationKey:    opts.DestinationKey,
+			SourceBucket:      opts.SourceBucket,
+			SourceKey:         opts.SourceKey,
+		}
+
+		return opts.Client.CopyObject(opts.Context, copts)
 	}
 
-	id, err := client.CreateMultipartUpload(ctx, dstBucket, dstKey)
+	id, err := opts.Client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
+		Bucket: opts.DestinationBucket,
+		Key:    opts.DestinationKey,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
-	defer client.AbortMultipartUpload(ctx, dstBucket, id, dstKey) //nolint:errcheck,wsl
+
+	aopts := objcli.AbortMultipartUploadOptions{
+		Bucket:   opts.DestinationBucket,
+		UploadID: id,
+		Key:      opts.DestinationKey,
+	}
+
+	defer opts.Client.AbortMultipartUpload(opts.Context, aopts) //nolint:errcheck
 
 	var parts []objval.Part
 
@@ -86,16 +96,15 @@ func CopyObject(opts CopyObjectOptions) error {
 	// NOTE: We currently perform this operation sequentially, so we don't need to guard access to the 'parts'. There is
 	// room for improvement to do this concurrently though, so that must be considered in the future.
 	cp := func(start, end int64) error {
-		part, err := client.UploadPartCopy(
-			ctx,
-			dstBucket,
-			id,
-			dstKey,
-			srcBucket,
-			srcKey,
-			len(parts)+1,
-			&objval.ByteRange{Start: start, End: end},
-		)
+		part, err := opts.Client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+			DestinationBucket: opts.DestinationBucket,
+			UploadID:          id,
+			DestinationKey:    opts.DestinationKey,
+			SourceBucket:      opts.SourceBucket,
+			SourceKey:         opts.SourceKey,
+			Number:            len(parts) + 1,
+			ByteRange:         &objval.ByteRange{Start: start, End: end},
+		})
 		if err != nil {
 			return fmt.Errorf("failed to copy part: %w", err)
 		}
@@ -106,12 +115,17 @@ func CopyObject(opts CopyObjectOptions) error {
 	}
 
 	// Break the object down into chunks, and perform copy operations for each
-	err = chunk(size, partSize, cp)
+	err = chunk(size, opts.PartSize, cp)
 	if err != nil {
 		return fmt.Errorf("failed to copy parts: %w", err)
 	}
 
-	err = client.CompleteMultipartUpload(ctx, dstBucket, id, dstKey, parts...)
+	err = opts.Client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:   opts.DestinationBucket,
+		UploadID: id,
+		Key:      opts.DestinationKey,
+		Parts:    parts,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}

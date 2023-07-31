@@ -8,7 +8,7 @@ import (
 
 // Options contains common options for upload/download of objects.
 type Options struct {
-	// Context is the ctx.Context that can be used to cancel all requests.
+	// Context is the 'context.Context' that can be used to cancel all requests.
 	Context context.Context
 
 	// ParseSize is the size in bytes of individual parts in multipart up/download.

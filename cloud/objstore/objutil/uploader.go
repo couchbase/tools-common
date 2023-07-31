@@ -127,7 +127,10 @@ func (m *MPUploader) createMPU() error {
 
 	var err error
 
-	m.opts.ID, err = m.opts.Client.CreateMultipartUpload(m.opts.Options.Context, m.opts.Bucket, m.opts.Key)
+	m.opts.ID, err = m.opts.Client.CreateMultipartUpload(m.opts.Context, objcli.CreateMultipartUploadOptions{
+		Bucket: m.opts.Bucket,
+		Key:    m.opts.Key,
+	})
 
 	return err
 }
@@ -167,7 +170,13 @@ func (m *MPUploader) UploadWithMeta(metadata any, body io.ReadSeeker) error {
 
 // upload a new part with the given number/body.
 func (m *MPUploader) upload(ctx context.Context, number int, metadata any, body io.ReadSeeker) error {
-	part, err := m.opts.Client.UploadPart(ctx, m.opts.Bucket, m.opts.ID, m.opts.Key, number, body)
+	part, err := m.opts.Client.UploadPart(ctx, objcli.UploadPartOptions{
+		Bucket:   m.opts.Bucket,
+		UploadID: m.opts.ID,
+		Key:      m.opts.Key,
+		Number:   number,
+		Body:     body,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
@@ -206,7 +215,13 @@ func (m *MPUploader) Abort() error {
 		return fmt.Errorf("failed to stop worker pool: %w", err)
 	}
 
-	return m.opts.Client.AbortMultipartUpload(m.opts.Options.Context, m.opts.Bucket, m.opts.ID, m.opts.Key)
+	err = m.opts.Client.AbortMultipartUpload(m.opts.Context, objcli.AbortMultipartUploadOptions{
+		Bucket:   m.opts.Bucket,
+		UploadID: m.opts.ID,
+		Key:      m.opts.Key,
+	})
+
+	return err
 }
 
 // Commit the multipart upload and stop the worker pool.
@@ -222,6 +237,12 @@ func (m *MPUploader) Commit() error {
 		func(i, j int) bool { return m.opts.Parts[i].Number < m.opts.Parts[j].Number },
 	)
 
-	return m.opts.Client.CompleteMultipartUpload(m.opts.Options.Context, m.opts.Bucket, m.opts.ID, m.opts.Key,
-		m.opts.Parts...)
+	err = m.opts.Client.CompleteMultipartUpload(m.opts.Context, objcli.CompleteMultipartUploadOptions{
+		Bucket:   m.opts.Bucket,
+		UploadID: m.opts.ID,
+		Key:      m.opts.Key,
+		Parts:    m.opts.Parts,
+	})
+
+	return err
 }

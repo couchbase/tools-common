@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"regexp"
 	"strings"
 	"time"
 
@@ -56,25 +55,25 @@ func (c *Client) Provider() objval.Provider {
 	return objval.ProviderGCP
 }
 
-func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
-	if err := br.Valid(false); err != nil {
+func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*objval.Object, error) {
+	if err := opts.ByteRange.Valid(false); err != nil {
 		return nil, err // Purposefully not wrapped
 	}
 
 	var offset, length int64 = 0, -1
-	if br != nil {
-		offset, length = br.ToOffsetLength(length)
+	if opts.ByteRange != nil {
+		offset, length = opts.ByteRange.ToOffsetLength(length)
 	}
 
-	reader, err := c.serviceAPI.Bucket(bucket).Object(key).NewRangeReader(ctx, offset, length)
+	reader, err := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).NewRangeReader(ctx, offset, length)
 	if err != nil {
-		return nil, handleError(bucket, key, err)
+		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
 	remote := reader.Attrs()
 
 	attrs := objval.ObjectAttrs{
-		Key:          key,
+		Key:          opts.Key,
 		Size:         ptr.To(remote.Size),
 		LastModified: aws.Time(remote.LastModified),
 	}
@@ -87,14 +86,14 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 	return object, nil
 }
 
-func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
-	remote, err := c.serviceAPI.Bucket(bucket).Object(key).Attrs(ctx)
+func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsOptions) (*objval.ObjectAttrs, error) {
+	remote, err := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).Attrs(ctx)
 	if err != nil {
-		return nil, handleError(bucket, key, err)
+		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
 	attrs := &objval.ObjectAttrs{
-		Key:          key,
+		Key:          opts.Key,
 		ETag:         ptr.To(remote.Etag),
 		Size:         ptr.To(remote.Size),
 		LastModified: &remote.Updated,
@@ -103,7 +102,7 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 	return attrs, nil
 }
 
-func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
+func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
 	ctx, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
 
@@ -113,10 +112,11 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.Read
 		// We always want to retry failed 'PutObject' requests, we generally have a lockfile which ensures (or we make
 		// the assumption) that we have exclusive access to a given path prefix in GCP so we don't need to worry about
 		// potentially overwriting objects.
-		writer = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways)).NewWriter(ctx)
+		object = c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).Retryer(storage.WithPolicy(storage.RetryAlways))
+		writer = object.NewWriter(ctx)
 	)
 
-	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum, crc32c), body)
+	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum, crc32c), opts.Body)
 	if err != nil {
 		return fmt.Errorf("failed to calculate checksums: %w", err)
 	}
@@ -124,52 +124,73 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.Read
 	writer.SendMD5(md5sum.Sum(nil))
 	writer.SendCRC(crc32c.Sum32())
 
-	_, err = io.Copy(writer, body)
+	_, err = io.Copy(writer, opts.Body)
 	if err != nil {
-		return handleError(bucket, key, err)
+		return handleError(opts.Bucket, opts.Key, err)
 	}
 
-	return handleError(bucket, key, writer.Close())
+	return handleError(opts.Bucket, opts.Key, writer.Close())
 }
 
-func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
 	var (
-		srcHdle = c.serviceAPI.Bucket(srcBucket).Object(srcKey)
-		// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
-		// destination object, always retry.
-		dstHdle = c.serviceAPI.Bucket(dstBucket).Object(dstKey).Retryer(storage.WithPolicy(storage.RetryAlways))
+		srcHdle = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
+		dstHdle = c.serviceAPI.Bucket(opts.DestinationBucket).Object(opts.DestinationKey)
 	)
 
-	_, err := dstHdle.CopierFrom(srcHdle).Run(ctx)
+	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
+	// destination object, always retry.
+	_, err := dstHdle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHdle).Run(ctx)
 
 	return handleError("", "", err)
 }
 
-func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
-	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
+func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) error {
+	attrs, err := c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions{
+		Bucket: opts.Bucket,
+		Key:    opts.Key,
+	})
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
 	if objerr.IsNotFoundError(err) || ptr.From(attrs.Size) == 0 {
-		return c.PutObject(ctx, bucket, key, data)
+		return c.PutObject(ctx, objcli.PutObjectOptions(opts))
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
-	id, err := c.CreateMultipartUpload(ctx, bucket, key)
+	id, err := c.CreateMultipartUpload(ctx, objcli.CreateMultipartUploadOptions{
+		Bucket: opts.Bucket,
+		Key:    opts.Key,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	intermediate, err := c.UploadPart(ctx, bucket, id, key, 2, data)
+	intermediate, err := c.UploadPart(ctx, objcli.UploadPartOptions{
+		Bucket:   opts.Bucket,
+		UploadID: id,
+		Key:      opts.Key,
+		Number:   2,
+		Body:     opts.Body,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	part := objval.Part{ID: key, Number: 1, Size: ptr.From(attrs.Size)}
+	part := objval.Part{
+		ID:     opts.Key,
+		Number: 1,
+		Size:   ptr.From(attrs.Size),
+	}
 
-	err = c.CompleteMultipartUpload(ctx, bucket, id, key, part, intermediate)
+	err = c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
+		Bucket:   opts.Bucket,
+		UploadID: id,
+		Key:      opts.Key,
+		Parts:    []objval.Part{part, intermediate},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -177,10 +198,10 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 	return nil
 }
 
-func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
+func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
 	pool := hofp.NewPool(hofp.Options{
 		Context:   ctx,
-		Size:      system.NumWorkers(len(keys)),
+		Size:      system.NumWorkers(len(opts.Keys)),
 		LogPrefix: "(objgcp)",
 	})
 
@@ -188,12 +209,12 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 		var (
 			// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
 			// prefix in GCP, always retry.
-			handle = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
+			handle = c.serviceAPI.Bucket(opts.Bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
 			err    = handle.Delete(ctx)
 		)
 
 		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
-			return handleError(bucket, key, err)
+			return handleError(opts.Bucket, key, err)
 		}
 
 		return nil
@@ -203,7 +224,7 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
 	}
 
-	for _, key := range keys {
+	for _, key := range opts.Keys {
 		if queue(key) != nil {
 			break
 		}
@@ -212,24 +233,33 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 	return pool.Stop()
 }
 
-func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
+func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
 	fn := func(attrs *objval.ObjectAttrs) error {
-		return c.DeleteObjects(ctx, bucket, attrs.Key)
+		dopts := objcli.DeleteObjectsOptions{
+			Bucket: opts.Bucket,
+			Keys:   []string{attrs.Key},
+		}
+
+		return c.DeleteObjects(ctx, dopts)
 	}
 
-	return c.IterateObjects(ctx, bucket, prefix, "", nil, nil, fn)
+	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
+		Bucket: opts.Bucket,
+		Prefix: opts.Prefix,
+		Func:   fn,
+	})
+
+	return err
 }
 
-func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
-	exclude []*regexp.Regexp, fn objcli.IterateFunc,
-) error {
-	if include != nil && exclude != nil {
+func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
+	if opts.Include != nil && opts.Exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
 	query := &storage.Query{
-		Prefix:     prefix,
-		Delimiter:  delimiter,
+		Prefix:     opts.Prefix,
+		Delimiter:  opts.Delimiter,
 		Projection: storage.ProjectionNoACL,
 	}
 
@@ -243,7 +273,7 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 		return fmt.Errorf("failed to set attribute selection: %w", err)
 	}
 
-	it := c.serviceAPI.Bucket(bucket).Objects(ctx, query)
+	it := c.serviceAPI.Bucket(opts.Bucket).Objects(ctx, query)
 
 	for {
 		remote, err := it.Next()
@@ -256,7 +286,7 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 			return fmt.Errorf("failed to get next object: %w", err)
 		}
 
-		if objcli.ShouldIgnore(remote.Name, include, exclude) {
+		if objcli.ShouldIgnore(remote.Name, opts.Include, opts.Exclude) {
 			continue
 		}
 
@@ -280,7 +310,7 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 		}
 
 		// If the caller has returned an error, stop iteration, and return control to them
-		if err = fn(attrs); err != nil {
+		if err = opts.Func(attrs); err != nil {
 			return err
 		}
 	}
@@ -288,13 +318,13 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 	return nil
 }
 
-func (c *Client) CreateMultipartUpload(_ context.Context, _, _ string) (string, error) {
+func (c *Client) CreateMultipartUpload(_ context.Context, _ objcli.CreateMultipartUploadOptions) (string, error) {
 	return uuid.NewString(), nil
 }
 
-func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
+func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([]objval.Part, error) {
 	var (
-		prefix = partPrefix(id, key)
+		prefix = partPrefix(opts.UploadID, opts.Key)
 		parts  = make([]objval.Part, 0)
 	)
 
@@ -307,92 +337,93 @@ func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objva
 		return nil
 	}
 
-	err := c.IterateObjects(ctx, bucket, prefix, "/", nil, nil, fn)
+	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
+		Bucket:    opts.Bucket,
+		Prefix:    prefix,
+		Delimiter: "/",
+		Func:      fn,
+	})
 	if err != nil {
-		return nil, handleError(bucket, key, err)
+		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
 	return parts, nil
 }
 
-func (c *Client) UploadPart(
-	ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker,
-) (objval.Part, error) {
-	size, err := aws.SeekerLen(body)
+func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) (objval.Part, error) {
+	size, err := aws.SeekerLen(opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
 	}
 
-	intermediate := partKey(id, key)
+	intermediate := partKey(opts.UploadID, opts.Key)
 
-	err = c.PutObject(ctx, bucket, intermediate, body)
+	err = c.PutObject(ctx, objcli.PutObjectOptions{
+		Bucket: opts.Bucket,
+		Key:    intermediate,
+		Body:   opts.Body,
+	})
 	if err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
-	return objval.Part{ID: intermediate, Number: number, Size: size}, nil
+	return objval.Part{ID: intermediate, Number: opts.Number, Size: size}, nil
 }
 
 // NOTE: Google storage does not support byte range copying, therefore, only the entire object may be copied; this may
 // be done by either not providing a byte range, or providing a byte range for the entire object.
-func (c *Client) UploadPartCopy(
-	ctx context.Context,
-	dstBucket,
-	id,
-	dstKey,
-	srcBucket,
-	srcKey string,
-	number int,
-	br *objval.ByteRange,
-) (objval.Part, error) {
-	if err := br.Valid(false); err != nil {
+func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyOptions) (objval.Part, error) {
+	if err := opts.ByteRange.Valid(false); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
-	attrs, err := c.GetObjectAttrs(ctx, srcBucket, srcKey)
+	attrs, err := c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions{
+		Bucket: opts.SourceBucket,
+		Key:    opts.SourceKey,
+	})
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
 	// If the user has provided a byte range, ensure that it's for the entire object
-	if br != nil && !(br.Start == 0 && br.End == ptr.From(attrs.Size)-1) {
+	if opts.ByteRange != nil && !(opts.ByteRange.Start == 0 && opts.ByteRange.End == ptr.From(attrs.Size)-1) {
 		return objval.Part{}, objerr.ErrUnsupportedOperation
 	}
 
 	var (
-		intermediate = partKey(id, dstKey)
-		srcHdle      = c.serviceAPI.Bucket(srcBucket).Object(srcKey)
-		// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
-		// destination object, always retry.
-		dstHdle = c.serviceAPI.Bucket(dstBucket).Object(intermediate).Retryer(storage.WithPolicy(storage.RetryAlways))
+		intermediate = partKey(opts.UploadID, opts.DestinationKey)
+		srcHdle      = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
+		dstHdle      = c.serviceAPI.Bucket(opts.DestinationBucket).Object(intermediate)
 	)
 
-	_, err = dstHdle.CopierFrom(srcHdle).Run(ctx)
+	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
+	// destination object, always retry.
+	_, err = dstHdle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHdle).Run(ctx)
 	if err != nil {
-		return objval.Part{}, handleError(dstBucket, intermediate, err)
+		return objval.Part{}, handleError(opts.DestinationBucket, intermediate, err)
 	}
 
-	return objval.Part{ID: intermediate, Number: number, Size: ptr.From(attrs.Size)}, nil
+	return objval.Part{ID: intermediate, Number: opts.Number, Size: ptr.From(attrs.Size)}, nil
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, _, key string, parts ...objval.Part) error {
-	converted := make([]string, 0, len(parts))
+func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
+	converted := make([]string, 0, len(opts.Parts))
 
-	for _, part := range parts {
+	for _, part := range opts.Parts {
 		converted = append(converted, part.ID)
 	}
 
-	err := c.complete(ctx, bucket, key, converted...)
+	err := c.complete(ctx, opts.Bucket, opts.Key, converted...)
 	if err != nil {
 		return err
 	}
 
 	// Object composition may use the source object in the output, ensure that we don't delete it by mistake
-	if idx := slices.Index(converted, key); idx >= 0 {
+	if idx := slices.Index(converted, opts.Key); idx >= 0 {
 		converted = slices.Delete(converted, idx, idx+1)
 	}
 
-	c.cleanup(ctx, bucket, converted...)
+	c.cleanup(ctx, opts.Bucket, converted...)
 
 	return nil
 }
@@ -434,7 +465,10 @@ func (c *Client) compose(ctx context.Context, bucket, key string, parts ...strin
 
 // cleanup attempts to remove the given keys, logging them if we receive an error.
 func (c *Client) cleanup(ctx context.Context, bucket string, keys ...string) {
-	err := c.DeleteObjects(ctx, bucket, keys...)
+	err := c.DeleteObjects(ctx, objcli.DeleteObjectsOptions{
+		Bucket: bucket,
+		Keys:   keys,
+	})
 	if err == nil {
 		return
 	}
@@ -443,6 +477,11 @@ func (c *Client) cleanup(ctx context.Context, bucket string, keys ...string) {
 		`| {"keys":[%s],"error":"%s"}`, strings.Join(keys, ","), err)
 }
 
-func (c *Client) AbortMultipartUpload(ctx context.Context, bucket, id, key string) error {
-	return c.DeleteDirectory(ctx, bucket, partPrefix(id, key))
+func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMultipartUploadOptions) error {
+	err := c.DeleteDirectory(ctx, objcli.DeleteDirectoryOptions{
+		Bucket: opts.Bucket,
+		Prefix: partPrefix(opts.UploadID, opts.Key),
+	})
+
+	return err
 }

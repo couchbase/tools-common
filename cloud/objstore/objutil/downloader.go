@@ -81,7 +81,10 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 		return m.opts.ByteRange, nil
 	}
 
-	attrs, err := m.opts.Client.GetObjectAttrs(m.opts.Options.Context, m.opts.Bucket, m.opts.Key)
+	attrs, err := m.opts.Client.GetObjectAttrs(m.opts.Context, objcli.GetObjectAttrsOptions{
+		Bucket: m.opts.Bucket,
+		Key:    m.opts.Key,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
@@ -117,7 +120,11 @@ func (m *MPDownloader) download(br *objval.ByteRange) error {
 
 // downloadChunk downloads the given byte range and writes it to the underlying write.
 func (m *MPDownloader) downloadChunk(ctx context.Context, br *objval.ByteRange) error {
-	object, err := m.opts.Client.GetObject(ctx, m.opts.Bucket, m.opts.Key, br)
+	object, err := m.opts.Client.GetObject(ctx, objcli.GetObjectOptions{
+		Bucket:    m.opts.Bucket,
+		Key:       m.opts.Key,
+		ByteRange: br,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get object range: %w", err)
 	}

@@ -66,7 +66,10 @@ func TestClientGetObject(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	object, err := client.GetObject(context.Background(), "bucket", "key", nil)
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
 	require.NoError(t, err)
 
 	require.Equal(t, []byte("value"), testutil.ReadAll(t, object.Body))
@@ -103,7 +106,11 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	_, err := client.GetObject(context.Background(), "bucket", "key", &objval.ByteRange{Start: 64, End: 128})
+	_, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		ByteRange: &objval.ByteRange{Start: 64, End: 128},
+	})
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
@@ -113,7 +120,11 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.GetObject(context.Background(), "bucket", "key", &objval.ByteRange{Start: 128, End: 64})
+	_, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		ByteRange: &objval.ByteRange{Start: 128, End: 64},
+	})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -142,7 +153,10 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	attrs, err := client.GetObjectAttrs(context.Background(), "bucket", "key")
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
 	require.NoError(t, err)
 
 	expected := &objval.ObjectAttrs{
@@ -175,7 +189,12 @@ func TestClientPutObject(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.PutObject(context.Background(), "bucket", "key", strings.NewReader("value")))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
@@ -210,7 +229,11 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("appended"),
+	})
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
@@ -235,7 +258,12 @@ func TestClientCopyObject(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	err := client.CopyObject(context.Background(), "dstBucket", "dstKey", "srcBucket", "srcKey")
+	err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
+		DestinationBucket: "dstBucket",
+		DestinationKey:    "dstKey",
+		SourceBucket:      "srcBucket",
+		SourceKey:         "srcKey",
+	})
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
@@ -294,7 +322,11 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("appended"),
+	})
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
@@ -393,7 +425,11 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("appended"),
+	})
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
@@ -468,7 +504,11 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), "bucket", "key", strings.NewReader("appended"))
+	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("appended"),
+	})
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
@@ -510,7 +550,11 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.DeleteObjects(context.Background(), "bucket", "key1", "key2", "key3"))
+	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
+		Bucket: "bucket",
+		Keys:   []string{"key1", "key2", "key3"},
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
@@ -553,7 +597,11 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 		keys = append(keys, fmt.Sprintf("key%d", i))
 	}
 
-	require.NoError(t, client.DeleteObjects(context.Background(), "bucket", keys...))
+	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
+		Bucket: "bucket",
+		Keys:   keys,
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 2)
@@ -570,7 +618,11 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.DeleteObjects(context.Background(), "bucket", "key"))
+	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
+		Bucket: "bucket",
+		Keys:   []string{"key"},
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
@@ -690,7 +742,12 @@ func TestClientIterateObjects(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", nil, nil, nil))
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
@@ -699,8 +756,10 @@ func TestClientIterateObjects(t *testing.T) {
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	client := &Client{}
 
-	err := client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", []*regexp.Regexp{},
-		[]*regexp.Regexp{}, nil)
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Include: []*regexp.Regexp{},
+		Exclude: []*regexp.Regexp{},
+	})
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
@@ -755,7 +814,13 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(t, client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", nil, nil, fn))
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+		Func:      fn,
+	})
+	require.NoError(t, err)
 	require.Equal(t, 1, dirs)
 	require.Equal(t, 1, objects)
 
@@ -793,18 +858,12 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	err := client.IterateObjects(
-		context.Background(),
-		"bucket",
-		"prefix",
-		"delimiter",
-		nil,
-		nil,
-		func(attrs *objval.ObjectAttrs) error {
-			return assert.AnError
-		},
-	)
-
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+		Func:      func(attrs *objval.ObjectAttrs) error { return assert.AnError },
+	})
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
@@ -961,8 +1020,14 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 
 			fn := func(attrs *objval.ObjectAttrs) error { all = append(all, attrs); return nil }
 
-			err := client.IterateObjects(context.Background(), "bucket", "prefix", "delimiter", test.include,
-				test.exclude, fn)
+			err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+				Bucket:    "bucket",
+				Prefix:    "prefix",
+				Delimiter: "delimiter",
+				Include:   test.include,
+				Exclude:   test.exclude,
+				Func:      fn,
+			})
 			require.NoError(t, err)
 			require.Equal(t, test.all, all)
 
@@ -993,7 +1058,10 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	id, err := client.CreateMultipartUpload(context.Background(), "bucket", "key")
+	id, err := client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
 	require.NoError(t, err)
 	require.Equal(t, "id", id)
 
@@ -1035,7 +1103,11 @@ func TestClientListParts(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	parts, err := client.ListParts(context.Background(), "bucket", "id", "key")
+	parts, err := client.ListParts(context.Background(), objcli.ListPartsOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+	})
 	require.NoError(t, err)
 
 	expected := []objval.Part{{ID: "etag1", Size: 64}, {ID: "etag2", Size: 128}}
@@ -1063,7 +1135,11 @@ func TestClientListPartsUploadNotFound(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	_, err := client.ListParts(context.Background(), "bucket", "id", "key")
+	_, err := client.ListParts(context.Background(), objcli.ListPartsOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+	})
 	require.True(t, objerr.IsNotFoundError(err))
 
 	api.AssertExpectations(t)
@@ -1093,7 +1169,13 @@ func TestClientUploadPart(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	part, err := client.UploadPart(context.Background(), "bucket", "id", "key", 1, strings.NewReader("value"))
+	part, err := client.UploadPart(context.Background(), objcli.UploadPartOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+		Number:   1,
+		Body:     strings.NewReader("value"),
+	})
 	require.NoError(t, err)
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 5}, part)
 
@@ -1125,16 +1207,15 @@ func TestClientUploadPartCopy(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	part, err := client.UploadPartCopy(
-		context.Background(),
-		"dstBucket",
-		"id",
-		"key2",
-		"srcBucket",
-		"key1",
-		1,
-		&objval.ByteRange{Start: 64, End: 128},
-	)
+	part, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		DestinationBucket: "dstBucket",
+		UploadID:          "id",
+		DestinationKey:    "key2",
+		SourceBucket:      "srcBucket",
+		SourceKey:         "key1",
+		Number:            1,
+		ByteRange:         &objval.ByteRange{Start: 64, End: 128},
+	})
 	require.NoError(t, err)
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 65}, part)
 
@@ -1145,16 +1226,15 @@ func TestClientUploadPartCopy(t *testing.T) {
 func TestClientUploadPartCopyInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(
-		context.Background(),
-		"dstBucket",
-		"id",
-		"key2",
-		"srcBucket",
-		"key1",
-		1,
-		&objval.ByteRange{Start: 128, End: 64},
-	)
+	_, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		DestinationBucket: "dstBucket",
+		UploadID:          "id",
+		DestinationKey:    "key2",
+		SourceBucket:      "srcBucket",
+		SourceKey:         "key1",
+		Number:            1,
+		ByteRange:         &objval.ByteRange{Start: 128, End: 64},
+	})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -1182,13 +1262,13 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.CompleteMultipartUpload(context.Background(),
-		"bucket",
-		"id",
-		"key",
-		objval.Part{ID: "etag1", Number: 1},
-		objval.Part{ID: "etag2", Number: 2},
-	))
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+		Parts:    []objval.Part{{ID: "etag1", Number: 1}, {ID: "etag2", Number: 2}},
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "CompleteMultipartUploadWithContext", 1)
@@ -1211,7 +1291,12 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.AbortMultipartUpload(context.Background(), "bucket", "id", "key"))
+	err := client.AbortMultipartUpload(context.Background(), objcli.AbortMultipartUploadOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
@@ -1235,7 +1320,12 @@ func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	require.NoError(t, client.AbortMultipartUpload(context.Background(), "bucket", "id", "key"))
+	err := client.AbortMultipartUpload(context.Background(), objcli.AbortMultipartUploadOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)

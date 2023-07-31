@@ -68,27 +68,28 @@ func (c *Client) Provider() objval.Provider {
 	return objval.ProviderAzure
 }
 
-func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
-	if err := br.Valid(false); err != nil {
+func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*objval.Object, error) {
+	if err := opts.ByteRange.Valid(false); err != nil {
 		return nil, err // Purposefully not wrapped
 	}
 
 	var offset, length int64 = 0, blob.CountToEnd
-	if br != nil {
-		offset, length = br.ToOffsetLength(length)
+	if opts.ByteRange != nil {
+		offset, length = opts.ByteRange.ToOffsetLength(length)
 	}
 
-	blobClient := c.getBlobBlockClient(bucket, key)
+	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
 	resp, err := blobClient.DownloadStream(
-		ctx, &blob.DownloadStreamOptions{Range: blob.HTTPRange{Offset: offset, Count: length}},
+		ctx,
+		&blob.DownloadStreamOptions{Range: blob.HTTPRange{Offset: offset, Count: length}},
 	)
 	if err != nil {
-		return nil, handleError(bucket, key, err)
+		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
 	attrs := objval.ObjectAttrs{
-		Key:          key,
+		Key:          opts.Key,
 		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
 	}
@@ -101,16 +102,16 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 	return object, nil
 }
 
-func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
-	blobClient := c.getBlobBlockClient(bucket, key)
+func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsOptions) (*objval.ObjectAttrs, error) {
+	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
 	resp, err := blobClient.GetProperties(ctx, &blob.GetPropertiesOptions{})
 	if err != nil {
-		return nil, handleError(bucket, key, err)
+		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
 	attrs := &objval.ObjectAttrs{
-		Key:          key,
+		Key:          opts.Key,
 		ETag:         (*string)(resp.ETag),
 		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
@@ -119,29 +120,29 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 	return attrs, nil
 }
 
-func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
-	blobClient := c.getBlobBlockClient(bucket, key)
+func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
+	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
 	md5sum := md5.New()
 
-	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum), body)
+	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum), opts.Body)
 	if err != nil {
 		return fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
 	_, err = blobClient.Upload(
 		ctx,
-		aws.ReadSeekCloser(body),
+		aws.ReadSeekCloser(opts.Body),
 		&blockblob.UploadOptions{TransactionalContentMD5: md5sum.Sum(nil)},
 	)
 
-	return handleError(bucket, key, err)
+	return handleError(opts.Bucket, opts.Key, err)
 }
 
-func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
-	dstClient := c.serviceAPI.NewContainerClient(dstBucket).NewBlobClient(dstKey)
+func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
+	dstClient := c.serviceAPI.NewContainerClient(opts.DestinationBucket).NewBlobClient(opts.DestinationKey)
 
-	srcURL, err := c.getSASURL(srcBucket, srcKey)
+	srcURL, err := c.getSASURL(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
 		return fmt.Errorf("failed to get the source object URL: %w", err)
 	}
@@ -151,34 +152,58 @@ func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, s
 	return handleError("", "", err)
 }
 
-func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
-	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
+func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) error {
+	attrs, err := c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions{
+		Bucket: opts.Bucket,
+		Key:    opts.Key,
+	})
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
 	if objerr.IsNotFoundError(err) || attrs != nil && ptr.From(attrs.Size) == 0 {
-		return c.PutObject(ctx, bucket, key, data)
+		return c.PutObject(ctx, objcli.PutObjectOptions(opts))
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
-	id, err := c.CreateMultipartUpload(ctx, bucket, key)
+	id, err := c.CreateMultipartUpload(ctx, objcli.CreateMultipartUploadOptions{
+		Bucket: opts.Bucket,
+		Key:    opts.Key,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
-	existing, err := c.UploadPartCopy(ctx, bucket, id, key, bucket, key, objcli.NoPartNumber, nil)
+	existing, err := c.UploadPartCopy(ctx, objcli.UploadPartCopyOptions{
+		DestinationBucket: opts.Bucket,
+		UploadID:          id,
+		DestinationKey:    opts.Key,
+		SourceBucket:      opts.Bucket,
+		SourceKey:         opts.Key,
+		Number:            objcli.NoPartNumber,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get existing object part: %w", err)
 	}
 
-	intermediate, err := c.UploadPart(ctx, bucket, id, key, objcli.NoPartNumber, data)
+	intermediate, err := c.UploadPart(ctx, objcli.UploadPartOptions{
+		Bucket:   opts.Bucket,
+		UploadID: id,
+		Key:      opts.Key,
+		Number:   objcli.NoPartNumber,
+		Body:     opts.Body,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(ctx, bucket, id, key, existing, intermediate)
+	err = c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
+		Bucket:   opts.Bucket,
+		UploadID: id,
+		Key:      opts.Key,
+		Parts:    []objval.Part{existing, intermediate},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -186,19 +211,19 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 	return nil
 }
 
-func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
+func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
 	pool := hofp.NewPool(hofp.Options{
 		Context:   ctx,
-		Size:      system.NumWorkers(len(keys)),
+		Size:      system.NumWorkers(len(opts.Keys)),
 		LogPrefix: "(objazure)",
 	})
 
 	del := func(ctx context.Context, key string) error {
-		blobClient := c.getBlobBlockClient(bucket, key)
+		blobClient := c.getBlobBlockClient(opts.Bucket, key)
 
 		_, err := blobClient.Delete(ctx, &blob.DeleteOptions{})
 		if err != nil && !isKeyNotFound(err) {
-			return handleError(bucket, key, err)
+			return handleError(opts.Bucket, key, err)
 		}
 
 		return nil
@@ -208,7 +233,7 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
 	}
 
-	for _, key := range keys {
+	for _, key := range opts.Keys {
 		if queue(key) != nil {
 			break
 		}
@@ -217,22 +242,39 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 	return pool.Stop()
 }
 
-func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
+func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
 	fn := func(attrs *objval.ObjectAttrs) error {
-		return c.DeleteObjects(ctx, bucket, attrs.Key)
+		dopts := objcli.DeleteObjectsOptions{
+			Bucket: opts.Bucket,
+			Keys:   []string{attrs.Key},
+		}
+
+		return c.DeleteObjects(ctx, dopts)
 	}
 
-	return c.IterateObjects(ctx, bucket, prefix, "", nil, nil, fn)
+	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
+		Bucket: opts.Bucket,
+		Prefix: opts.Prefix,
+		Func:   fn,
+	})
+
+	return err
 }
 
-func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
-	exclude []*regexp.Regexp, fn objcli.IterateFunc,
-) error {
-	if include != nil && exclude != nil {
+func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
+	if opts.Include != nil && opts.Exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
-	containerClient := c.serviceAPI.NewContainerClient(bucket)
+	var (
+		containerClient = c.serviceAPI.NewContainerClient(opts.Bucket)
+		bucket          = opts.Bucket
+		prefix          = opts.Prefix
+		delimiter       = opts.Delimiter
+		include         = opts.Include
+		exclude         = opts.Exclude
+		fn              = opts.Func
+	)
 
 	if delimiter == "" {
 		return c.iterateObjectsFlat(ctx, containerClient, bucket, prefix, include, exclude, fn)
@@ -241,8 +283,12 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 	return c.iterateObjectsHierarchy(ctx, containerClient, bucket, prefix, delimiter, include, exclude, fn)
 }
 
-func (c *Client) iterateObjectsFlat(ctx context.Context, containerClient containerAPI, bucket, prefix string, include,
-	exclude []*regexp.Regexp, fn objcli.IterateFunc,
+func (c *Client) iterateObjectsFlat(
+	ctx context.Context,
+	containerClient containerAPI,
+	bucket, prefix string,
+	include, exclude []*regexp.Regexp,
+	fn objcli.IterateFunc,
 ) error {
 	var (
 		options = container.ListBlobsFlatOptions{Prefix: &prefix}
@@ -267,8 +313,12 @@ func (c *Client) iterateObjectsFlat(ctx context.Context, containerClient contain
 	return nil
 }
 
-func (c *Client) iterateObjectsHierarchy(ctx context.Context, containerClient containerAPI, bucket, prefix,
-	delimiter string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc,
+func (c *Client) iterateObjectsHierarchy(
+	ctx context.Context,
+	containerClient containerAPI,
+	bucket, prefix, delimiter string,
+	include, exclude []*regexp.Regexp,
+	fn objcli.IterateFunc,
 ) error {
 	options := container.ListBlobsHierarchyOptions{Prefix: &prefix}
 
@@ -299,7 +349,9 @@ func (c *Client) iterateObjectsHierarchy(ctx context.Context, containerClient co
 	return nil
 }
 
-func (c *Client) convertBlobsToObjectAttrs(prefixes []*string, blobs []*container.BlobItem,
+func (c *Client) convertBlobsToObjectAttrs(
+	prefixes []*string,
+	blobs []*container.BlobItem,
 ) []*objval.ObjectAttrs {
 	converted := make([]*objval.ObjectAttrs, 0, len(prefixes)+len(blobs))
 
@@ -320,7 +372,9 @@ func (c *Client) convertBlobsToObjectAttrs(prefixes []*string, blobs []*containe
 
 // iterateObjects iterates over the given segment (<=5000) of objects executing the given function for each object which
 // has not been explicitly ignored by the user.
-func (c *Client) iterateObjects(objects []*objval.ObjectAttrs, include, exclude []*regexp.Regexp,
+func (c *Client) iterateObjects(
+	objects []*objval.ObjectAttrs,
+	include, exclude []*regexp.Regexp,
 	fn objcli.IterateFunc,
 ) error {
 	for _, attrs := range objects {
@@ -337,20 +391,22 @@ func (c *Client) iterateObjects(objects []*objval.ObjectAttrs, include, exclude 
 	return nil
 }
 
-func (c *Client) CreateMultipartUpload(_ context.Context, _, _ string) (string, error) {
+func (c *Client) CreateMultipartUpload(_ context.Context, _ objcli.CreateMultipartUploadOptions) (string, error) {
 	return objcli.NoUploadID, nil
 }
 
-func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
-	if id != objcli.NoUploadID {
+func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([]objval.Part, error) {
+	if opts.UploadID != objcli.NoUploadID {
 		return nil, objcli.ErrExpectedNoUploadID
 	}
 
-	return c.listParts(ctx, bucket, key, blockblob.BlockListTypeUncommitted)
+	return c.listParts(ctx, opts.Bucket, opts.Key, blockblob.BlockListTypeUncommitted)
 }
 
 func (c *Client) listParts(
-	ctx context.Context, bucket, key string, blockType blockblob.BlockListType,
+	ctx context.Context,
+	bucket, key string,
+	blockType blockblob.BlockListType,
 ) ([]objval.Part, error) {
 	blobClient := c.getBlobBlockClient(bucket, key)
 
@@ -377,14 +433,12 @@ func (c *Client) listParts(
 	return parts, nil
 }
 
-func (c *Client) UploadPart(
-	ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker,
-) (objval.Part, error) {
-	if id != objcli.NoUploadID {
+func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) (objval.Part, error) {
+	if opts.UploadID != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
 	}
 
-	size, err := aws.SeekerLen(body)
+	size, err := aws.SeekerLen(opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
 	}
@@ -394,9 +448,9 @@ func (c *Client) UploadPart(
 		blockID = base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 	)
 
-	blobClient := c.getBlobBlockClient(bucket, key)
+	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
-	_, err = aws.CopySeekableBody(md5sum, body)
+	_, err = aws.CopySeekableBody(md5sum, opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
@@ -404,44 +458,41 @@ func (c *Client) UploadPart(
 	_, err = blobClient.StageBlock(
 		ctx,
 		blockID,
-		aws.ReadSeekCloser(body),
+		aws.ReadSeekCloser(opts.Body),
 		&blockblob.StageBlockOptions{TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil))},
 	)
 
-	return objval.Part{ID: blockID, Number: number, Size: size}, handleError(bucket, key, err)
+	part := objval.Part{
+		ID:     blockID,
+		Number: opts.Number,
+		Size:   size,
+	}
+
+	return part, handleError(opts.Bucket, opts.Key, err)
 }
 
-func (c *Client) UploadPartCopy(
-	ctx context.Context,
-	dstBucket,
-	id,
-	dstKey,
-	srcBucket,
-	srcKey string,
-	number int,
-	br *objval.ByteRange,
-) (objval.Part, error) {
-	if id != objcli.NoUploadID {
+func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyOptions) (objval.Part, error) {
+	if opts.UploadID != objcli.NoUploadID {
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
 	}
 
-	if err := br.Valid(false); err != nil {
+	if err := opts.ByteRange.Valid(false); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
 	var offset, length int64 = 0, blob.CountToEnd
-	if br != nil {
-		offset, length = br.ToOffsetLength(length)
+	if opts.ByteRange != nil {
+		offset, length = opts.ByteRange.ToOffsetLength(length)
 	}
 
 	blockID := base64.StdEncoding.EncodeToString([]byte(uuid.NewString()))
 
-	srcURL, err := c.getSASURL(srcBucket, srcKey)
+	srcURL, err := c.getSASURL(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to get the source part URL: %w", err)
 	}
 
-	dstClient := c.getBlobBlockClient(dstBucket, dstKey)
+	dstClient := c.getBlobBlockClient(opts.DestinationBucket, opts.DestinationKey)
 
 	_, err = dstClient.StageBlockFromURL(
 		ctx,
@@ -450,20 +501,19 @@ func (c *Client) UploadPartCopy(
 		&blockblob.StageBlockFromURLOptions{Range: blob.HTTPRange{Offset: offset, Count: length}},
 	)
 	if err != nil {
-		return objval.Part{}, handleError(dstBucket, dstKey, err)
+		return objval.Part{}, handleError(opts.DestinationBucket, opts.DestinationKey, err)
 	}
 
-	return objval.Part{ID: blockID, Number: number, Size: length}, nil
+	return objval.Part{ID: blockID, Number: opts.Number, Size: length}, nil
 }
 
 func (c *Client) getSASURL(bucket, src string) (string, error) {
 	var (
 		srcContainerClient = c.serviceAPI.NewContainerClient(bucket)
 		srcClient          = srcContainerClient.NewBlobClient(src)
-
-		permissions = sas.BlobPermissions{Read: true}
-		start       = time.Now().UTC()
-		expiry      = start.Add(48 * time.Hour)
+		permissions        = sas.BlobPermissions{Read: true}
+		start              = time.Now().UTC()
+		expiry             = start.Add(48 * time.Hour)
 	)
 
 	opts := blob.GetSASURLOptions{StartTime: &start}
@@ -478,23 +528,22 @@ func (c *Client) getSASURL(bucket, src string) (string, error) {
 	// not provide a method of finding this out directly. The call to GetSASURL will check it is the case however, but it
 	// does not export the error returned. We therefore must resort to a string comparison on the error. See MB-55302.
 	if err.Error() == sasErrString {
-		blobClient := c.getBlobBlockClient(bucket, src)
-		return blobClient.URL(), nil
+		return c.getBlobBlockClient(bucket, src).URL(), nil
 	}
 
 	return "", fmt.Errorf("failed to get SAS URL: %w", err)
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key string, parts ...objval.Part) error {
-	if id != objcli.NoUploadID {
+func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
+	if opts.UploadID != objcli.NoUploadID {
 		return objcli.ErrExpectedNoUploadID
 	}
 
-	blobClient := c.getBlobBlockClient(bucket, key)
+	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
-	converted := make([]string, 0, len(parts))
+	converted := make([]string, 0, len(opts.Parts))
 
-	for _, part := range parts {
+	for _, part := range opts.Parts {
 		converted = append(converted, part.ID)
 	}
 
@@ -504,11 +553,11 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key st
 		&blockblob.CommitBlockListOptions{},
 	)
 
-	return handleError(bucket, key, err)
+	return handleError(opts.Bucket, opts.Key, err)
 }
 
-func (c *Client) AbortMultipartUpload(_ context.Context, _, id, _ string) error {
-	if id != objcli.NoUploadID {
+func (c *Client) AbortMultipartUpload(_ context.Context, opts objcli.AbortMultipartUploadOptions) error {
+	if opts.UploadID != objcli.NoUploadID {
 		return objcli.ErrExpectedNoUploadID
 	}
 

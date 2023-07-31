@@ -94,15 +94,14 @@ func CopyObjects(opts CopyObjectsOptions) error {
 		return pool.Queue(func(ctx context.Context) error { return cp(ctx, attrs) })
 	}
 
-	err := opts.Client.IterateObjects(
-		opts.Context,
-		opts.SourceBucket,
-		opts.SourcePrefix,
-		opts.SourceDelimiter,
-		opts.SourceInclude,
-		opts.SourceExclude,
-		queue,
-	)
+	err := opts.Client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    opts.SourceBucket,
+		Prefix:    opts.SourcePrefix,
+		Delimiter: opts.SourceDelimiter,
+		Include:   opts.SourceInclude,
+		Exclude:   opts.SourceExclude,
+		Func:      queue,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to iterate objects: %w", err)
 	}

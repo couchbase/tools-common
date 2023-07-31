@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/couchbase/tools-common/cloud/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/objstore/objval"
 	"github.com/couchbase/tools-common/core/log"
 	fsutil "github.com/couchbase/tools-common/fs/util"
@@ -161,7 +162,11 @@ func (s *Syncer) Download(source, destination *CloudOrFileURL) error {
 		return pool.Queue(func(ctx context.Context) error { return dl(ctx, attrs.Key) })
 	}
 
-	err := s.opts.Client.IterateObjects(s.opts.Context, source.Bucket, source.Path, "", nil, nil, queue)
+	err := s.opts.Client.IterateObjects(s.opts.Context, objcli.IterateObjectsOptions{
+		Bucket: source.Bucket,
+		Prefix: source.Path,
+		Func:   queue,
+	})
 	if err != nil {
 		return fmt.Errorf("could not iterate objects: %w", err)
 	}

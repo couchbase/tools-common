@@ -57,7 +57,13 @@ func setupTestClient(t *testing.T) *objcli.TestClient {
 
 		require.NoError(t, err)
 		require.Equal(t, len(buf), n)
-		require.NoError(t, cli.PutObject(context.Background(), "bucket", path.path, bytes.NewReader(buf[0:path.size])))
+
+		err = cli.PutObject(context.Background(), objcli.PutObjectOptions{
+			Bucket: "bucket",
+			Key:    path.path,
+			Body:   bytes.NewReader(buf[0:path.size]),
+		})
+		require.NoError(t, err)
 	}
 
 	return cli
@@ -229,14 +235,9 @@ func TestCompressUploadUploadError(t *testing.T) {
 
 	cli := objcli.MockClient{}
 	cli.
-		On(
-			"IterateObjects", matchers.Context, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
-			mock.Anything, mock.Anything,
-		).
-		Return(func(
-			ctx context.Context, bucket, prefix, delimiter string, include, exclude []*regexp.Regexp, fn objcli.IterateFunc,
-		) error {
-			_ = fn(&objval.ObjectAttrs{
+		On("IterateObjects", matchers.Context, mock.Anything).
+		Return(func(_ context.Context, opts objcli.IterateObjectsOptions) error {
+			_ = opts.Func(&objval.ObjectAttrs{
 				Key:  "foo",
 				Size: ptr.To[int64](size),
 			})
@@ -245,8 +246,8 @@ func TestCompressUploadUploadError(t *testing.T) {
 		})
 
 	cli.
-		On("GetObject", matchers.Context, mock.Anything, mock.Anything, mock.Anything).
-		Return(func(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
+		On("GetObject", matchers.Context, mock.Anything).
+		Return(func(_ context.Context, _ objcli.GetObjectOptions) (*objval.Object, error) {
 			var (
 				body = make([]byte, size)
 				r    = io.NopCloser(bytes.NewReader(body))
@@ -259,17 +260,14 @@ func TestCompressUploadUploadError(t *testing.T) {
 			return &objval.Object{Body: r}, nil
 		})
 
-	cli.On("CreateMultipartUpload", matchers.Context, mock.Anything, mock.Anything).Return("mp-001", nil)
+	cli.On("CreateMultipartUpload", matchers.Context, mock.Anything).Return("mp-001", nil)
 
 	// To make the scenario more realistic we allow a couple of parts to get uploaded before returning an error.
 	var i int
 
 	cli.
-		On(
-			"UploadPart", matchers.Context, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
-			mock.Anything,
-		).
-		Return(func(ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker) (objval.Part, error) {
+		On("UploadPart", matchers.Context, mock.Anything).
+		Return(func(_ context.Context, _ objcli.UploadPartOptions) (objval.Part, error) {
 			if i < 2 {
 				return objval.Part{}, nil
 			}
@@ -280,20 +278,18 @@ func TestCompressUploadUploadError(t *testing.T) {
 		})
 
 	cli.
-		On(
-			"AbortMultipartUpload", matchers.Context, mock.Anything, mock.Anything, mock.Anything,
-			mock.Anything,
-		).
+		On("AbortMultipartUpload", matchers.Context, mock.Anything).
 		Return(nil)
 
-	require.Error(t, CompressObjects(CompressObjectsOptions{
+	err := CompressObjects(CompressObjectsOptions{
 		Options:           Options{PartSize: 1024},
 		Client:            &cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",
 		Destination:       "export.zip",
-	}))
+	})
+	require.ErrorIs(t, err, ErrMPUploaderExceededMaxPartCount)
 
 	cli.AssertExpectations(t)
 }

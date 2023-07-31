@@ -3,6 +3,7 @@
 package objutil
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -71,11 +72,17 @@ func Upload(opts UploadOptions) error {
 	}
 
 	// Under the threshold, upload using a single request
-	if length <= opts.MPUThreshold {
-		return opts.Client.PutObject(opts.Context, opts.Bucket, opts.Key, opts.Body)
+	if length > opts.MPUThreshold {
+		return upload(opts)
 	}
 
-	return upload(opts)
+	err = opts.Client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: opts.Bucket,
+		Key:    opts.Key,
+		Body:   opts.Body,
+	})
+
+	return err
 }
 
 // upload an object to a remote cloud by breaking it down into individual chunks and uploading them concurrently.

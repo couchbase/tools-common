@@ -64,7 +64,12 @@ func TestDownload(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
+			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "bucket",
+				Key:    "key",
+				Body:   bytes.NewReader(test.data),
+			})
+			require.NoError(t, err)
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)
@@ -92,8 +97,12 @@ func TestDownloadTrackExpectedWrites(t *testing.T) {
 		writer = &tracker{}
 	)
 
-	require.NoError(t,
-		client.PutObject(context.Background(), "bucket", "key", strings.NewReader(strings.Repeat("a", MinPartSize*2+42))))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader(strings.Repeat("a", MinPartSize*2+42)),
+	})
+	require.NoError(t, err)
 
 	options := DownloadOptions{
 		Client: client,
@@ -122,7 +131,12 @@ func TestDownloadWithByteRange(t *testing.T) {
 		client  = objcli.NewTestClient(t, objval.ProviderAWS)
 	)
 
-	require.NoError(t, client.PutObject(context.Background(), "bucket", "key", strings.NewReader("value")))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
 
 	file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 	require.NoError(t, err)

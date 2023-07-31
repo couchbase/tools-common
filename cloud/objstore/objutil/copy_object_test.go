@@ -37,7 +37,11 @@ func TestCopyObject(t *testing.T) {
 				body   = []byte("Hello, World!")
 			)
 
-			err := client.PutObject(context.Background(), "srcBucket", "srcKey", bytes.NewReader(body))
+			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "srcBucket",
+				Key:    "srcKey",
+				Body:   bytes.NewReader(body),
+			})
 			require.NoError(t, err)
 
 			options := CopyObjectOptions{
@@ -51,7 +55,10 @@ func TestCopyObject(t *testing.T) {
 			err = CopyObject(options)
 			require.NoError(t, err)
 
-			dst, err := client.GetObject(context.Background(), "dstBucket", "dstKey", nil)
+			dst, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+				Bucket: "dstBucket",
+				Key:    "dstKey",
+			})
 			require.NoError(t, err)
 			require.Equal(t, body, testutil.ReadAll(t, dst.Body))
 		})

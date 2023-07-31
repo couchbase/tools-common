@@ -30,7 +30,11 @@ func TestPrefixExists(t *testing.T) {
 		prefix = "prefix"
 	)
 
-	err := client.PutObject(ctx, bucket, path.Join(prefix, "new_beginnings.txt"), strings.NewReader("Hello, World!"))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: bucket,
+		Key:    path.Join(prefix, "new_beginnings.txt"),
+		Body:   strings.NewReader("Hello, World!"),
+	})
 	require.NoError(t, err)
 
 	opts := PrefixExistsOptions{

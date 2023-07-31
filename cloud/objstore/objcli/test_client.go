@@ -51,18 +51,18 @@ func (t *TestClient) Provider() objval.Provider {
 	return t.provider
 }
 
-func (t *TestClient) GetObject(_ context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
+func (t *TestClient) GetObject(_ context.Context, opts GetObjectOptions) (*objval.Object, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	object, err := t.getObjectRLocked(bucket, key)
+	object, err := t.getObjectRLocked(opts.Bucket, opts.Key)
 	if err != nil {
 		return nil, err
 	}
 
 	var offset, length int64 = 0, int64(len(object.Body) + 1)
-	if br != nil {
-		offset, length = br.ToOffsetLength(length)
+	if opts.ByteRange != nil {
+		offset, length = opts.ByteRange.ToOffsetLength(length)
 	}
 
 	return &objval.Object{
@@ -71,11 +71,11 @@ func (t *TestClient) GetObject(_ context.Context, bucket, key string, br *objval
 	}, nil
 }
 
-func (t *TestClient) GetObjectAttrs(_ context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
+func (t *TestClient) GetObjectAttrs(_ context.Context, opts GetObjectAttrsOptions) (*objval.ObjectAttrs, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	object, err := t.getObjectRLocked(bucket, key)
+	object, err := t.getObjectRLocked(opts.Bucket, opts.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -83,64 +83,64 @@ func (t *TestClient) GetObjectAttrs(_ context.Context, bucket, key string) (*obj
 	return &object.ObjectAttrs, nil
 }
 
-func (t *TestClient) PutObject(_ context.Context, bucket, key string, body io.ReadSeeker) error {
+func (t *TestClient) PutObject(_ context.Context, opts PutObjectOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	_ = t.putObjectLocked(bucket, key, body)
+	_ = t.putObjectLocked(opts.Bucket, opts.Key, opts.Body)
 
 	return nil
 }
 
-func (t *TestClient) CopyObject(_ context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+func (t *TestClient) CopyObject(_ context.Context, opts CopyObjectOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	src, err := t.getObjectRLocked(srcBucket, srcKey)
+	src, err := t.getObjectRLocked(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
 		return err
 	}
 
-	_ = t.putObjectLocked(dstBucket, dstKey, bytes.NewReader(src.Body))
+	_ = t.putObjectLocked(opts.DestinationBucket, opts.DestinationKey, bytes.NewReader(src.Body))
 
 	return nil
 }
 
-func (t *TestClient) AppendToObject(_ context.Context, bucket, key string, data io.ReadSeeker) error {
+func (t *TestClient) AppendToObject(_ context.Context, opts AppendToObjectOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, ok := t.getBucketLocked(bucket)[key]
+	object, ok := t.getBucketLocked(opts.Bucket)[opts.Key]
 	if ok {
-		object.Body = append(object.Body, testutil.ReadAll(t.t, data)...)
+		object.Body = append(object.Body, testutil.ReadAll(t.t, opts.Body)...)
 	} else {
-		_ = t.putObjectLocked(bucket, key, data)
+		_ = t.putObjectLocked(opts.Bucket, opts.Key, opts.Body)
 	}
 
 	return nil
 }
 
-func (t *TestClient) DeleteObjects(_ context.Context, bucket string, keys ...string) error {
+func (t *TestClient) DeleteObjects(_ context.Context, opts DeleteObjectsOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	b := t.getBucketLocked(bucket)
+	b := t.getBucketLocked(opts.Bucket)
 
-	for _, key := range keys {
+	for _, key := range opts.Keys {
 		delete(b, key)
 	}
 
 	return nil
 }
 
-func (t *TestClient) DeleteDirectory(_ context.Context, bucket, prefix string) error {
+func (t *TestClient) DeleteDirectory(_ context.Context, opts DeleteDirectoryOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	b := t.getBucketLocked(bucket)
+	b := t.getBucketLocked(opts.Bucket)
 
 	for key := range b {
-		if !strings.HasPrefix(key, prefix) {
+		if !strings.HasPrefix(key, opts.Prefix) {
 			continue
 		}
 
@@ -150,16 +150,14 @@ func (t *TestClient) DeleteDirectory(_ context.Context, bucket, prefix string) e
 	return nil
 }
 
-func (t *TestClient) IterateObjects(_ context.Context, bucket, prefix, delimiter string, include,
-	exclude []*regexp.Regexp, fn IterateFunc,
-) error {
-	if include != nil && exclude != nil {
+func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOptions) error {
+	if opts.Include != nil && opts.Exclude != nil {
 		return ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
 	t.lock.RLock()
 
-	b, ok := t.Buckets[bucket]
+	b, ok := t.Buckets[opts.Bucket]
 	if !ok {
 		t.lock.RUnlock()
 		return nil
@@ -172,24 +170,24 @@ func (t *TestClient) IterateObjects(_ context.Context, bucket, prefix, delimiter
 	t.lock.RUnlock()
 
 	for key, object := range cpy {
-		if !strings.HasPrefix(key, prefix) || ShouldIgnore(key, include, exclude) {
+		if !strings.HasPrefix(key, opts.Prefix) || ShouldIgnore(key, opts.Include, opts.Exclude) {
 			continue
 		}
 
 		var (
-			trimmed = strings.TrimPrefix(key, prefix)
+			trimmed = strings.TrimPrefix(key, opts.Prefix)
 			attrs   = object.ObjectAttrs
 		)
 
 		// If this is a nested key, convert it into a directory stub
-		if delimiter != "" && strings.Count(trimmed, delimiter) > 1 {
+		if opts.Delimiter != "" && strings.Count(trimmed, opts.Delimiter) > 1 {
 			attrs.Key = rootDirectory(trimmed)
 			attrs.ETag = nil
 			attrs.Size = nil
 			attrs.LastModified = nil
 		}
 
-		if err := fn(&attrs); err != nil {
+		if err := opts.Func(&attrs); err != nil {
 			return err
 		}
 	}
@@ -197,13 +195,13 @@ func (t *TestClient) IterateObjects(_ context.Context, bucket, prefix, delimiter
 	return nil
 }
 
-func (t *TestClient) CreateMultipartUpload(_ context.Context, _, _ string) (string, error) {
+func (t *TestClient) CreateMultipartUpload(_ context.Context, _ CreateMultipartUploadOptions) (string, error) {
 	return uuid.NewString(), nil
 }
 
-func (t *TestClient) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
+func (t *TestClient) ListParts(ctx context.Context, opts ListPartsOptions) ([]objval.Part, error) {
 	var (
-		prefix = partPrefix(id, key)
+		prefix = partPrefix(opts.UploadID, opts.Key)
 		parts  = make([]objval.Part, 0)
 	)
 
@@ -215,7 +213,12 @@ func (t *TestClient) ListParts(ctx context.Context, bucket, id, key string) ([]o
 		return nil
 	}
 
-	err := t.IterateObjects(ctx, bucket, prefix, "/", nil, nil, fn)
+	err := t.IterateObjects(ctx, IterateObjectsOptions{
+		Bucket:    opts.Bucket,
+		Prefix:    prefix,
+		Delimiter: "/",
+		Func:      fn,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to iterate objects: %w", err)
 	}
@@ -223,65 +226,57 @@ func (t *TestClient) ListParts(ctx context.Context, bucket, id, key string) ([]o
 	return parts, nil
 }
 
-func (t *TestClient) UploadPart(
-	_ context.Context,
-	bucket, id, key string,
-	number int,
-	body io.ReadSeeker,
-) (objval.Part, error) {
+func (t *TestClient) UploadPart(_ context.Context, opts UploadPartOptions) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	size, err := aws.SeekerLen(body)
+	size, err := aws.SeekerLen(opts.Body)
 	require.NoError(t.t, err)
 
 	part := objval.Part{
-		ID:     t.putObjectLocked(bucket, partKey(id, key), body),
-		Number: number,
+		ID:     t.putObjectLocked(opts.Bucket, partKey(opts.UploadID, opts.Key), opts.Body),
+		Number: opts.Number,
 		Size:   size,
 	}
 
 	return part, nil
 }
 
-func (t *TestClient) UploadPartCopy(
-	_ context.Context,
-	dstBucket,
-	id,
-	dstKey,
-	srcBucket,
-	srcKey string,
-	number int,
-	br *objval.ByteRange,
-) (objval.Part, error) {
+func (t *TestClient) UploadPartCopy(_ context.Context, opts UploadPartCopyOptions) (objval.Part, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, err := t.getObjectRLocked(srcBucket, srcKey)
+	object, err := t.getObjectRLocked(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
 		return objval.Part{}, err
 	}
 
-	body := make([]byte, br.End-br.Start+1)
+	body := make([]byte, opts.ByteRange.End-opts.ByteRange.Start+1)
 	copy(body, object.Body)
 
+	id := t.putObjectLocked(
+		opts.DestinationBucket,
+		partKey(opts.UploadID, opts.DestinationKey),
+		bytes.NewReader(body),
+	)
+
 	part := objval.Part{
-		ID:     t.putObjectLocked(dstBucket, partKey(id, dstKey), bytes.NewReader(body)),
-		Number: number,
+		ID:     id,
+		Number: opts.Number,
 		Size:   int64(len(body)),
 	}
 
 	return part, nil
 }
 
-func (t *TestClient) CompleteMultipartUpload(_ context.Context, bucket, id, key string, parts ...objval.Part) error {
+func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMultipartUploadOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	buffer := &bytes.Buffer{}
 
-	for _, part := range parts {
-		object, err := t.getObjectRLocked(bucket, part.ID)
+	for _, part := range opts.Parts {
+		object, err := t.getObjectRLocked(opts.Bucket, part.ID)
 		if err != nil {
 			return err
 		}
@@ -289,16 +284,16 @@ func (t *TestClient) CompleteMultipartUpload(_ context.Context, bucket, id, key 
 		buffer.Write(object.Body)
 	}
 
-	_ = t.putObjectLocked(bucket, key, bytes.NewReader(buffer.Bytes()))
+	_ = t.putObjectLocked(opts.Bucket, opts.Key, bytes.NewReader(buffer.Bytes()))
 
-	return t.deleteKeysLocked(bucket, partPrefix(id, key), nil, nil)
+	return t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
 }
 
-func (t *TestClient) AbortMultipartUpload(_ context.Context, bucket, id, key string) error {
+func (t *TestClient) AbortMultipartUpload(_ context.Context, opts AbortMultipartUploadOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.deleteKeysLocked(bucket, partPrefix(id, key), nil, nil)
+	return t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
 }
 
 func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {

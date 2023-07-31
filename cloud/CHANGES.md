@@ -11,6 +11,7 @@
 - Added a `CopyObject` function to the `objcli.Client` interface.
 - Added a `CopyObject` function to `objutil`.
 - Added a `CopyObjects` function to `objutil`.
+- Moved the `objcli.Client` interface to option structures.
 
 ## v1.0.0
 

@@ -87,7 +87,12 @@ func TestMPDownloaderDownload(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
+			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "bucket",
+				Key:    "key",
+				Body:   bytes.NewReader(test.data),
+			})
+			require.NoError(t, err)
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)
@@ -113,7 +118,12 @@ func TestMPDownloaderDownload(t *testing.T) {
 func TestMPDownloaderByteRangeUseRemote(t *testing.T) {
 	client := objcli.NewTestClient(t, objval.ProviderAWS)
 
-	require.NoError(t, client.PutObject(context.Background(), "bucket", "key", strings.NewReader("value")))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
 
 	var (
 		expected   = &objval.ByteRange{End: 4}
@@ -181,7 +191,12 @@ func TestMPDownloaderInternalDownload(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
+			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "bucket",
+				Key:    "key",
+				Body:   bytes.NewReader(test.data),
+			})
+			require.NoError(t, err)
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)
@@ -249,7 +264,12 @@ func TestMPDownloaderDownloadChunk(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			require.NoError(t, client.PutObject(context.Background(), "bucket", "key", bytes.NewReader(test.data)))
+			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "bucket",
+				Key:    "key",
+				Body:   bytes.NewReader(test.data),
+			})
+			require.NoError(t, err)
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 			require.NoError(t, err)

@@ -31,10 +31,18 @@ func TestCopyObjects(t *testing.T) {
 		body2  = []byte("2")
 	)
 
-	err := client.PutObject(context.Background(), "srcBucket", "src/key1", bytes.NewReader(body1))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key1",
+		Body:   bytes.NewReader(body1),
+	})
 	require.NoError(t, err)
 
-	err = client.PutObject(context.Background(), "srcBucket", "src/key2", bytes.NewReader(body2))
+	err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key2",
+		Body:   bytes.NewReader(body2),
+	})
 	require.NoError(t, err)
 
 	options := CopyObjectsOptions{
@@ -48,11 +56,17 @@ func TestCopyObjects(t *testing.T) {
 	err = CopyObjects(options)
 	require.NoError(t, err)
 
-	dst1, err := client.GetObject(context.Background(), "dstBucket", "dst/key1", nil)
+	dst1, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key1",
+	})
 	require.NoError(t, err)
 	require.Equal(t, body1, testutil.ReadAll(t, dst1.Body))
 
-	dst2, err := client.GetObject(context.Background(), "dstBucket", "dst/key2", nil)
+	dst2, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key2",
+	})
 	require.NoError(t, err)
 	require.Equal(t, body2, testutil.ReadAll(t, dst2.Body))
 }
@@ -64,10 +78,18 @@ func TestCopyObjectsWithDelimiter(t *testing.T) {
 		body2  = []byte("2")
 	)
 
-	err := client.PutObject(context.Background(), "srcBucket", "src/key1", bytes.NewReader(body1))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key1",
+		Body:   bytes.NewReader(body1),
+	})
 	require.NoError(t, err)
 
-	err = client.PutObject(context.Background(), "srcBucket", "src/skip/key2", bytes.NewReader(body2))
+	err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/skip/key2",
+		Body:   bytes.NewReader(body2),
+	})
 	require.NoError(t, err)
 
 	options := CopyObjectsOptions{
@@ -82,11 +104,17 @@ func TestCopyObjectsWithDelimiter(t *testing.T) {
 	err = CopyObjects(options)
 	require.NoError(t, err)
 
-	dst1, err := client.GetObject(context.Background(), "dstBucket", "dst/key1", nil)
+	dst1, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key1",
+	})
 	require.NoError(t, err)
 	require.Equal(t, body1, testutil.ReadAll(t, dst1.Body))
 
-	_, err = client.GetObject(context.Background(), "dstBucket", "dst/skip/key2", nil)
+	_, err = client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/skip/key2",
+	})
 
 	var notFound *objerr.NotFoundError
 
@@ -100,10 +128,18 @@ func TestCopyObjectsWithInclude(t *testing.T) {
 		body2  = []byte("2")
 	)
 
-	err := client.PutObject(context.Background(), "srcBucket", "src/key1", bytes.NewReader(body1))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key1",
+		Body:   bytes.NewReader(body1),
+	})
 	require.NoError(t, err)
 
-	err = client.PutObject(context.Background(), "srcBucket", "src/key2", bytes.NewReader(body2))
+	err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key2",
+		Body:   bytes.NewReader(body2),
+	})
 	require.NoError(t, err)
 
 	options := CopyObjectsOptions{
@@ -118,11 +154,17 @@ func TestCopyObjectsWithInclude(t *testing.T) {
 	err = CopyObjects(options)
 	require.NoError(t, err)
 
-	dst1, err := client.GetObject(context.Background(), "dstBucket", "dst/key1", nil)
+	dst1, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key1",
+	})
 	require.NoError(t, err)
 	require.Equal(t, body1, testutil.ReadAll(t, dst1.Body))
 
-	_, err = client.GetObject(context.Background(), "dstBucket", "dst/key2", nil)
+	_, err = client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key2",
+	})
 
 	var notFound *objerr.NotFoundError
 
@@ -136,10 +178,18 @@ func TestCopyObjectsWithExclude(t *testing.T) {
 		body2  = []byte("2")
 	)
 
-	err := client.PutObject(context.Background(), "srcBucket", "src/key1", bytes.NewReader(body1))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key1",
+		Body:   bytes.NewReader(body1),
+	})
 	require.NoError(t, err)
 
-	err = client.PutObject(context.Background(), "srcBucket", "src/key2", bytes.NewReader(body2))
+	err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "src/key2",
+		Body:   bytes.NewReader(body2),
+	})
 	require.NoError(t, err)
 
 	options := CopyObjectsOptions{
@@ -154,13 +204,19 @@ func TestCopyObjectsWithExclude(t *testing.T) {
 	err = CopyObjects(options)
 	require.NoError(t, err)
 
-	_, err = client.GetObject(context.Background(), "dstBucket", "dst/key1", nil)
+	_, err = client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key1",
+	})
 
 	var notFound *objerr.NotFoundError
 
 	require.ErrorAs(t, err, &notFound)
 
-	dst2, err := client.GetObject(context.Background(), "dstBucket", "dst/key2", nil)
+	dst2, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "dstBucket",
+		Key:    "dst/key2",
+	})
 	require.NoError(t, err)
 	require.Equal(t, body2, testutil.ReadAll(t, dst2.Body))
 }
@@ -171,7 +227,11 @@ func TestCopyObjectsSingleObject(t *testing.T) {
 		body   = []byte("Hello, World!")
 	)
 
-	err := client.PutObject(context.Background(), "srcBucket", "srcKey", bytes.NewReader(body))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "srcKey",
+		Body:   bytes.NewReader(body),
+	})
 	require.NoError(t, err)
 
 	options := CopyObjectsOptions{
@@ -185,8 +245,10 @@ func TestCopyObjectsSingleObject(t *testing.T) {
 	err = CopyObjects(options)
 	require.NoError(t, err)
 
-	dst, err := client.GetObject(context.Background(), "srcBucket", "dstKey", nil)
+	dst, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "srcBucket",
+		Key:    "dstKey",
+	})
 	require.NoError(t, err)
-
 	require.Equal(t, body, testutil.ReadAll(t, dst.Body))
 }

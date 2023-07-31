@@ -51,18 +51,18 @@ func (c *Client) Provider() objval.Provider {
 	return objval.ProviderAWS
 }
 
-func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.ByteRange) (*objval.Object, error) {
-	if err := br.Valid(false); err != nil {
+func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*objval.Object, error) {
+	if err := opts.ByteRange.Valid(false); err != nil {
 		return nil, err // Purposefully not wrapped
 	}
 
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Bucket: aws.String(opts.Bucket),
+		Key:    aws.String(opts.Key),
 	}
 
-	if br != nil {
-		input.Range = aws.String(br.ToRangeHeader())
+	if opts.ByteRange != nil {
+		input.Range = aws.String(opts.ByteRange.ToRangeHeader())
 	}
 
 	resp, err := c.serviceAPI.GetObjectWithContext(ctx, input)
@@ -71,7 +71,7 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 	}
 
 	attrs := objval.ObjectAttrs{
-		Key:          key,
+		Key:          opts.Key,
 		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
 	}
@@ -84,10 +84,10 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string, br *objval.B
 	return object, nil
 }
 
-func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
+func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsOptions) (*objval.ObjectAttrs, error) {
 	input := &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Bucket: aws.String(opts.Bucket),
+		Key:    aws.String(opts.Key),
 	}
 
 	resp, err := c.serviceAPI.HeadObjectWithContext(ctx, input)
@@ -96,7 +96,7 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 	}
 
 	attrs := &objval.ObjectAttrs{
-		Key:          key,
+		Key:          opts.Key,
 		ETag:         resp.ETag,
 		Size:         resp.ContentLength,
 		LastModified: resp.LastModified,
@@ -105,11 +105,11 @@ func (c *Client) GetObjectAttrs(ctx context.Context, bucket, key string) (*objva
 	return attrs, nil
 }
 
-func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
+func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
 	input := &s3.PutObjectInput{
-		Body:   body,
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Body:   opts.Body,
+		Bucket: aws.String(opts.Bucket),
+		Key:    aws.String(opts.Key),
 	}
 
 	_, err := c.serviceAPI.PutObjectWithContext(ctx, input)
@@ -117,11 +117,11 @@ func (c *Client) PutObject(ctx context.Context, bucket, key string, body io.Read
 	return handleError(input.Bucket, input.Key, err)
 }
 
-func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, srcKey string) error {
+func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
 	input := &s3.CopyObjectInput{
-		Bucket:     aws.String(dstBucket),
-		Key:        aws.String(dstKey),
-		CopySource: aws.String(url.PathEscape(srcBucket + "/" + srcKey)),
+		Bucket:     aws.String(opts.DestinationBucket),
+		Key:        aws.String(opts.DestinationKey),
+		CopySource: aws.String(url.PathEscape(opts.SourceBucket + "/" + opts.SourceKey)),
 	}
 
 	_, err := c.serviceAPI.CopyObjectWithContext(ctx, input)
@@ -129,12 +129,18 @@ func (c *Client) CopyObject(ctx context.Context, dstBucket, dstKey, srcBucket, s
 	return handleError(nil, nil, err)
 }
 
-func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
-	attrs, err := c.GetObjectAttrs(ctx, bucket, key)
+func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) error {
+	var (
+		bucket = opts.Bucket
+		key    = opts.Key
+		body   = opts.Body
+	)
+
+	attrs, err := c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions{Bucket: bucket, Key: key})
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
 	if objerr.IsNotFoundError(err) {
-		return c.PutObject(ctx, bucket, key, data)
+		return c.PutObject(ctx, objcli.PutObjectOptions(opts))
 	}
 
 	if err != nil {
@@ -142,30 +148,37 @@ func (c *Client) AppendToObject(ctx context.Context, bucket, key string, data io
 	}
 
 	if ptr.From(attrs.Size) < MinUploadSize {
-		return c.downloadAndAppend(ctx, bucket, attrs, data)
+		return c.downloadAndAppend(ctx, bucket, attrs, body)
 	}
 
-	return c.createMPUThenCopyAndAppend(ctx, bucket, attrs, data)
+	return c.createMPUThenCopyAndAppend(ctx, bucket, attrs, body)
 }
 
 // downloadAndAppend downloads an object, and appends the given data to it before uploading it back to S3; this should
 // be used for objects which are less than 5MiB in size (i.e. under the multipart upload minium size).
 func (c *Client) downloadAndAppend(
-	ctx context.Context, bucket string, attrs *objval.ObjectAttrs, data io.ReadSeeker,
+	ctx context.Context,
+	bucket string,
+	attrs *objval.ObjectAttrs,
+	body io.ReadSeeker,
 ) error {
-	object, err := c.GetObject(ctx, bucket, attrs.Key, nil)
+	object, err := c.GetObject(ctx, objcli.GetObjectOptions{Bucket: bucket, Key: attrs.Key})
 	if err != nil {
 		return fmt.Errorf("failed to get object: %w", err)
 	}
 
-	buffer := &bytes.Buffer{}
+	var buffer bytes.Buffer
 
-	_, err = io.Copy(buffer, io.MultiReader(object.Body, data))
+	_, err = io.Copy(&buffer, io.MultiReader(object.Body, body))
 	if err != nil {
 		return fmt.Errorf("failed to download and append to object: %w", err)
 	}
 
-	err = c.PutObject(ctx, bucket, attrs.Key, bytes.NewReader(buffer.Bytes()))
+	err = c.PutObject(ctx, objcli.PutObjectOptions{
+		Bucket: bucket,
+		Key:    attrs.Key,
+		Body:   bytes.NewReader(buffer.Bytes()),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to upload updated object: %w", err)
 	}
@@ -175,9 +188,15 @@ func (c *Client) downloadAndAppend(
 
 // createMPUThenCopyAndAppend creates a multipart upload, then kicks off the copy and append operation.
 func (c *Client) createMPUThenCopyAndAppend(
-	ctx context.Context, bucket string, attrs *objval.ObjectAttrs, data io.ReadSeeker,
+	ctx context.Context,
+	bucket string,
+	attrs *objval.ObjectAttrs,
+	data io.ReadSeeker,
 ) error {
-	id, err := c.CreateMultipartUpload(ctx, bucket, attrs.Key)
+	id, err := c.CreateMultipartUpload(ctx, objcli.CreateMultipartUploadOptions{
+		Bucket: bucket,
+		Key:    attrs.Key,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create multipart upload: %w", err)
 	}
@@ -187,9 +206,15 @@ func (c *Client) createMPUThenCopyAndAppend(
 		return nil
 	}
 
+	aopts := objcli.AbortMultipartUploadOptions{
+		Bucket:   bucket,
+		UploadID: id,
+		Key:      attrs.Key,
+	}
+
 	// NOTE: We've failed for some reason, we should try to cleanup after ourselves; the AWS client does not use the
 	// given 'parts' argument, so we can omit it here
-	if err := c.AbortMultipartUpload(ctx, bucket, id, attrs.Key); err != nil {
+	if err := c.AbortMultipartUpload(ctx, aopts); err != nil {
 		c.logger.Errorf(`(Objaws) Failed to abort multipart upload, it should be aborted manually | `+
 			`{"id":"%s","key":"%s"}`, id, attrs.Key)
 	}
@@ -203,29 +228,39 @@ func (c *Client) copyAndAppend(
 	ctx context.Context,
 	bucket, id string,
 	attrs *objval.ObjectAttrs,
-	data io.ReadSeeker,
+	body io.ReadSeeker,
 ) error {
-	copied, err := c.UploadPartCopy(
-		ctx,
-		bucket,
-		id,
-		attrs.Key,
-		bucket,
-		attrs.Key,
-		1,
+	copied, err := c.UploadPartCopy(ctx, objcli.UploadPartCopyOptions{
+		DestinationBucket: bucket,
+		UploadID:          id,
+		DestinationKey:    attrs.Key,
+		SourceBucket:      bucket,
+		SourceKey:         attrs.Key,
+		Number:            1,
 		// The attributes uses here are obtained from 'GetObjectAttrs' so the 'Size' will be non-nil.
-		&objval.ByteRange{End: ptr.From(attrs.Size) - 1},
-	)
+		ByteRange: &objval.ByteRange{End: ptr.From(attrs.Size) - 1},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to copy source object: %w", err)
 	}
 
-	appended, err := c.UploadPart(ctx, bucket, id, attrs.Key, 2, data)
+	appended, err := c.UploadPart(ctx, objcli.UploadPartOptions{
+		Bucket:   bucket,
+		UploadID: id,
+		Key:      attrs.Key,
+		Number:   2,
+		Body:     body,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(ctx, bucket, id, attrs.Key, copied, appended)
+	err = c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
+		Bucket:   bucket,
+		UploadID: id,
+		Key:      attrs.Key,
+		Parts:    []objval.Part{copied, appended},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
@@ -233,22 +268,22 @@ func (c *Client) copyAndAppend(
 	return nil
 }
 
-func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
+func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
 	pool := hofp.NewPool(hofp.Options{
 		Context:   ctx,
-		Size:      system.NumWorkers(len(keys)),
+		Size:      system.NumWorkers(len(opts.Keys)),
 		LogPrefix: "(objaws)",
 	})
 
 	del := func(ctx context.Context, start, end int) error {
-		return c.deleteObjects(ctx, bucket, keys[start:maths.Min(end, len(keys))]...)
+		return c.deleteObjects(ctx, opts.Bucket, opts.Keys[start:maths.Min(end, len(opts.Keys))]...)
 	}
 
 	queue := func(start, end int) error {
 		return pool.Queue(func(ctx context.Context) error { return del(ctx, start, end) })
 	}
 
-	for start, end := 0, PageSize; start < len(keys); start, end = start+PageSize, end+PageSize {
+	for start, end := 0, PageSize; start < len(opts.Keys); start, end = start+PageSize, end+PageSize {
 		if queue(start, end) != nil {
 			break
 		}
@@ -257,8 +292,8 @@ func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys ...strin
 	return pool.Stop()
 }
 
-func (c *Client) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
-	return c.deleteDirectory(ctx, bucket, prefix, c.deleteObjects)
+func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
+	return c.deleteDirectory(ctx, opts.Bucket, opts.Prefix, c.deleteObjects)
 }
 
 // deleteDirectory is a wrapper function which allows unit testing the 'DeleteDirectory' function with a mocked deletion
@@ -329,24 +364,22 @@ func (c *Client) deleteObjects(ctx context.Context, bucket string, keys ...strin
 	return nil
 }
 
-func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
-	exclude []*regexp.Regexp, fn objcli.IterateFunc,
-) error {
-	if include != nil && exclude != nil {
+func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
+	if opts.Include != nil && opts.Exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
 	var err error
 
 	callback := func(page *s3.ListObjectsV2Output, _ bool) bool {
-		err = c.handlePage(page, include, exclude, fn)
+		err = c.handlePage(page, opts.Include, opts.Exclude, opts.Func)
 		return err == nil
 	}
 
 	input := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(bucket),
-		Prefix:    aws.String(prefix),
-		Delimiter: aws.String(delimiter),
+		Bucket:    aws.String(opts.Bucket),
+		Prefix:    aws.String(opts.Prefix),
+		Delimiter: aws.String(opts.Delimiter),
 	}
 
 	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
@@ -359,7 +392,9 @@ func (c *Client) IterateObjects(ctx context.Context, bucket, prefix, delimiter s
 
 // handlePage iterates over common prefixes/objects in the given page executing the given function for each object which
 // has not been explicitly ignored by the user.
-func (c *Client) handlePage(page *s3.ListObjectsV2Output, include, exclude []*regexp.Regexp,
+func (c *Client) handlePage(
+	page *s3.ListObjectsV2Output,
+	include, exclude []*regexp.Regexp,
 	fn objcli.IterateFunc,
 ) error {
 	converted := make([]*objval.ObjectAttrs, 0, len(page.CommonPrefixes)+len(page.Contents))
@@ -386,10 +421,10 @@ func (c *Client) handlePage(page *s3.ListObjectsV2Output, include, exclude []*re
 	return nil
 }
 
-func (c *Client) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
+func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMultipartUploadOptions) (string, error) {
 	input := &s3.CreateMultipartUploadInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Bucket: aws.String(opts.Bucket),
+		Key:    aws.String(opts.Key),
 	}
 
 	resp, err := c.serviceAPI.CreateMultipartUploadWithContext(ctx, input)
@@ -400,13 +435,13 @@ func (c *Client) CreateMultipartUpload(ctx context.Context, bucket, key string) 
 	return *resp.UploadId, nil
 }
 
-func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
+func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([]objval.Part, error) {
 	parts := make([]objval.Part, 0)
 
 	input := &s3.ListPartsInput{
-		Bucket:   aws.String(bucket),
-		UploadId: aws.String(id),
-		Key:      aws.String(key),
+		Bucket:   aws.String(opts.Bucket),
+		UploadId: aws.String(opts.UploadID),
+		Key:      aws.String(opts.Key),
 	}
 
 	err := c.serviceAPI.ListPartsPagesWithContext(ctx, input, func(page *s3.ListPartsOutput, _ bool) bool {
@@ -422,27 +457,25 @@ func (c *Client) ListParts(ctx context.Context, bucket, id, key string) ([]objva
 
 	// Must be handled here localstack may return a clashing "NotFound" error
 	if isNoSuchUpload(err) {
-		return nil, &objerr.NotFoundError{Type: "upload", Name: id}
+		return nil, &objerr.NotFoundError{Type: "upload", Name: opts.UploadID}
 	}
 
 	return nil, handleError(input.Bucket, input.Key, err)
 }
 
-func (c *Client) UploadPart(
-	ctx context.Context, bucket, id, key string, number int, body io.ReadSeeker,
-) (objval.Part, error) {
-	size, err := aws.SeekerLen(body)
+func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) (objval.Part, error) {
+	size, err := aws.SeekerLen(opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
 	}
 
 	input := &s3.UploadPartInput{
-		Body:          body,
-		Bucket:        aws.String(bucket),
+		Body:          opts.Body,
+		Bucket:        aws.String(opts.Bucket),
 		ContentLength: aws.Int64(size),
-		Key:           aws.String(key),
-		PartNumber:    aws.Int64(int64(number)),
-		UploadId:      aws.String(id),
+		Key:           aws.String(opts.Key),
+		PartNumber:    aws.Int64(int64(opts.Number)),
+		UploadId:      aws.String(opts.UploadID),
 	}
 
 	output, err := c.serviceAPI.UploadPartWithContext(ctx, input)
@@ -450,30 +483,21 @@ func (c *Client) UploadPart(
 		return objval.Part{}, handleError(input.Bucket, input.Key, err)
 	}
 
-	return objval.Part{ID: *output.ETag, Number: number, Size: size}, nil
+	return objval.Part{ID: *output.ETag, Number: opts.Number, Size: size}, nil
 }
 
-func (c *Client) UploadPartCopy(
-	ctx context.Context,
-	dstBucket,
-	id,
-	dstKey,
-	srcBucket,
-	srcKey string,
-	number int,
-	br *objval.ByteRange,
-) (objval.Part, error) {
-	if err := br.Valid(true); err != nil {
+func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyOptions) (objval.Part, error) {
+	if err := opts.ByteRange.Valid(true); err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
 	input := &s3.UploadPartCopyInput{
-		Bucket:          aws.String(dstBucket),
-		CopySource:      aws.String(path.Join(srcBucket, srcKey)),
-		CopySourceRange: aws.String(br.ToRangeHeader()),
-		Key:             aws.String(dstKey),
-		PartNumber:      aws.Int64(int64(number)),
-		UploadId:        aws.String(id),
+		Bucket:          aws.String(opts.DestinationBucket),
+		CopySource:      aws.String(path.Join(opts.SourceBucket, opts.SourceKey)),
+		CopySourceRange: aws.String(opts.ByteRange.ToRangeHeader()),
+		Key:             aws.String(opts.DestinationKey),
+		PartNumber:      aws.Int64(int64(opts.Number)),
+		UploadId:        aws.String(opts.UploadID),
 	}
 
 	output, err := c.serviceAPI.UploadPartCopyWithContext(ctx, input)
@@ -481,20 +505,26 @@ func (c *Client) UploadPartCopy(
 		return objval.Part{}, handleError(input.Bucket, input.Key, err)
 	}
 
-	return objval.Part{ID: *output.CopyPartResult.ETag, Number: number, Size: br.End - br.Start + 1}, nil
+	part := objval.Part{
+		ID:     *output.CopyPartResult.ETag,
+		Number: opts.Number,
+		Size:   opts.ByteRange.End - opts.ByteRange.Start + 1,
+	}
+
+	return part, nil
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key string, parts ...objval.Part) error {
-	converted := make([]*s3.CompletedPart, len(parts))
+func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
+	converted := make([]*s3.CompletedPart, len(opts.Parts))
 
-	for index, part := range parts {
+	for index, part := range opts.Parts {
 		converted[index] = &s3.CompletedPart{ETag: aws.String(part.ID), PartNumber: aws.Int64(int64(part.Number))}
 	}
 
 	input := &s3.CompleteMultipartUploadInput{
-		Bucket:          aws.String(bucket),
-		Key:             aws.String(key),
-		UploadId:        aws.String(id),
+		Bucket:          aws.String(opts.Bucket),
+		Key:             aws.String(opts.Key),
+		UploadId:        aws.String(opts.UploadID),
 		MultipartUpload: &s3.CompletedMultipartUpload{Parts: converted},
 	}
 
@@ -503,11 +533,11 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, bucket, id, key st
 	return handleError(input.Bucket, input.Key, err)
 }
 
-func (c *Client) AbortMultipartUpload(ctx context.Context, bucket, id, key string) error {
+func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMultipartUploadOptions) error {
 	input := &s3.AbortMultipartUploadInput{
-		Bucket:   aws.String(bucket),
-		Key:      aws.String(key),
-		UploadId: aws.String(id),
+		Bucket:   aws.String(opts.Bucket),
+		Key:      aws.String(opts.Key),
+		UploadId: aws.String(opts.UploadID),
 	}
 
 	_, err := c.serviceAPI.AbortMultipartUploadWithContext(ctx, input)

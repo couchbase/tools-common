@@ -66,7 +66,10 @@ func TestClientGetObject(t *testing.T) {
 			return output, nil
 		})
 
-	object, err := client.GetObject(context.Background(), "container", "blob", nil)
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "container",
+		Key:    "blob",
+	})
 	require.NoError(t, err)
 
 	expected := &objval.Object{
@@ -100,7 +103,11 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 			return output, nil
 		})
 
-	object, err := client.GetObject(context.Background(), "container", "blob", &objval.ByteRange{Start: 64, End: 128})
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "container",
+		Key:       "blob",
+		ByteRange: &objval.ByteRange{Start: 64, End: 128},
+	})
 	require.NoError(t, err)
 
 	expected := &objval.Object{
@@ -118,7 +125,11 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.GetObject(context.Background(), "bucket", "blob", &objval.ByteRange{Start: 128, End: 64})
+	_, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "bucket",
+		Key:       "blob",
+		ByteRange: &objval.ByteRange{Start: 128, End: 64},
+	})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -136,7 +147,10 @@ func TestClientGetObjectAttrs(t *testing.T) {
 
 	bAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
 
-	attrs, err := client.GetObjectAttrs(context.Background(), "container", "blob")
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket: "container",
+		Key:    "blob",
+	})
 	require.NoError(t, err)
 
 	expected := &objval.ObjectAttrs{
@@ -168,7 +182,12 @@ func TestClientPutObject(t *testing.T) {
 		Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(fn)
 
-	require.NoError(t, client.PutObject(context.Background(), "container", "blob", strings.NewReader("value")))
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "container",
+		Key:    "blob",
+		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
 }
 
 func TestClientAppendToObjectNotExists(t *testing.T) {
@@ -195,7 +214,12 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(fn)
 
-	require.NoError(t, client.AppendToObject(context.Background(), "container", "blob", strings.NewReader("value")))
+	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "container",
+		Key:    "blob",
+		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
 }
 
 func TestClientCopyObject(t *testing.T) {
@@ -230,14 +254,12 @@ func TestClientCopyObject(t *testing.T) {
 		CopyFromURL(matchers.Context, gomock.Any(), gomock.Any()).
 		DoAndReturn(fn)
 
-	err := client.CopyObject(
-		context.Background(),
-		"dstContainer",
-		"dstBlob",
-		"srcContainer",
-		"srcBlob",
-	)
-
+	err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
+		DestinationBucket: "dstContainer",
+		DestinationKey:    "dstBlob",
+		SourceBucket:      "srcContainer",
+		SourceKey:         "srcBlob",
+	})
 	require.NoError(t, err)
 }
 
@@ -283,7 +305,12 @@ func TestClientAppendToObject(t *testing.T) {
 			return blockblob.CommitBlockListResponse{}, nil
 		})
 
-	require.NoError(t, client.AppendToObject(context.Background(), "container", "blob", strings.NewReader("value")))
+	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "container",
+		Key:    "blob",
+		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
 }
 
 func TestClientDeleteObjects(t *testing.T) {
@@ -302,7 +329,11 @@ func TestClientDeleteObjects(t *testing.T) {
 
 	bAPI.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(blob.DeleteResponse{}, nil).Times(2)
 
-	require.NoError(t, client.DeleteObjects(context.Background(), "container", "blob1", "blob2"))
+	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
+		Bucket: "container",
+		Keys:   []string{"blob1", "blob2"},
+	})
+	require.NoError(t, err)
 }
 
 func TestClientDeleteObjectsKeyNotFound(t *testing.T) {
@@ -313,13 +344,20 @@ func TestClientDeleteObjectsKeyNotFound(t *testing.T) {
 		&azcore.ResponseError{ErrorCode: string(bloberror.BlobNotFound)},
 	)
 
-	require.NoError(t, client.DeleteObjects(context.Background(), "container", "blob"))
+	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
+		Bucket: "container",
+		Keys:   []string{"blob"},
+	})
+	require.NoError(t, err)
 }
 
 func TestClientCreateMultipartUpload(t *testing.T) {
 	client := &Client{}
 
-	id, err := client.CreateMultipartUpload(context.Background(), "container", "blob")
+	id, err := client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
+		Bucket: "container",
+		Key:    "blob",
+	})
 	require.NoError(t, err)
 	require.Equal(t, objcli.NoUploadID, id)
 }
@@ -327,7 +365,12 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 func TestClientUploadPartWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPart(context.Background(), "container", "id", "blob", 42, nil)
+	_, err := client.UploadPart(context.Background(), objcli.UploadPartOptions{
+		Bucket:   "container",
+		UploadID: "id",
+		Key:      "blob",
+		Number:   42,
+	})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -350,7 +393,11 @@ func TestClientListParts(t *testing.T) {
 
 	bAPI.EXPECT().GetBlockList(gomock.Any(), gomock.Any(), gomock.Any()).Return(output, nil)
 
-	parts, err := client.ListParts(context.Background(), "container", objcli.NoUploadID, "blob")
+	parts, err := client.ListParts(context.Background(), objcli.ListPartsOptions{
+		Bucket:   "container",
+		UploadID: objcli.NoUploadID,
+		Key:      "blob",
+	})
 	require.NoError(t, err)
 
 	expected := []objval.Part{{ID: "block3", Size: 256}, {ID: "block4", Size: 512}}
@@ -360,7 +407,11 @@ func TestClientListParts(t *testing.T) {
 func TestClientListPartsWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.ListParts(context.Background(), "container", "id", "blob")
+	_, err := client.ListParts(context.Background(), objcli.ListPartsOptions{
+		Bucket:   "container",
+		UploadID: "id",
+		Key:      "blob",
+	})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -376,8 +427,13 @@ func TestClientUploadPart(t *testing.T) {
 			return blockblob.StageBlockResponse{}, nil
 		})
 
-	part, err := client.UploadPart(context.Background(), "container", objcli.NoUploadID, "blob", 42,
-		strings.NewReader("value"))
+	part, err := client.UploadPart(context.Background(), objcli.UploadPartOptions{
+		Bucket:   "container",
+		UploadID: objcli.NoUploadID,
+		Key:      "blob",
+		Number:   42,
+		Body:     strings.NewReader("value"),
+	})
 	require.NoError(t, err)
 	require.NotZero(t, part.ID)
 
@@ -447,16 +503,15 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 					return blockblob.StageBlockFromURLResponse{}, nil
 				})
 
-			part, err := client.UploadPartCopy(
-				context.Background(),
-				"container",
-				objcli.NoUploadID,
-				"dst",
-				"container",
-				"src",
-				42,
-				test.br,
-			)
+			part, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+				DestinationBucket: "container",
+				UploadID:          objcli.NoUploadID,
+				DestinationKey:    "dst",
+				SourceBucket:      "container",
+				SourceKey:         "src",
+				Number:            42,
+				ByteRange:         test.br,
+			})
 			require.NoError(t, err)
 			require.NotZero(t, part.ID)
 
@@ -502,16 +557,14 @@ func TestClientUploadPartCopy(t *testing.T) {
 			return blockblob.StageBlockFromURLResponse{}, nil
 		})
 
-	part, err := client.UploadPartCopy(
-		context.Background(),
-		"dstContainer",
-		objcli.NoUploadID,
-		"dstKey",
-		"srcContainer",
-		"srcKey",
-		42,
-		nil,
-	)
+	part, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		DestinationBucket: "dstContainer",
+		UploadID:          objcli.NoUploadID,
+		DestinationKey:    "dstKey",
+		SourceBucket:      "srcContainer",
+		SourceKey:         "srcKey",
+		Number:            42,
+	})
 	require.NoError(t, err)
 	require.NotZero(t, part.ID)
 
@@ -522,16 +575,15 @@ func TestClientUploadPartCopy(t *testing.T) {
 func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(
-		context.Background(),
-		"dstContainer",
-		objcli.NoUploadID,
-		"dstKey",
-		"srcContainer",
-		"srcKey",
-		42,
-		&objval.ByteRange{Start: 128, End: 64},
-	)
+	_, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		DestinationBucket: "dstContainer",
+		UploadID:          objcli.NoUploadID,
+		DestinationKey:    "dstKey",
+		SourceBucket:      "srcContainer",
+		SourceKey:         "srcKey",
+		Number:            42,
+		ByteRange:         &objval.ByteRange{Start: 128, End: 64},
+	})
 
 	var invalidByteRange *objval.InvalidByteRangeError
 
@@ -541,23 +593,25 @@ func TestClientUploadPartCopyWithInvalidByteRange(t *testing.T) {
 func TestClientUploadPartCopyWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	_, err := client.UploadPartCopy(
-		context.Background(),
-		"dstContainer",
-		"id",
-		"dstKey",
-		"srcContainer",
-		"srcKey",
-		42,
-		nil,
-	)
+	_, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		DestinationBucket: "dstContainer",
+		UploadID:          "id",
+		DestinationKey:    "dstKey",
+		SourceBucket:      "srcContainer",
+		SourceKey:         "srcKey",
+		Number:            42,
+	})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
 func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.CompleteMultipartUpload(context.Background(), "bucket", "id", "blob", objval.Part{})
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "blob",
+	})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }
 
@@ -581,21 +635,33 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
 	}
 
-	require.NoError(
-		t,
-		client.CompleteMultipartUpload(context.Background(), "container", objcli.NoUploadID, "blob", parts...),
-	)
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:   "container",
+		UploadID: objcli.NoUploadID,
+		Key:      "blob",
+		Parts:    parts,
+	})
+	require.NoError(t, err)
 }
 
 func TestClientAbortMultipartUpload(t *testing.T) {
 	client := &Client{}
 
-	require.NoError(t, client.AbortMultipartUpload(context.Background(), "container", objcli.NoUploadID, "blob"))
+	err := client.AbortMultipartUpload(context.Background(), objcli.AbortMultipartUploadOptions{
+		Bucket:   "container",
+		UploadID: objcli.NoUploadID,
+		Key:      "blob",
+	})
+	require.NoError(t, err)
 }
 
 func TestClientAbortMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.AbortMultipartUpload(context.Background(), "container", "id", "blob")
+	err := client.AbortMultipartUpload(context.Background(), objcli.AbortMultipartUploadOptions{
+		Bucket:   "container",
+		UploadID: "id",
+		Key:      "blob",
+	})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
 }

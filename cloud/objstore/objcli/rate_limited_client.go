@@ -2,8 +2,6 @@ package objcli
 
 import (
 	"context"
-	"io"
-	"regexp"
 
 	"golang.org/x/time/rate"
 
@@ -16,16 +14,12 @@ import (
 //
 // The rate-limited methods are:
 //
-// * GetObject
-//
-// * PutObject
-//
-// * AppendToObject
-//
-// * UploadPart
+// - GetObject
+// - PutObject
+// - AppendToObject
+// - UploadPart
 type RateLimitedClient struct {
-	c Client
-
+	c  Client
 	rl *rate.Limiter
 }
 
@@ -38,12 +32,8 @@ func (r *RateLimitedClient) Provider() objval.Provider {
 	return r.c.Provider()
 }
 
-func (r *RateLimitedClient) GetObject(
-	ctx context.Context,
-	bucket, key string,
-	br *objval.ByteRange,
-) (*objval.Object, error) {
-	obj, err := r.c.GetObject(ctx, bucket, key, br)
+func (r *RateLimitedClient) GetObject(ctx context.Context, opts GetObjectOptions) (*objval.Object, error) {
+	obj, err := r.c.GetObject(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -53,68 +43,59 @@ func (r *RateLimitedClient) GetObject(
 	return obj, nil
 }
 
-func (r *RateLimitedClient) GetObjectAttrs(ctx context.Context, bucket, key string) (*objval.ObjectAttrs, error) {
-	return r.c.GetObjectAttrs(ctx, bucket, key)
-}
-
-func (r *RateLimitedClient) PutObject(ctx context.Context, bucket, key string, body io.ReadSeeker) error {
-	return r.c.PutObject(ctx, bucket, key, ratelimit.NewRateLimitedReadSeeker(ctx, body, r.rl))
-}
-
-func (r *RateLimitedClient) AppendToObject(ctx context.Context, bucket, key string, data io.ReadSeeker) error {
-	return r.c.AppendToObject(ctx, bucket, key, ratelimit.NewRateLimitedReadSeeker(ctx, data, r.rl))
-}
-
-func (r *RateLimitedClient) DeleteObjects(ctx context.Context, bucket string, keys ...string) error {
-	return r.c.DeleteObjects(ctx, bucket, keys...)
-}
-
-func (r *RateLimitedClient) DeleteDirectory(ctx context.Context, bucket, prefix string) error {
-	return r.c.DeleteDirectory(ctx, bucket, prefix)
-}
-
-func (r *RateLimitedClient) IterateObjects(ctx context.Context, bucket, prefix, delimiter string, include,
-	exclude []*regexp.Regexp, fn IterateFunc,
-) error {
-	return r.c.IterateObjects(ctx, bucket, prefix, delimiter, include, exclude, fn)
-}
-
-func (r *RateLimitedClient) CreateMultipartUpload(ctx context.Context, bucket, key string) (string, error) {
-	return r.c.CreateMultipartUpload(ctx, bucket, key)
-}
-
-func (r *RateLimitedClient) ListParts(ctx context.Context, bucket, id, key string) ([]objval.Part, error) {
-	return r.c.ListParts(ctx, bucket, id, key)
-}
-
-func (r *RateLimitedClient) UploadPart(
+func (r *RateLimitedClient) GetObjectAttrs(
 	ctx context.Context,
-	bucket, id, key string,
-	number int,
-	body io.ReadSeeker,
-) (objval.Part, error) {
-	return r.c.UploadPart(ctx, bucket, id, key, number, ratelimit.NewRateLimitedReadSeeker(ctx, body, r.rl))
+	opts GetObjectAttrsOptions,
+) (*objval.ObjectAttrs, error) {
+	return r.c.GetObjectAttrs(ctx, opts)
 }
 
-func (r *RateLimitedClient) UploadPartCopy(
+func (r *RateLimitedClient) PutObject(ctx context.Context, opts PutObjectOptions) error {
+	opts.Body = ratelimit.NewRateLimitedReadSeeker(ctx, opts.Body, r.rl)
+	return r.c.PutObject(ctx, opts)
+}
+
+func (r *RateLimitedClient) AppendToObject(ctx context.Context, opts AppendToObjectOptions) error {
+	opts.Body = ratelimit.NewRateLimitedReadSeeker(ctx, opts.Body, r.rl)
+	return r.c.AppendToObject(ctx, opts)
+}
+
+func (r *RateLimitedClient) DeleteObjects(ctx context.Context, opts DeleteObjectsOptions) error {
+	return r.c.DeleteObjects(ctx, opts)
+}
+
+func (r *RateLimitedClient) DeleteDirectory(ctx context.Context, opts DeleteDirectoryOptions) error {
+	return r.c.DeleteDirectory(ctx, opts)
+}
+
+func (r *RateLimitedClient) IterateObjects(ctx context.Context, opts IterateObjectsOptions) error {
+	return r.c.IterateObjects(ctx, opts)
+}
+
+func (r *RateLimitedClient) CreateMultipartUpload(
 	ctx context.Context,
-	dstBucket,
-	id,
-	dstKey,
-	srcBucket,
-	srcKey string,
-	number int,
-	br *objval.ByteRange,
-) (objval.Part, error) {
-	return r.c.UploadPartCopy(ctx, dstBucket, id, dstKey, srcBucket, srcKey, number, br)
+	opts CreateMultipartUploadOptions,
+) (string, error) {
+	return r.c.CreateMultipartUpload(ctx, opts)
 }
 
-func (r *RateLimitedClient) CompleteMultipartUpload(ctx context.Context, bucket, id, key string,
-	parts ...objval.Part,
-) error {
-	return r.c.CompleteMultipartUpload(ctx, bucket, id, key, parts...)
+func (r *RateLimitedClient) ListParts(ctx context.Context, opts ListPartsOptions) ([]objval.Part, error) {
+	return r.c.ListParts(ctx, opts)
 }
 
-func (r *RateLimitedClient) AbortMultipartUpload(ctx context.Context, bucket, id, key string) error {
-	return r.c.AbortMultipartUpload(ctx, bucket, id, key)
+func (r *RateLimitedClient) UploadPart(ctx context.Context, opts UploadPartOptions) (objval.Part, error) {
+	opts.Body = ratelimit.NewRateLimitedReadSeeker(ctx, opts.Body, r.rl)
+	return r.c.UploadPart(ctx, opts)
+}
+
+func (r *RateLimitedClient) UploadPartCopy(ctx context.Context, opts UploadPartCopyOptions) (objval.Part, error) {
+	return r.c.UploadPartCopy(ctx, opts)
+}
+
+func (r *RateLimitedClient) CompleteMultipartUpload(ctx context.Context, opts CompleteMultipartUploadOptions) error {
+	return r.c.CompleteMultipartUpload(ctx, opts)
+}
+
+func (r *RateLimitedClient) AbortMultipartUpload(ctx context.Context, opts AbortMultipartUploadOptions) error {
+	return r.c.AbortMultipartUpload(ctx, opts)
 }

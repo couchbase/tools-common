@@ -14,18 +14,30 @@ import (
 
 // TestUploadRAW uploads the given raw data.
 func TestUploadRAW(t *testing.T, client Client, key string, body []byte) {
-	require.NoError(t, client.PutObject(context.Background(), "bucket", key, bytes.NewReader(body)))
+	err := client.PutObject(context.Background(), PutObjectOptions{
+		Bucket: "bucket",
+		Key:    key,
+		Body:   bytes.NewReader(body),
+	})
+	require.NoError(t, err)
 }
 
 // TestUploadJSON uploads the given data as JSON.
 func TestUploadJSON(t *testing.T, client Client, key string, body any) {
-	require.NoError(t,
-		client.PutObject(context.Background(), "bucket", key, bytes.NewReader(testutil.MarshalJSON(t, body))))
+	err := client.PutObject(context.Background(), PutObjectOptions{
+		Bucket: "bucket",
+		Key:    key,
+		Body:   bytes.NewReader(testutil.MarshalJSON(t, body)),
+	})
+	require.NoError(t, err)
 }
 
 // TestDownloadRAW downloads the object as raw data.
 func TestDownloadRAW(t *testing.T, client Client, key string) []byte {
-	object, err := client.GetObject(context.Background(), "bucket", key, nil)
+	object, err := client.GetObject(context.Background(), GetObjectOptions{
+		Bucket: "bucket",
+		Key:    key,
+	})
 	require.NoError(t, err)
 
 	defer object.Body.Close()
@@ -35,7 +47,10 @@ func TestDownloadRAW(t *testing.T, client Client, key string) []byte {
 
 // TestDownloadJSON downloads the given object, unmarshaling it into the provided interface.
 func TestDownloadJSON(t *testing.T, client Client, key string, data any) {
-	object, err := client.GetObject(context.Background(), "bucket", key, nil)
+	object, err := client.GetObject(context.Background(), GetObjectOptions{
+		Bucket: "bucket",
+		Key:    key,
+	})
 	require.NoError(t, err)
 
 	defer object.Body.Close()
@@ -45,13 +60,19 @@ func TestDownloadJSON(t *testing.T, client Client, key string, data any) {
 
 // TestRequireKeyExists asserts that the given key exists.
 func TestRequireKeyExists(t *testing.T, client Client, key string) {
-	_, err := client.GetObjectAttrs(context.Background(), "bucket", key)
+	_, err := client.GetObjectAttrs(context.Background(), GetObjectAttrsOptions{
+		Bucket: "bucket",
+		Key:    key,
+	})
 	require.NoError(t, err)
 }
 
 // TestRequireKeyNotFound asserts that the given key does not exist.
 func TestRequireKeyNotFound(t *testing.T, client Client, key string) {
-	_, err := client.GetObjectAttrs(context.Background(), "bucket", key)
+	_, err := client.GetObjectAttrs(context.Background(), GetObjectAttrsOptions{
+		Bucket: "bucket",
+		Key:    key,
+	})
 	require.True(t, objerr.IsNotFoundError(err))
 }
 
@@ -62,7 +83,12 @@ func TestListObjects(t *testing.T, client Client, prefix string) []*objval.Objec
 		fn  = func(attrs *objval.ObjectAttrs) error { all = append(all, attrs); return nil }
 	)
 
-	require.NoError(t, client.IterateObjects(context.Background(), "bucket", prefix, "", nil, nil, fn))
+	err := client.IterateObjects(context.Background(), IterateObjectsOptions{
+		Bucket: "bucket",
+		Prefix: prefix,
+		Func:   fn,
+	})
+	require.NoError(t, err)
 
 	return all
 }
