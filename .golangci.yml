@@ -1,7 +1,7 @@
 issues:
   max-issues-per-linter: 0 # Unlimited
   max-same-issues: 0 # Unlimited
-linters: # TODO (MB-52626): Re-enable linters that were broken by Go 1.18.
+linters:
   fast: false
   enable:
     - asciicheck
@@ -20,14 +20,13 @@ linters: # TODO (MB-52626): Re-enable linters that were broken by Go 1.18.
     - nolintlint
     - prealloc
     - revive
-    # - rowserrcheck
-    # - sqlclosecheck
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
-    # - structcheck
     - unconvert
     - unparam
     - unused
-    # - wastedassign
+    - wastedassign
     - whitespace
     - wsl
 run:
