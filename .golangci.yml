@@ -1,12 +1,11 @@
 issues:
   max-issues-per-linter: 0 # Unlimited
-  max-same-issues: 0 # Unlimited 
+  max-same-issues: 0 # Unlimited
 linters: # TODO (MB-52626): Re-enable linters that were broken by Go 1.18.
   fast: false
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
     - dogsled
     - godox
     - gofmt
@@ -27,7 +26,7 @@ linters: # TODO (MB-52626): Re-enable linters that were broken by Go 1.18.
     # - structcheck
     - unconvert
     - unparam
-    - varcheck
+    - unused
     # - wastedassign
     - whitespace
     - wsl
