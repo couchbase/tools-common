@@ -93,21 +93,25 @@ pipeline {
                 // Create somewhere to store our coverage/test reports
                 sh "mkdir -p reports"
 
-                dir("${PROJECT}") {
-                    // Run unit testing with coverage and place output in 'reports'.
-                    //
-                    // - 'reports/tests.xml'
-                    // - 'reports/coverage.xml'
-                    sh "./scripts/cv/test.sh ${WORKSPACE}/reports"
+                timeout(time: 15, unit: "MINUTES") {
+                    dir("${PROJECT}") {
+                        // Run unit testing with coverage and place output in 'reports'.
+                        //
+                        // - 'reports/tests.xml'
+                        // - 'reports/coverage.xml'
+                        sh "./scripts/cv/test.sh ${WORKSPACE}/reports"
+                    }
                 }
             }
         }
 
         stage("Benchmark") {
             steps {
-                dir("${PROJECT}") {
-                    // Run the benchmarks without running any tests
-                    sh "./scripts/cv/benchmark.sh"
+                timeout(time: 15, unit: "MINUTES") {
+                    dir("${PROJECT}") {
+                        // Run the benchmarks without running any tests
+                        sh "./scripts/cv/benchmark.sh"
+                    }
                 }
             }
         }

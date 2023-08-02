@@ -44,7 +44,7 @@ for MOD in $(find . -name 'go.mod' | xargs dirname | grep -v 'scripts' | tr -d '
     REP_FILE=$REPORTS/$MOD.raw
 
     # Run testing outputting to 'stdout' and to a module specific file
-    2>&1 go test -v -timeout=15m -count=1 -coverprofile=$COV_FILE ./... | tee $REP_FILE
+    2>&1 go test -v -count=1 -coverprofile=$COV_FILE ./... | tee $REP_FILE
 
     # Convert the module specific file into JSON
     gocov convert $COV_FILE > ${COV_FILE%.out}.json
