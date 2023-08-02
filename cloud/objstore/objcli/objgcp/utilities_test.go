@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
 
 	"cloud.google.com/go/storage"
 	"github.com/stretchr/testify/assert"

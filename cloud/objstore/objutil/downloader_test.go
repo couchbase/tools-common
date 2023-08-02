@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 )
 

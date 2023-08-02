@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
 )

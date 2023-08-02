@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/core/log"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 	"github.com/couchbase/tools-common/sync/hofp"

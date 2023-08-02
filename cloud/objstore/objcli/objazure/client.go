@@ -13,9 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/system"

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 )
 
 func TestPrefixExistsOptionsDefaults(t *testing.T) {

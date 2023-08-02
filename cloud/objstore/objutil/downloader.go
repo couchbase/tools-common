@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/maths"

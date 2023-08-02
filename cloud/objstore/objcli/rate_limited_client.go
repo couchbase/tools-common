@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/types/ratelimit"
 )
 

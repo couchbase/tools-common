@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/couchbase/tools-common/cloud/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	ioiface "github.com/couchbase/tools-common/types/iface"
 	"github.com/couchbase/tools-common/utils/maths"
 
