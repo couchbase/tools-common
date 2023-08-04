@@ -428,6 +428,10 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 	return nil
 }
 
+func (c *Client) Close() error {
+	return c.serviceAPI.Close()
+}
+
 // complete recursively composes the object in chunks of 32 eventually resulting in a single complete object.
 func (c *Client) complete(ctx context.Context, bucket, key string, parts ...string) error {
 	if len(parts) <= MaxComposable {

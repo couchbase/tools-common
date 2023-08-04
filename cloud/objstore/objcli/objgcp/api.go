@@ -12,6 +12,7 @@ import (
 // storageAPI is a top level interface which allows interactions with Google cloud storage.
 type serviceAPI interface {
 	Bucket(name string) bucketAPI
+	Close() error
 }
 
 // serviceClient implements the 'storageAPI' interface and encapsulates the Google SDK into a unit testable interface.
@@ -21,6 +22,10 @@ type serviceClient struct {
 
 func (s serviceClient) Bucket(name string) bucketAPI {
 	return bucketHandle{h: s.c.Bucket(name)}
+}
+
+func (s serviceClient) Close() error {
+	return s.c.Close()
 }
 
 // bucketAPI is a bucket level interface which allows interactions with a Google Storage bucket.

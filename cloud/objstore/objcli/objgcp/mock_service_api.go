@@ -25,6 +25,20 @@ func (_m *mockServiceAPI) Bucket(name string) bucketAPI {
 	return r0
 }
 
+// Close provides a mock function with given fields:
+func (_m *mockServiceAPI) Close() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // newMockServiceAPI creates a new instance of mockServiceAPI. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func newMockServiceAPI(t interface {

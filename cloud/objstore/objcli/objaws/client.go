@@ -296,6 +296,11 @@ func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirector
 	return c.deleteDirectory(ctx, opts.Bucket, opts.Prefix, c.deleteObjects)
 }
 
+// Close is a no-op for AWS as this won't result in a memory leak.
+func (c *Client) Close() error {
+	return nil
+}
+
 // deleteDirectory is a wrapper function which allows unit testing the 'DeleteDirectory' function with a mocked deletion
 // callback; this is required because the callback uses 'serviceAPI' which when mocked acquires a lock, causing a
 // deadlock.

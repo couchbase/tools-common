@@ -195,6 +195,10 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 	return nil
 }
 
+func (t *TestClient) Close() error {
+	return nil
+}
+
 func (t *TestClient) CreateMultipartUpload(_ context.Context, _ CreateMultipartUploadOptions) (string, error) {
 	return uuid.NewString(), nil
 }

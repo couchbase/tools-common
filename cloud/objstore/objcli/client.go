@@ -269,4 +269,8 @@ type Client interface {
 
 	// AbortMultipartUpload aborts the multipart upload with the given id whilst cleaning up any abandoned parts.
 	AbortMultipartUpload(ctx context.Context, opts AbortMultipartUploadOptions) error
+
+	// Close the underlying client/SDK where applicable; use of the client, or the underlying SDK after a call to Close
+	// has undefined behavior. This is required to stop memory leaks in GCP.
+	Close() error
 }

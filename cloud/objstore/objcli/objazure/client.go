@@ -261,6 +261,11 @@ func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirector
 	return err
 }
 
+// Close is a no-op for Azure as this won't result in a memory leak.
+func (c *Client) Close() error {
+	return nil
+}
+
 func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
 	if opts.Include != nil && opts.Exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
