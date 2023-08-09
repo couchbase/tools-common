@@ -1,5 +1,13 @@
 # Changes
 
+## v2.0.2
+
+- Added a `Close` method to the `objcli.Client` interface.
+
+## v2.0.1
+
+- Renames module from `cloud` to `cloud/v2`.
+
 ## v2.0.0
 
 - BREAKING: Made `ObjectAttrs.Size` a pointer given it may be conditionally
