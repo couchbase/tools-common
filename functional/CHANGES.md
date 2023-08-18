@@ -3,6 +3,7 @@
 ## v1.1.0
 
 - Added a 'Difference' method to 'slices'.
+- Fixed the 'Union' function in 'slices' which was returning the intersection.
 
 ## v1.0.0
 

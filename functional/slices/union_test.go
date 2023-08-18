@@ -1,49 +1,65 @@
 package slices
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnionString(t *testing.T) {
-	tests := []struct {
+func TestUnion(t *testing.T) {
+	type test struct {
 		name     string
 		a        []string
 		b        []string
 		expected []string
-	}{
+	}
+
+	tests := []test{
 		{
-			name:     "disjoint",
-			a:        []string{"0", "1", "2", "3"},
-			b:        []string{"a", "b"},
-			expected: []string{},
+			name:     "Nil",
+			expected: make([]string, 0),
 		},
 		{
-			name:     "equal",
-			a:        []string{"0", "1", "2", "3"},
-			b:        []string{"2", "1", "0", "3"},
-			expected: []string{"0", "1", "2", "3"},
+			name:     "ANil",
+			b:        []string{"a", "b", "c"},
+			expected: []string{"a", "b", "c"},
 		},
 		{
-			name:     "partial_match",
-			a:        []string{"alpha", "tango", "papa", "romeo"},
-			b:        []string{"bravo", "charlie", "echo", "tango", "quebec", "romeo", "zulu"},
-			expected: []string{"romeo", "tango"},
+			name:     "BNil",
+			a:        []string{"a", "b", "c"},
+			expected: []string{"a", "b", "c"},
 		},
 		{
-			name:     "nil-input",
-			a:        []string{"alpha"},
-			expected: []string{},
+			name:     "Empty",
+			a:        make([]string, 0),
+			b:        make([]string, 0),
+			expected: make([]string, 0),
+		},
+		{
+			name:     "InA",
+			a:        []string{"a"},
+			expected: []string{"a"},
+		},
+		{
+			name:     "InB",
+			b:        []string{"a"},
+			expected: []string{"a"},
+		},
+		{
+			name:     "MultipleInA",
+			a:        []string{"a", "a"},
+			expected: []string{"a"},
+		},
+		{
+			name:     "MultipleInB",
+			b:        []string{"a", "a"},
+			expected: []string{"a"},
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			out := Union(tc.a, tc.b)
-			sort.Strings(out)
-			require.Equal(t, tc.expected, out)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.ElementsMatch(t, test.expected, Union(test.a, test.b))
 		})
 	}
 }
