@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.0
+
+- Added a 'Difference' method to 'slices'.
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to
