@@ -4,6 +4,8 @@
 
 - Added a 'Difference' method to 'slices'.
 - Fixed the 'Union' function in 'slices' which was returning the intersection.
+- Added an 'Intersection' function to 'slices' for those relying on the
+  incorrect behavior of 'Union'.
 
 ## v1.0.0
 
