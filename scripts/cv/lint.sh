@@ -7,7 +7,7 @@ for MOD in $(find . -name 'go.mod' | xargs dirname | grep -v 'scripts' | tr -d '
     cd $MOD
 
     # Run golangci-lint using the top-level config
-    golangci-lint run --config ../.golangci.yml
+    golangci-lint run --config ../.golangci.yml --timeout=10m
 
     # Return to the parent directory
     cd ..
