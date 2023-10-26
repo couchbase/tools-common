@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.0
+
+- Added a 'crypto/random' package.
+
 ## v1.0.0
 
 ### Features
