@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	aprov "github.com/couchbase/tools-common/auth/provider"
+	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/utils/maths"

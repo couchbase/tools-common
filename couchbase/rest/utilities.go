@@ -11,10 +11,13 @@ import (
 	"strings"
 	"time"
 
+	aprov "github.com/couchbase/tools-common/auth/v2/provider"
+	"github.com/couchbase/tools-common/core/log"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/retry"
 )
 
 // newHTTPClient returns a new HTTP client with the given client/transport.
@@ -70,12 +73,40 @@ func readBody(method Method, endpoint Endpoint, reader io.Reader, contentLength 
 }
 
 // setAuthHeaders is a utility function which sets all the request headers which are provided by the 'AuthProvider'.
-func setAuthHeaders(host string, authProvider *AuthProvider, req *http.Request) {
-	// Use the auth provider to populate the credentials
-	req.SetBasicAuth(authProvider.provider.GetCredentials(host))
-
+func setAuthHeaders(host string, provider aprov.Provider, req *http.Request, logger log.WrappedLogger) error {
 	// Set the 'User-Agent' so that we can trace how these requests are handled by the cluster
-	req.Header.Set("User-Agent", authProvider.GetUserAgent())
+	req.Header.Set("User-Agent", provider.GetUserAgent())
+
+	credentials, err := getCredentials(provider, host, logger)
+	if err != nil {
+		return err
+	}
+
+	// Use the auth provider to populate the credentials
+	req.SetBasicAuth(credentials.Username, credentials.Password)
+
+	return nil
+}
+
+// getCredentials uses a retryer to get the credentials from the given provider.
+func getCredentials(provider aprov.Provider, host string, logger log.WrappedLogger) (aprov.Credentials, error) {
+	log := func(ctx *retry.Context, _ any, err error) {
+		logger.Warnf("(REST) (Attempt %d) Failed to get credentials due to error: %s", ctx.Attempt, err)
+	}
+
+	retryer := retry.NewRetryer(retry.RetryerOptions{
+		Algorithm:  retry.AlgorithmExponential,
+		MaxRetries: 3,
+		MinDelay:   250 * time.Second,
+		Log:        log,
+	})
+
+	payload, err := retryer.Do(func(ctx *retry.Context) (any, error) { return provider.GetCredentials(host) })
+	if err != nil {
+		return aprov.Credentials{}, err
+	}
+
+	return payload.(aprov.Credentials), nil
 }
 
 // waitForRetryAfter sleeps until we can retry the request for the given response.

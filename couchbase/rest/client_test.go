@@ -16,20 +16,20 @@ import (
 	"testing"
 	"time"
 
-	aprov "github.com/couchbase/tools-common/auth/provider"
+	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/couchbase/connstr"
+	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 	netutil "github.com/couchbase/tools-common/http/util"
 	testutil "github.com/couchbase/tools-common/testing/util"
 
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	username  = "username"
-	password  = "password"
-	userAgent = "user-agent"
-)
+// provider is the auth provider used in the testing; it should not be modified.
+var provider = &aprov.Static{
+	UserAgent:   "user-agent",
+	Credentials: aprov.Credentials{Username: "username", Password: "password"},
+}
 
 // newTestClient returns a client which is boostrapped against the provided cluster.
 //
@@ -44,7 +44,7 @@ func newTestClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
 	return NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
 		DisableCCP:       disableCCP,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		TLSConfig:        &tls.Config{RootCAs: pool},
 		Logger:           log.StdoutLogger{},
 	})
@@ -77,7 +77,7 @@ func TestNewClientWithThisNodeOnly(t *testing.T) {
 
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		Logger:           log.StdoutLogger{},
 	})
@@ -91,7 +91,7 @@ func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
 
 	_, err := NewClient(ClientOptions{
 		ConnectionString: fmt.Sprintf("%s,secondhostname:8091", cluster.URL()),
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		Logger:           log.StdoutLogger{},
 	})
@@ -101,7 +101,7 @@ func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
 func TestNewClientWithLoopbackWithTLS(t *testing.T) {
 	_, err := NewClient(ClientOptions{
 		ConnectionString: "https://localhost:8091",
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		ConnectionMode:   ConnectionModeLoopback,
 		Logger:           log.StdoutLogger{},
 	})
@@ -129,7 +129,7 @@ func TestNewClient(t *testing.T) {
 				Port: cluster.Port(),
 			}},
 		},
-		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		provider: provider,
 		manager: &ClusterConfigManager{
 			config: &ClusterConfig{
 				Nodes: Nodes{{
@@ -151,7 +151,7 @@ func TestNewClientThisNodeOnly(t *testing.T) {
 
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		Logger:           log.StdoutLogger{},
 	})
@@ -213,7 +213,7 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		ConnectionString: fmt.Sprintf("http://notahost:21345,%s:%d", cluster.Address(), cluster.Port()),
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 				},
 			},
 		},
-		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		provider: provider,
 		manager: &ClusterConfigManager{
 			config: &ClusterConfig{
 				Nodes: cluster.Nodes(),
@@ -256,7 +256,7 @@ func TestNewClientFailedToBootstrapAgainstAnyHost(t *testing.T) {
 	_, err := NewClient(ClientOptions{
 		ConnectionString: "http://notahost:21345,notanotherhost:12355",
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 
@@ -319,7 +319,7 @@ func TestNewClientForcedExternalNetworkMode(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL() + "?network=external",
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
@@ -342,7 +342,7 @@ func TestNewClientForcedExternalNetworkMode(t *testing.T) {
 			Params: url.Values{"network": {"external"}},
 		},
 		useAltAddr: true,
-		provider:   &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		provider:   provider,
 		manager: &ClusterConfigManager{
 			config: &ClusterConfig{
 				Nodes: cluster.Nodes(),
@@ -362,7 +362,7 @@ func TestNewClientForcedExternalNetworkModeNoExternal(t *testing.T) {
 	_, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL() + "?network=external",
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 	})
 
 	// External networking isn't enabled on the cluster, therefore, we should be unable to find a node running the
@@ -397,7 +397,7 @@ func TestNewClientTLS(t *testing.T) {
 			}},
 			UseSSL: true,
 		},
-		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		provider: provider,
 		manager: &ClusterConfigManager{
 			config: &ClusterConfig{
 				Nodes: cluster.Nodes(),
@@ -680,7 +680,7 @@ func TestClientExecuteWithModeLoopback(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		DisableCCP:       true,
 		ConnectionMode:   ConnectionModeLoopback,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
@@ -1147,7 +1147,7 @@ func TestClientExecuteUnknownAuthority(t *testing.T) {
 	_, err := NewClient(ClientOptions{
 		ConnectionString: cluster.URL(),
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.Error(t, err)
@@ -1501,7 +1501,7 @@ func TestGetServiceHostServiceConnectionMode(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		DisableCCP:       true,
 		ConnectionMode:   ConnectionModeLoopback,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
@@ -1817,7 +1817,7 @@ func TestClientUpdateCCFromNodeThisNodeOnly(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
@@ -1853,7 +1853,7 @@ func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		DisableCCP:       true,
-		Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		Provider:         provider,
 		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
@@ -1913,7 +1913,7 @@ func TestClientValidHost(t *testing.T) {
 				client: &http.Client{},
 				authProvider: NewAuthProvider(AuthProviderOptions{
 					&connstr.ResolvedConnectionString{},
-					&aprov.Static{Username: "username", Password: "password"},
+					provider,
 					log.StdoutLogger{},
 				}),
 				clusterInfo: test.info,
@@ -2025,7 +2025,7 @@ func TestClientWaitUntilUpdated(t *testing.T) {
 
 			client, err := NewClient(ClientOptions{
 				ConnectionString: cluster.URL(),
-				Provider:         &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+				Provider:         provider,
 				ConnectionMode:   connectionMode,
 				DisableCCP:       true,
 				Logger:           log.StdoutLogger{},

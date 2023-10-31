@@ -1,5 +1,5 @@
-github.com/couchbase/tools-common/auth v1.0.0 h1:M39kYSSQGt2lD50qjgje4k7qAAEaS3DsG+k65j3Tkhk=
-github.com/couchbase/tools-common/auth v1.0.0/go.mod h1:+6Eh+FBrWnEEqhm8rJnbU/DdWdq0hU/t5VDrLW8jKlY=
+github.com/couchbase/tools-common/auth/v2 v2.0.0 h1:d90qZEOGBag+4uF052t/HUaV/b7kWb4T/0OD11UB4uA=
+github.com/couchbase/tools-common/auth/v2 v2.0.0/go.mod h1:xMgH0GBF9h4k7Y/pGnoDA6qZ96E1Ni8gnsrMxyzUi2E=
 github.com/couchbase/tools-common/core v1.0.0 h1:pHz0xN+qhAd/OchSDPQKsZvIulJzFoLK95RVPLbeEBY=
 github.com/couchbase/tools-common/core v1.0.0/go.mod h1:jzRm/z2CehQ8xcUAlNL7wRz6EN3o7OPrAgncFiEEA6s=
 github.com/couchbase/tools-common/environment v1.0.0 h1:1j2JlE9hVtRdddO6lM395XlzaL7JuXNGILWrrk76hUU=

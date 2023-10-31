@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	aprov "github.com/couchbase/tools-common/auth/provider"
+	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/couchbase/connstr"
+	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 	envvar "github.com/couchbase/tools-common/environment/variable"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
@@ -383,7 +383,10 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	setAuthHeaders(host, c.authProvider, req)
+	err = setAuthHeaders(host, c.authProvider.provider, req, c.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth headers: %w", err)
+	}
 
 	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0)
 	if err != nil {
@@ -819,7 +822,10 @@ func (c *Client) prepare(ctx *retry.Context, request *Request) (*http.Request, e
 		req.Header.Set(key, value)
 	}
 
-	setAuthHeaders(host, c.authProvider, req)
+	err = setAuthHeaders(host, c.authProvider.provider, req, c.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth headers: %w", err)
+	}
 
 	// Set the content type for the request body. Note that we don't default to a value e.g. if must be set for every
 	// request otherwise the string zero value will be used.

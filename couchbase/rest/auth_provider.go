@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	aprov "github.com/couchbase/tools-common/auth/provider"
+	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/couchbase/connstr"
+	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 )
 
 // AuthProvider is the auth provider for the REST client which handles providing credentials/hosts required to execute
@@ -94,16 +94,6 @@ func (a *AuthProvider) GetAllServiceHosts(service Service) ([]string, error) {
 	}
 
 	return hosts, nil
-}
-
-// GetCredentials returns the username/password credentials needed to authenticate against the given host.
-func (a *AuthProvider) GetCredentials(host string) (string, string) {
-	return a.provider.GetCredentials(host)
-}
-
-// GetUserAgent returns a string which should be used as the 'User-Agent' header of any REST requests.
-func (a *AuthProvider) GetUserAgent() string {
-	return a.provider.GetUserAgent()
 }
 
 // SetClusterConfig updates the auth providers cluster config in a thread safe fashion. Returns an error if the provided

@@ -4,9 +4,9 @@ import (
 	"net/url"
 	"testing"
 
-	aprov "github.com/couchbase/tools-common/auth/provider"
+	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/couchbase/connstr"
+	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +15,7 @@ func TestNewAuthProvider(t *testing.T) {
 	actual := NewAuthProvider(
 		AuthProviderOptions{
 			&connstr.ResolvedConnectionString{},
-			&aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+			provider,
 			log.StdoutLogger{},
 		},
 	)
@@ -27,7 +27,7 @@ func TestNewAuthProvider(t *testing.T) {
 
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{},
-		provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
+		provider: provider,
 		manager:  &ClusterConfigManager{maxAge: DefaultCCMaxAge, logger: log.NewWrappedLogger(log.StdoutLogger{})},
 	}
 
@@ -412,30 +412,26 @@ func TestAuthProviderGetHostServiceShouldUseBootstrapHost(t *testing.T) {
 
 func TestAuthProviderGetCredentials(t *testing.T) {
 	type test struct {
-		name             string
-		provider         *AuthProvider
-		host             string
-		expectedUsername string
-		expectedPassword string
+		name        string
+		provider    *AuthProvider
+		host        string
+		credentials aprov.Credentials
 	}
 
 	tests := []*test{
 		{
-			name: "StandardPassword",
-			provider: &AuthProvider{
-				provider: &aprov.Static{Username: username, Password: password, UserAgent: userAgent},
-			},
-			host:             "hostname",
-			expectedUsername: "username",
-			expectedPassword: "password",
+			name:        "StandardPassword",
+			provider:    &AuthProvider{provider: provider},
+			host:        "hostname",
+			credentials: aprov.Credentials{Username: "username", Password: "password"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			username, password := test.provider.GetCredentials(test.host)
-			require.Equal(t, test.expectedUsername, username)
-			require.Equal(t, test.expectedPassword, password)
+			credentials, err := test.provider.provider.GetCredentials(test.host)
+			require.NoError(t, err)
+			require.Equal(t, test.credentials, credentials)
 		})
 	}
 }

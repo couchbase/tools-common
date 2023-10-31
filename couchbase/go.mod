@@ -1,9 +1,9 @@
-module github.com/couchbase/tools-common/couchbase
+module github.com/couchbase/tools-common/couchbase/v2
 
 go 1.18
 
 require (
-	github.com/couchbase/tools-common/auth v1.0.0
+	github.com/couchbase/tools-common/auth/v2 v2.0.0
 	github.com/couchbase/tools-common/core v1.0.0
 	github.com/couchbase/tools-common/environment v1.0.0
 	github.com/couchbase/tools-common/errors v1.0.0

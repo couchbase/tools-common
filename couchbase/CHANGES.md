@@ -1,5 +1,10 @@
 # Changes
 
+## v2.0.0
+
+- BREAKING: Auth providers may now return an error when unable to provide
+  credentials.
+
 ## v1.0.1
 
 - Added 7.2 to versions.
