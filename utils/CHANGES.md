@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.0
+
+- Made the `Retryer` type generic.
+
 ## v1.2.0
 
 - Added a `Selection` function to 'crypto/random'.

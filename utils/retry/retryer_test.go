@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewRetryer(t *testing.T) {
-	retryer := NewRetryer(RetryerOptions{})
+	retryer := NewRetryer[int](RetryerOptions{})
 
 	options := RetryerOptions{
 		Algorithm:  AlgorithmFibonacci,
@@ -19,13 +19,13 @@ func TestNewRetryer(t *testing.T) {
 		MaxDelay:   2*time.Second + 500*time.Millisecond,
 	}
 
-	require.Equal(t, Retryer{options: options}, retryer)
+	require.Equal(t, Retryer[int]{options: options}, retryer)
 }
 
 func TestRetryerDo(t *testing.T) {
 	var called int
 
-	payload, err := NewRetryer(RetryerOptions{}).Do(func(ctx *Context) (any, error) {
+	payload, err := NewRetryer[struct{}](RetryerOptions{}).Do(func(ctx *Context) (struct{}, error) {
 		called++
 		return struct{}{}, nil
 	})
@@ -48,7 +48,7 @@ func TestRetryerDoWithLogFuncAllButLast(t *testing.T) {
 		}
 	)
 
-	_, err := NewRetryer(options).Do(func(ctx *Context) (any, error) { return nil, assert.AnError })
+	_, err := NewRetryer[int](options).Do(func(ctx *Context) (int, error) { return 0, assert.AnError })
 	require.Error(t, err)
 	require.Equal(t, 2, called)
 }
@@ -63,9 +63,9 @@ func TestRetryerDoCleanupAllButLast(t *testing.T) {
 		Cleanup: func(payload any) { cleanupCalled++ },
 	}
 
-	payload, err := NewRetryer(options).Do(func(ctx *Context) (any, error) {
+	payload, err := NewRetryer[int](options).Do(func(ctx *Context) (int, error) {
 		fnCalled++
-		return nil, assert.AnError
+		return 0, assert.AnError
 	})
 
 	var retriesExhausted *RetriesExhaustedError
@@ -81,9 +81,9 @@ func TestRetryerDoCleanupAllButLast(t *testing.T) {
 func TestRetryerDoWithError(t *testing.T) {
 	var called int
 
-	payload, err := NewRetryer(RetryerOptions{}).Do(func(ctx *Context) (any, error) {
+	payload, err := NewRetryer[int](RetryerOptions{}).Do(func(ctx *Context) (int, error) {
 		called++
-		return nil, assert.AnError
+		return 0, assert.AnError
 	})
 
 	var retriesExhausted *RetriesExhaustedError
@@ -101,8 +101,8 @@ func TestRetryerDoShouldNotRetry(t *testing.T) {
 		options = RetryerOptions{ShouldRetry: func(_ *Context, _ any, _ error) bool { return false }}
 	)
 
-	payload, err := NewRetryer(options).Do(
-		func(ctx *Context) (any, error) { called++; return nil, assert.AnError },
+	payload, err := NewRetryer[int](options).Do(
+		func(ctx *Context) (int, error) { called++; return 0, assert.AnError },
 	)
 
 	require.ErrorIs(t, err, assert.AnError)
@@ -114,9 +114,9 @@ func TestRetryerDoShouldNotRetry(t *testing.T) {
 func TestRetryerDoWithContext(t *testing.T) {
 	var called int
 
-	payload, err := NewRetryer(RetryerOptions{}).DoWithContext(
+	payload, err := NewRetryer[struct{}](RetryerOptions{}).DoWithContext(
 		context.Background(),
-		func(ctx *Context) (any, error) { called++; return struct{}{}, nil },
+		func(ctx *Context) (struct{}, error) { called++; return struct{}{}, nil },
 	)
 
 	require.NoError(t, err)
@@ -128,12 +128,12 @@ func TestRetryerDoWithContext(t *testing.T) {
 func TestRetryerDoWithContextCancelled(t *testing.T) {
 	var called int
 
-	fn := func(ctx *Context) (any, error) {
+	fn := func(ctx *Context) (int, error) {
 		called++
 
 		time.Sleep(100 * time.Millisecond)
 
-		return nil, assert.AnError
+		return 0, assert.AnError
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -141,7 +141,7 @@ func TestRetryerDoWithContextCancelled(t *testing.T) {
 
 	go func() { time.Sleep(50 * time.Millisecond); cancel() }()
 
-	payload, err := NewRetryer(RetryerOptions{}).DoWithContext(ctx, fn)
+	payload, err := NewRetryer[int](RetryerOptions{}).DoWithContext(ctx, fn)
 
 	var retriesAborted *RetriesAbortedError
 
@@ -159,9 +159,9 @@ func TestRetryerInternalDoContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	payload, err := NewRetryer(RetryerOptions{}).DoWithContext(
+	payload, err := NewRetryer[int](RetryerOptions{}).DoWithContext(
 		ctx,
-		func(ctx *Context) (any, error) { called++; return nil, assert.AnError },
+		func(ctx *Context) (int, error) { called++; return 0, assert.AnError },
 	)
 
 	var retriesAborted *RetriesAbortedError
@@ -205,7 +205,7 @@ func TestRetryerDuration(t *testing.T) {
 				require.Equal(
 					t,
 					test.expected[i],
-					NewRetryer(RetryerOptions{Algorithm: test.algorithm}).duration(i+1),
+					NewRetryer[int](RetryerOptions{Algorithm: test.algorithm}).duration(i+1),
 				)
 			}
 		})
@@ -216,6 +216,6 @@ func TestRetryerDurationWithOverflow(t *testing.T) {
 	require.Equal(
 		t,
 		2*time.Second+500*time.Millisecond,
-		NewRetryer(RetryerOptions{Algorithm: AlgorithmExponential}).duration(42),
+		NewRetryer[int](RetryerOptions{Algorithm: AlgorithmExponential}).duration(42),
 	)
 }

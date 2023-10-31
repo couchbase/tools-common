@@ -10,31 +10,35 @@ import (
 )
 
 // RetryableFunc represents a function which is retryable.
-type RetryableFunc func(ctx *Context) (any, error)
+type RetryableFunc[T any] func(ctx *Context) (T, error)
 
 // Retryer is a function retryer, which supports executing a given function a number of times until successful.
-type Retryer struct {
+type Retryer[T any] struct {
 	options RetryerOptions
 }
 
 // NewRetryer returns a new retryer with the given options.
-func NewRetryer(options RetryerOptions) Retryer {
+func NewRetryer[T any](options RetryerOptions) Retryer[T] {
 	// Not all options are required, but we use sane defaults otherwise behavior may be undesired/unexpected
 	options.defaults()
 
-	return Retryer{options: options}
+	retryer := Retryer[T]{
+		options: options,
+	}
+
+	return retryer
 }
 
 // Do executes the given function until it's successful.
-func (r Retryer) Do(fn RetryableFunc) (any, error) {
+func (r Retryer[T]) Do(fn RetryableFunc[T]) (T, error) {
 	return r.DoWithContext(context.Background(), fn)
 }
 
 // DoWithContext executes the given function until it's successful, the provided context may be used for cancellation.
-func (r Retryer) DoWithContext(ctx context.Context, fn RetryableFunc) (any, error) {
+func (r Retryer[T]) DoWithContext(ctx context.Context, fn RetryableFunc[T]) (T, error) {
 	var (
 		wrapped = NewContext(ctx)
-		payload any
+		payload T
 		done    bool
 		err     error
 	)
@@ -55,9 +59,9 @@ func (r Retryer) DoWithContext(ctx context.Context, fn RetryableFunc) (any, erro
 }
 
 // do executes the given function, returning the payload error and whether retries should stop.
-func (r Retryer) do(ctx *Context, fn RetryableFunc) (any, bool, error) {
+func (r Retryer[T]) do(ctx *Context, fn RetryableFunc[T]) (T, bool, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, true, &RetriesAbortedError{attempts: ctx.attempt - 1, err: err}
+		return *new(T), true, &RetriesAbortedError{attempts: ctx.attempt - 1, err: err}
 	}
 
 	payload, err := fn(ctx)
@@ -72,7 +76,7 @@ func (r Retryer) do(ctx *Context, fn RetryableFunc) (any, bool, error) {
 	}
 
 	if err := r.sleep(ctx); err != nil {
-		return nil, true, err
+		return *new(T), true, err
 	}
 
 	return payload, false, err
@@ -81,7 +85,7 @@ func (r Retryer) do(ctx *Context, fn RetryableFunc) (any, bool, error) {
 // retry returns a boolean indicating whether the function should be executed again.
 //
 // NOTE: Users may supply a custom 'ShouldRetry' function for more complex retry behavior which depends on the payload.
-func (r Retryer) retry(ctx *Context, payload any, err error) bool {
+func (r Retryer[T]) retry(ctx *Context, payload T, err error) bool {
 	if r.options.ShouldRetry != nil {
 		return r.options.ShouldRetry(ctx, payload, err)
 	}
@@ -90,7 +94,7 @@ func (r Retryer) retry(ctx *Context, payload any, err error) bool {
 }
 
 // sleep until the next retry attempt, or the given context is cancelled.
-func (r Retryer) sleep(ctx *Context) error {
+func (r Retryer[T]) sleep(ctx *Context) error {
 	timer := time.NewTimer(r.duration(ctx.Attempt()))
 	defer timer.Stop()
 
@@ -103,7 +107,7 @@ func (r Retryer) sleep(ctx *Context) error {
 }
 
 // duration returns the duration to sleep for, this may be calculated using one of a number of different algorithms.
-func (r Retryer) duration(attempt int) time.Duration {
+func (r Retryer[T]) duration(attempt int) time.Duration {
 	var n time.Duration
 
 	switch r.options.Algorithm {
