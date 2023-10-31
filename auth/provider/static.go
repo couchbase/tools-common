@@ -3,15 +3,16 @@ package provider
 
 // Static implements the 'Provider' interface and always returns static credentials/information.
 type Static struct {
-	UserAgent, Username, Password string
+	UserAgent   string
+	Credentials Credentials
 }
 
 var _ Provider = (*Static)(nil)
 
-func (s *Static) GetCredentials(_ string) (string, string) {
-	return s.Username, s.Password
-}
-
 func (s *Static) GetUserAgent() string {
 	return s.UserAgent
+}
+
+func (s *Static) GetCredentials(_ string) (Credentials, error) {
+	return s.Credentials, nil
 }

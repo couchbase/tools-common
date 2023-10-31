@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/auth
+module github.com/couchbase/tools-common/auth/v2
 
 go 1.18
 

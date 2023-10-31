@@ -7,17 +7,17 @@ import (
 )
 
 func TestStaticGetCredentials(t *testing.T) {
-	provider := &Static{Username: "username", Password: "password"}
-	username, password := provider.GetCredentials("")
-	require.Equal(t, "username", username)
-	require.Equal(t, "password", password)
-	require.Zero(t, provider.GetUserAgent())
+	var (
+		expected = Credentials{Username: "username", Password: "password"}
+		provider = &Static{Credentials: expected}
+	)
+
+	actual, err := provider.GetCredentials("")
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestStaticGetUserAgent(t *testing.T) {
 	provider := &Static{UserAgent: "agent"}
-	username, password := provider.GetCredentials("")
-	require.Zero(t, username)
-	require.Zero(t, password)
 	require.Equal(t, "agent", provider.GetUserAgent())
 }

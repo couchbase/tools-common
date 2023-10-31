@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.0
+
+- BREAKING: The `Provider` interface now allows returning an error.
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to
