@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.0
+
+- Added a `Selection` function to 'crypto/random'.
+
 ## v1.1.0
 
 - Added a 'crypto/random' package.
