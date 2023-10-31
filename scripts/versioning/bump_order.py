@@ -8,7 +8,7 @@ import sys
 class SubModule():
     """Wrapper type which implements some helper functions required for topological sorting and version bumping"""
     def __init__(self, name: str):
-        self.name = name.removeprefix("github.com/couchbase/tools-common/")
+        self.name = self._mod_name(name.removeprefix("github.com/couchbase/tools-common/"))
         self._bumped = False
 
     @property
@@ -31,6 +31,14 @@ class SubModule():
 
     def __eq__(self, other):
         return self.name == other.name
+
+    @classmethod
+    def _mod_name(cls, name: str) -> str:
+        """Returns the given module name with any version suffix removed"""
+        try:
+            return name[:name.index('/')]
+        except ValueError:
+            return name
 
     @classmethod
     def _read_mod(cls, mod: str) -> [str]:
