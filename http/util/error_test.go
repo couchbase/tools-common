@@ -54,7 +54,7 @@ func TestIsTemporaryError(t *testing.T) {
 	}
 
 	// Ensure we're adding an expected number of test cases below
-	require.Len(t, TemporaryErrorMessages, 15)
+	require.Len(t, TemporaryErrorMessages, 16)
 
 	for _, msg := range TemporaryErrorMessages {
 		tests = append(tests, &test{
