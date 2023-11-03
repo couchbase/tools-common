@@ -1,5 +1,10 @@
 # Changes
 
+## v1.0.1
+
+- The `http2: client connection force closed via ClientConn.Close` error is now
+  considered as a temporary error in `IsTemporaryError`.
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to
