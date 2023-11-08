@@ -4,7 +4,7 @@ package system
 import (
 	"sync"
 
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 var (

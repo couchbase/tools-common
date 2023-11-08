@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.1
+
+- Renames module from `utils` to `utils/v2`.
+
 ## v2.0.0
 
 - Made the `Retryer` type generic.

@@ -1,6 +1,6 @@
 package random
 
-import "github.com/couchbase/tools-common/utils/maths"
+import "github.com/couchbase/tools-common/utils/v2/maths"
 
 // WeightedChoiceOption pairs a type with a weight.
 type WeightedChoiceOption[T any] struct {

@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/utils
+module github.com/couchbase/tools-common/utils/v2
 
 go 1.18
 
@@ -15,3 +15,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Not correctly setup for V2 versioning, see https://go.dev/ref/mod#major-version-suffixes.
+retract v2.0.0
