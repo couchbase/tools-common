@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/utils/system"
+	"github.com/couchbase/tools-common/utils/v2/system"
 )
 
 func TestNewPool(t *testing.T) {

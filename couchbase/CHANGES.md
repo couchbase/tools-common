@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.1
+
+- Upgraded `tools-common/utils` to v2.0.1.
+
 ## v2.0.0
 
 - BREAKING: Auth providers may now return an error when unable to provide

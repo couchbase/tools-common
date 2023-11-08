@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/couchbase/tools-common/core v1.0.0
-	github.com/couchbase/tools-common/utils v1.0.0
+	github.com/couchbase/tools-common/utils/v2 v2.0.1
 	github.com/stretchr/testify v1.8.4
 )
 

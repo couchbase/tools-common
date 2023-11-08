@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/utils/maths"
-	"github.com/couchbase/tools-common/utils/system"
+	"github.com/couchbase/tools-common/utils/v2/maths"
+	"github.com/couchbase/tools-common/utils/v2/system"
 )
 
 // Options encapsulates the available options which can be used when creating a worker pool.
