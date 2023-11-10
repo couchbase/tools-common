@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.1
+
+- Upgraded `tools-common/sync` to v1.0.1.
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to
