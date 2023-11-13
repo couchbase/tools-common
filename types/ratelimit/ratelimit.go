@@ -7,7 +7,7 @@ import (
 	"io"
 
 	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 
 	"golang.org/x/time/rate"
 )
