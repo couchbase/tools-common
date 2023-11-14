@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.2
+
+- Upgraded `tools-common/types` to v1.1.1.
+
 ## v1.0.1
 
 - The `http2: client connection force closed via ClientConn.Close` error is now
