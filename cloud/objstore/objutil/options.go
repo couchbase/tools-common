@@ -3,7 +3,7 @@ package objutil
 import (
 	"context"
 
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // Options contains common options for upload/download of objects.

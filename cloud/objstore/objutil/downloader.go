@@ -9,7 +9,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // MPDownloaderOptions encapsulates the options available when creating a 'MPDownloader'.

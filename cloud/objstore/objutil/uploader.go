@@ -13,7 +13,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // MaxUploadParts is the hard limit on the number of parts that can be uploaded by a 'MPUploader'.

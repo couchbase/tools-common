@@ -10,7 +10,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 
 	"github.com/aws/aws-sdk-go/aws"
 )

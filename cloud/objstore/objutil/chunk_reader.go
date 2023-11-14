@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 
 	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/maths"
+	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // ChunkReader allows data from an 'io.Reader' in chunks of a given size.

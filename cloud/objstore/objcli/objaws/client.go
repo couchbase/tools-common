@@ -16,8 +16,8 @@ import (
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/maths"
-	"github.com/couchbase/tools-common/utils/system"
+	"github.com/couchbase/tools-common/utils/v2/maths"
+	"github.com/couchbase/tools-common/utils/v2/system"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
