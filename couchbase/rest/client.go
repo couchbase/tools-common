@@ -21,8 +21,8 @@ import (
 	envvar "github.com/couchbase/tools-common/environment/variable"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
-	"github.com/couchbase/tools-common/utils/maths"
-	"github.com/couchbase/tools-common/utils/retry"
+	"github.com/couchbase/tools-common/utils/v2/maths"
+	"github.com/couchbase/tools-common/utils/v2/retry"
 
 	"golang.org/x/exp/slices"
 )
@@ -672,19 +672,17 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		c.cleanupResp(resp)
 	}
 
-	retryer := retry.NewRetryer(retry.RetryerOptions{
+	retryer := retry.NewRetryer[*http.Response](retry.RetryerOptions{
 		MaxRetries:  c.requestRetries,
 		ShouldRetry: shouldRetry,
 		Log:         logRetry,
 		Cleanup:     cleanup,
 	})
 
-	payload, err := retryer.DoWithContext(
+	resp, err := retryer.DoWithContext(
 		ctx,
-		func(ctx *retry.Context) (any, error) { return c.do(ctx, request) }, //nolint:bodyclose
+		func(ctx *retry.Context) (*http.Response, error) { return c.do(ctx, request) },
 	)
-
-	resp := payload.(*http.Response)
 
 	if err == nil || (resp != nil && resp.StatusCode == request.ExpectedStatusCode) {
 		return resp, err

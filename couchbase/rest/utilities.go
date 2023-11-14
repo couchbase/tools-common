@@ -16,8 +16,8 @@ import (
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/maths"
-	"github.com/couchbase/tools-common/utils/retry"
+	"github.com/couchbase/tools-common/utils/v2/maths"
+	"github.com/couchbase/tools-common/utils/v2/retry"
 )
 
 // newHTTPClient returns a new HTTP client with the given client/transport.
@@ -94,19 +94,14 @@ func getCredentials(provider aprov.Provider, host string, logger log.WrappedLogg
 		logger.Warnf("(REST) (Attempt %d) Failed to get credentials due to error: %s", ctx.Attempt, err)
 	}
 
-	retryer := retry.NewRetryer(retry.RetryerOptions{
+	retryer := retry.NewRetryer[aprov.Credentials](retry.RetryerOptions{
 		Algorithm:  retry.AlgorithmExponential,
 		MaxRetries: 3,
 		MinDelay:   250 * time.Second,
 		Log:        log,
 	})
 
-	payload, err := retryer.Do(func(ctx *retry.Context) (any, error) { return provider.GetCredentials(host) })
-	if err != nil {
-		return aprov.Credentials{}, err
-	}
-
-	return payload.(aprov.Credentials), nil
+	return retryer.Do(func(ctx *retry.Context) (aprov.Credentials, error) { return provider.GetCredentials(host) })
 }
 
 // waitForRetryAfter sleeps until we can retry the request for the given response.

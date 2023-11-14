@@ -1,5 +1,13 @@
 # Changes
 
+## v2.0.2
+
+- Upgraded `tools-common/environment` to v1.0.1.
+- Upgraded `tools-common/http` to v1.0.2.
+- Upgraded `tools-common/sync` to v1.0.1.
+- Upgraded `tools-common/types` to v1.1.1.
+- Upgraded `tools-common/utils` to v2.0.1.
+
 ## v2.0.1
 
 - Upgraded `tools-common/utils` to v2.0.1.
