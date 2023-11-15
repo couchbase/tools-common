@@ -18,3 +18,6 @@ require (
 
 // Not correctly setup for V2 versioning, see https://go.dev/ref/mod#major-version-suffixes.
 retract v2.0.0
+
+// Contained a breaking change which was subsequently discovered to be incomplete, see MB-59660 for more information.
+retract v2.0.1

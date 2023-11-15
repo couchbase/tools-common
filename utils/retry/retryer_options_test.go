@@ -8,10 +8,10 @@ import (
 )
 
 func TestRetryerOptionsDefaults(t *testing.T) {
-	options := RetryerOptions{}
+	options := RetryerOptions[int]{}
 	options.defaults()
 
-	expected := RetryerOptions{
+	expected := RetryerOptions[int]{
 		Algorithm:  AlgorithmFibonacci,
 		MaxRetries: 3,
 		MinDelay:   50 * time.Millisecond,
@@ -22,10 +22,10 @@ func TestRetryerOptionsDefaults(t *testing.T) {
 }
 
 func TestRetryerOptionsLimitRetries(t *testing.T) {
-	options := RetryerOptions{MaxRetries: 51}
+	options := RetryerOptions[int]{MaxRetries: 51}
 	options.defaults()
 
-	expected := RetryerOptions{
+	expected := RetryerOptions[int]{
 		Algorithm:  AlgorithmFibonacci,
 		MaxRetries: 50,
 		MinDelay:   50 * time.Millisecond,

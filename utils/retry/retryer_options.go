@@ -21,21 +21,21 @@ const (
 )
 
 // LogFunc is a function which is run before each retry attempt after failing to run the given 'RetryableFunc'.
-type LogFunc func(ctx *Context, payload any, err error)
+type LogFunc[T any] func(ctx *Context, payload T, err error)
 
 // ShouldRetryFunc is a function which may be supplied to the retry options which allows more control over which types
 // of errors are retried.
 //
 // NOTE: If not supplied, retries will take place if the given 'RetryableFunc' returns an error.
-type ShouldRetryFunc func(ctx *Context, payload any, err error) bool
+type ShouldRetryFunc[T any] func(ctx *Context, payload T, err error) bool
 
 // CleanupFunc is a function which is run with the payload for all, but the last retry attempt.
 //
 // NOTE: The final attempt is not cleaned up because the payload may want to be used/read to enhance returned errors.
-type CleanupFunc func(payload any)
+type CleanupFunc[T any] func(payload T)
 
 // RetryerOptions encapsulates the options available when creating a retryer.
-type RetryerOptions struct {
+type RetryerOptions[T any] struct {
 	// Algorithm is the algorithm to use when calculating backoff.
 	Algorithm Algorithm
 
@@ -49,16 +49,16 @@ type RetryerOptions struct {
 	MaxDelay time.Duration
 
 	// ShouldRetry is a custom retry function, when not supplied, this will be defaulted to 'err != nil'.
-	ShouldRetry ShouldRetryFunc
+	ShouldRetry ShouldRetryFunc[T]
 
 	// Log is a function which is run before each retry, when not supplied logging will be skipped.
-	Log LogFunc
+	Log LogFunc[T]
 
 	// Cleanup is a cleanup function run for all but the last payloads prior to performing a retry.
-	Cleanup CleanupFunc
+	Cleanup CleanupFunc[T]
 }
 
-func (r *RetryerOptions) defaults() {
+func (r *RetryerOptions[T]) defaults() {
 	if r.MaxRetries == 0 {
 		r.MaxRetries = 3
 	}

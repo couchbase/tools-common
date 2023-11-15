@@ -14,11 +14,11 @@ type RetryableFunc[T any] func(ctx *Context) (T, error)
 
 // Retryer is a function retryer, which supports executing a given function a number of times until successful.
 type Retryer[T any] struct {
-	options RetryerOptions
+	options RetryerOptions[T]
 }
 
 // NewRetryer returns a new retryer with the given options.
-func NewRetryer[T any](options RetryerOptions) Retryer[T] {
+func NewRetryer[T any](options RetryerOptions[T]) Retryer[T] {
 	// Not all options are required, but we use sane defaults otherwise behavior may be undesired/unexpected
 	options.defaults()
 
