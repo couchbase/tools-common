@@ -1,5 +1,5 @@
-github.com/couchbase/tools-common/sync v1.0.1 h1:BphhUVhYPJGGh943x/YvVJUaJmFURkaNeG0h97sEFZA=
-github.com/couchbase/tools-common/sync v1.0.1/go.mod h1:uCabx5CU3k1ItWo0LPof6/MGoC+6cFj7oQ3w5BalYLE=
+github.com/couchbase/tools-common/sync v1.0.2 h1:Sjrvu4AhfO+XVczcwvZ0ehbsCY05VqjUC6gCZWjkjiY=
+github.com/couchbase/tools-common/sync v1.0.2/go.mod h1:wK29GZBw14K1DPGZT7KNcesKwniymzkiFdxcA6xmHHQ=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/mattn/go-sqlite3 v1.14.17 h1:mCRHCLDUBXgpKAqIKsaAaAsrAlbkeomtRFKXh2L6YIM=
