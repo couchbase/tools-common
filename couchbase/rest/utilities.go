@@ -90,11 +90,11 @@ func setAuthHeaders(host string, provider aprov.Provider, req *http.Request, log
 
 // getCredentials uses a retryer to get the credentials from the given provider.
 func getCredentials(provider aprov.Provider, host string, logger log.WrappedLogger) (aprov.Credentials, error) {
-	log := func(ctx *retry.Context, _ any, err error) {
+	log := func(ctx *retry.Context, _ aprov.Credentials, err error) {
 		logger.Warnf("(REST) (Attempt %d) Failed to get credentials due to error: %s", ctx.Attempt, err)
 	}
 
-	retryer := retry.NewRetryer[aprov.Credentials](retry.RetryerOptions{
+	retryer := retry.NewRetryer[aprov.Credentials](retry.RetryerOptions[aprov.Credentials]{
 		Algorithm:  retry.AlgorithmExponential,
 		MaxRetries: 3,
 		MinDelay:   250 * time.Second,

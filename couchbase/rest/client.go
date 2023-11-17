@@ -640,22 +640,22 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 //
 // NOTE: If the returned error is nil, the Response will contain a non-nil Body which the caller is expected to close.
 func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, error) {
-	shouldRetry := func(ctx *retry.Context, payload any, err error) bool {
-		if resp := payload.(*http.Response); resp != nil {
+	shouldRetry := func(ctx *retry.Context, resp *http.Response, err error) bool {
+		if resp != nil {
 			return c.shouldRetryWithResponse(ctx, request, resp)
 		}
 
 		return c.shouldRetryWithError(ctx, request, err)
 	}
 
-	logRetry := func(ctx *retry.Context, payload any, err error) {
+	logRetry := func(ctx *retry.Context, resp *http.Response, err error) {
 		msg := fmt.Sprintf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s'", ctx.Attempt(), request.Method,
 			request.Endpoint)
 
 		if err != nil {
 			msg = fmt.Sprintf("%s: which failed due to error: %s", msg, err)
 		} else {
-			msg = fmt.Sprintf("%s: which failed with status code %d", msg, payload.(*http.Response).StatusCode)
+			msg = fmt.Sprintf("%s: which failed with status code %d", msg, resp.StatusCode)
 		}
 
 		// We don't log at error level because we expect some requests to fail and be explicitly handled by the caller
@@ -663,8 +663,7 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		c.logger.Warnf(msg)
 	}
 
-	cleanup := func(payload any) {
-		resp := payload.(*http.Response)
+	cleanup := func(resp *http.Response) {
 		if resp == nil {
 			return
 		}
@@ -672,7 +671,7 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		c.cleanupResp(resp)
 	}
 
-	retryer := retry.NewRetryer[*http.Response](retry.RetryerOptions{
+	retryer := retry.NewRetryer[*http.Response](retry.RetryerOptions[*http.Response]{
 		MaxRetries:  c.requestRetries,
 		ShouldRetry: shouldRetry,
 		Log:         logRetry,
