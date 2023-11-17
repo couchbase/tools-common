@@ -1,5 +1,10 @@
 # Changes
 
+## v1.1.2
+
+- Upgraded `tools-common/sync` to v1.0.2.
+- Upgraded `tools-common/utils` to v2.0.2.
+
 ## v1.1.1
 
 - Upgraded `tools-common/sync` to v1.0.1.

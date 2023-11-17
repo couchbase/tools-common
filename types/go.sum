@@ -2,10 +2,10 @@ github.com/couchbase/tools-common/core v1.0.0 h1:pHz0xN+qhAd/OchSDPQKsZvIulJzFoL
 github.com/couchbase/tools-common/core v1.0.0/go.mod h1:jzRm/z2CehQ8xcUAlNL7wRz6EN3o7OPrAgncFiEEA6s=
 github.com/couchbase/tools-common/strings v1.0.0 h1:GSP3nA/dDkoLbBPt4Zezfl0KJxLiPyw61PoWrNBsK5g=
 github.com/couchbase/tools-common/strings v1.0.0/go.mod h1:946T46RH9TQ9BwDag7oJsKCJrPguvYFeLlfMir7DFAY=
-github.com/couchbase/tools-common/sync v1.0.1 h1:BphhUVhYPJGGh943x/YvVJUaJmFURkaNeG0h97sEFZA=
-github.com/couchbase/tools-common/sync v1.0.1/go.mod h1:uCabx5CU3k1ItWo0LPof6/MGoC+6cFj7oQ3w5BalYLE=
-github.com/couchbase/tools-common/utils/v2 v2.0.1 h1:4Mc215MD4gda65OSWvHleigVnDVuKrZbC44NQOlf+ho=
-github.com/couchbase/tools-common/utils/v2 v2.0.1/go.mod h1:5do12EXvRPhAOSkFMf1SKBcT8t6lQW90VWEk/odzLXA=
+github.com/couchbase/tools-common/sync v1.0.2 h1:Sjrvu4AhfO+XVczcwvZ0ehbsCY05VqjUC6gCZWjkjiY=
+github.com/couchbase/tools-common/sync v1.0.2/go.mod h1:wK29GZBw14K1DPGZT7KNcesKwniymzkiFdxcA6xmHHQ=
+github.com/couchbase/tools-common/utils/v2 v2.0.2 h1:+1TsN2vgnWrhnuzGEPXWoqrVdNNuUoyAQyZEhVZOZnE=
+github.com/couchbase/tools-common/utils/v2 v2.0.2/go.mod h1:j+gcamUVrG1zjJZG0am0Kz68kRC6azgo0JaB11J2M9I=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
