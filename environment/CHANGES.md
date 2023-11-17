@@ -1,5 +1,10 @@
 # Changes
 
+## v1.0.2
+
+- Upgraded `tools-common/http` to v1.0.3.
+- Upgraded `tools-common/types` to v1.1.2.
+
 ## v1.0.1
 
 - Upgraded `tools-common/http` to v1.0.2.
