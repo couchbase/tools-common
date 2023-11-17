@@ -2,8 +2,8 @@ github.com/couchbase/tools-common/core v1.0.0 h1:pHz0xN+qhAd/OchSDPQKsZvIulJzFoL
 github.com/couchbase/tools-common/core v1.0.0/go.mod h1:jzRm/z2CehQ8xcUAlNL7wRz6EN3o7OPrAgncFiEEA6s=
 github.com/couchbase/tools-common/strings v1.0.0 h1:GSP3nA/dDkoLbBPt4Zezfl0KJxLiPyw61PoWrNBsK5g=
 github.com/couchbase/tools-common/strings v1.0.0/go.mod h1:946T46RH9TQ9BwDag7oJsKCJrPguvYFeLlfMir7DFAY=
-github.com/couchbase/tools-common/utils/v2 v2.0.1 h1:4Mc215MD4gda65OSWvHleigVnDVuKrZbC44NQOlf+ho=
-github.com/couchbase/tools-common/utils/v2 v2.0.1/go.mod h1:5do12EXvRPhAOSkFMf1SKBcT8t6lQW90VWEk/odzLXA=
+github.com/couchbase/tools-common/utils/v2 v2.0.2 h1:+1TsN2vgnWrhnuzGEPXWoqrVdNNuUoyAQyZEhVZOZnE=
+github.com/couchbase/tools-common/utils/v2 v2.0.2/go.mod h1:j+gcamUVrG1zjJZG0am0Kz68kRC6azgo0JaB11J2M9I=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
