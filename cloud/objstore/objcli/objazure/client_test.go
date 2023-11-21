@@ -171,7 +171,7 @@ func TestClientPutObject(t *testing.T) {
 		ctx context.Context, body io.ReadSeekCloser, opts *blockblob.UploadOptions,
 	) (blockblob.UploadResponse, error) {
 		b := md5.Sum([]byte("value"))
-		require.Equal(t, b[:], opts.TransactionalContentMD5)
+		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
 
 		return output, nil
 	}
@@ -203,7 +203,7 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		ctx context.Context, body io.ReadSeekCloser, opts *blockblob.UploadOptions,
 	) (blockblob.UploadResponse, error) {
 		b := md5.Sum([]byte("value"))
-		require.Equal(t, b[:], opts.TransactionalContentMD5)
+		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
 
 		return output, nil
 	}

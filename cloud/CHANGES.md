@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.5
+
+- Upgraded dependencies
+
 ## v2.0.4
 
 - Upgraded `tools-common/environment` to v1.0.2.

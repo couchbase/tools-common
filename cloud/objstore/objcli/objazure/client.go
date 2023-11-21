@@ -133,7 +133,7 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 	_, err = blobClient.Upload(
 		ctx,
 		aws.ReadSeekCloser(opts.Body),
-		&blockblob.UploadOptions{TransactionalContentMD5: md5sum.Sum(nil)},
+		&blockblob.UploadOptions{TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil))},
 	)
 
 	return handleError(opts.Bucket, opts.Key, err)
