@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.1
+
+- Upgraded dependencies
+
 ## v1.1.0
 
 - Added a 'Difference' method to 'slices'.
