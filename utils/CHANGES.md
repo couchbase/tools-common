@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.3
+
+- Upgraded dependencies
+
 ## v2.0.2
 
 - Makes `RetryOptions` generic; missed when making `Retryer` generic
