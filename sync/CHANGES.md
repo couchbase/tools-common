@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.3
+
+- Upgraded dependencies
+
 ## v1.0.2
 
 - Upgraded `tools-common/utils` to v2.0.2.
