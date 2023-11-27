@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.3
+
+- Upgraded dependencies
+
 ## v1.0.2
 
 - Upgraded `tools-common/sync` to v1.0.2.
