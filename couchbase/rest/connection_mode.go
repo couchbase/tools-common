@@ -15,9 +15,6 @@ const (
 	// connection string, and REST requests may be dispatched to any node in the cluster.
 	ConnectionModeDefault ConnectionMode = iota
 
-	// ConnectionModeThisNodeOnly means REST request will only be sent to the node contained in the given connection
-	// string, connections will use HTTP/HTTPS depending on the given given
-
 	// ConnectionModeThisNodeOnly means connections use HTTP/HTTPS depending on the given connection string, and REST
 	// requests will only be dispatched to the given node.
 	//
