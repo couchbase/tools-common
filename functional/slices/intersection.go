@@ -7,7 +7,7 @@ import (
 // Intersection returns all the elements that are in both 'a' and 'b'.
 //
 // NOTE: The provided slices may contain duplicates but the returned slice will not.
-func Intersection[S []E, E comparable](a, b S) S {
+func Intersection[S ~[]E, E comparable](a, b S) S {
 	intersection := make(map[E]*intersectionSentinal)
 
 	for _, v := range a {
