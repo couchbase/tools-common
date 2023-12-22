@@ -50,6 +50,12 @@ func TestVersionOlder(t *testing.T) {
 			name:   "EmptyTo5.0.0",
 			second: Version5_0_0,
 		},
+		{
+			name:     "10.2.4To42.1.5",
+			first:    Version("10.2.4"),
+			second:   Version("42.1.5"),
+			expected: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -102,6 +108,11 @@ func TestVersionNewer(t *testing.T) {
 			name:     "EmptyTo5.0.0",
 			second:   Version5_0_0,
 			expected: true,
+		},
+		{
+			name:   "10.2.4To42.1.5",
+			first:  Version("10.2.4"),
+			second: Version("42.1.5"),
 		},
 	}
 
@@ -181,6 +192,11 @@ func TestVersionAtLeast(t *testing.T) {
 			name:  "6.6.0ToEmpty",
 			first: Version6_0_0,
 		},
+		{
+			name:   "10.2.4To42.1.5",
+			first:  Version("10.2.4"),
+			second: Version("42.1.5"),
+		},
 	}
 
 	for _, test := range tests {
@@ -220,6 +236,11 @@ func TestVersionEqual(t *testing.T) {
 			name:   "NotEqualJustAString",
 			first:  Version("test"),
 			second: Version("testing"),
+		},
+		{
+			name:   "10.2.4To42.1.5",
+			first:  Version("10.2.4"),
+			second: Version("42.1.5"),
 		},
 	}
 

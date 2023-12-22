@@ -1,7 +1,7 @@
 // Package value exposes types related to Couchbase e.g. versions.
 package value
 
-import "strings"
+import "golang.org/x/mod/semver"
 
 // ClusterVersion encapsulates version information for a Couchbase cluster, including whether or not it is operating in
 // mixed mode.
@@ -87,7 +87,7 @@ func (v Version) compare(other Version) int {
 		other = VersionLatest
 	}
 
-	return strings.Compare(string(v), string(other))
+	return semver.Compare("v"+string(v), "v"+string(other))
 }
 
 // Equal returns a boolean indicating whether the current version is equal to the provided version.
