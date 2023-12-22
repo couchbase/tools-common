@@ -97,12 +97,23 @@ type IterateFunc func(attrs *objval.ObjectAttrs) error
 
 // IterateObjectsOptions encapsulates the options available when using the 'IterateObjects' function.
 type IterateObjectsOptions struct {
-	Bucket    string
-	Prefix    string
+	// Bucket is the bucket being operated on.
+	Bucket string
+
+	// Prefix is the prefix that will listed.
+	Prefix string
+
+	// Delimiter use to group keys e.g. '/' causes listing to only occur within a "directory".
 	Delimiter string
-	Include   []*regexp.Regexp
-	Exclude   []*regexp.Regexp
-	Func      IterateFunc
+
+	// Include objects where the keys match any of the given regular expressions.
+	Include []*regexp.Regexp
+
+	// Exclude objects where the keys match any of the given regular expressions.
+	Exclude []*regexp.Regexp
+
+	// Func is executed for each object listed.
+	Func IterateFunc
 }
 
 // CreateMultipartUploadOptions encapsulates the options available when using the 'CreateMultipartUpload' function.
