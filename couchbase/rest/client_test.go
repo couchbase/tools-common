@@ -145,6 +145,11 @@ func TestNewClient(t *testing.T) {
 	require.Equal(t, expected, client.authProvider)
 }
 
+func TestNewClientInvalidConnectionString(t *testing.T) {
+	_, err := NewClient(ClientOptions{ConnectionString: "abcd://efgh.ijkl"})
+	require.ErrorContains(t, err, "failed to parse connection string")
+}
+
 func TestNewClientThisNodeOnly(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{Nodes: TestNodes{{}, {}, {}, {}}})
 	defer cluster.Close()

@@ -137,7 +137,7 @@ func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 
 	parsed, err := connstr.Parse(options.ConnectionString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+		return nil, fmt.Errorf("failed to parse connection string: %s", err) // Purposefully not wrapped
 	}
 
 	if options.ConnectionMode.ThisNodeOnly() && len(parsed.Addresses) > 1 {
