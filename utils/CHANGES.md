@@ -1,5 +1,9 @@
 # Changes
 
+## v3.0.0
+
+- Removed `utils/maths` in favour of `min` and `max`.
+
 ## v2.0.3
 
 - Upgraded dependencies
