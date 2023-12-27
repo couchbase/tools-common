@@ -1,15 +1,19 @@
 # Changes
 
+## v1.1.2
+
+- Added a `Map` method to `slices`.
+
 ## v1.1.1
 
 - Upgraded dependencies
 
 ## v1.1.0
 
-- Added a 'Difference' method to 'slices'.
-- Fixed the 'Union' function in 'slices' which was returning the intersection.
-- Added an 'Intersection' function to 'slices' for those relying on the
-  incorrect behavior of 'Union'.
+- Added a `Difference` method to `slices`.
+- Fixed the `Union` function in `slices` which was returning the intersection.
+- Added an `Intersection` function to `slices` for those relying on the
+  incorrect behavior of `Union`.
 
 ## v1.0.0
 
