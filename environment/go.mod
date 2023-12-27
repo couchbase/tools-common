@@ -1,6 +1,6 @@
 module github.com/couchbase/tools-common/environment
 
-go 1.18
+go 1.21
 
 require (
 	github.com/couchbase/tools-common/http v1.0.4

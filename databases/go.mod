@@ -1,6 +1,6 @@
 module github.com/couchbase/tools-common/databases
 
-go 1.18
+go 1.21
 
 require (
 	github.com/couchbase/tools-common/sync v1.0.3

@@ -1,6 +1,6 @@
 module github.com/couchbase/tools-common/http
 
-go 1.18
+go 1.21
 
 require (
 	github.com/couchbase/tools-common/errors v1.0.0
