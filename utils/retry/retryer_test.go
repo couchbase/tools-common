@@ -36,6 +36,22 @@ func TestRetryerDo(t *testing.T) {
 	require.Equal(t, 1, called)
 }
 
+func TestRetryerDoWithAbort(t *testing.T) {
+	var called int
+
+	payload, err := NewRetryer[struct{}](RetryerOptions[struct{}]{}).Do(func(ctx *Context) (struct{}, error) {
+		called++
+		return struct{}{}, NewAbortRetriesError(assert.AnError)
+	})
+
+	var aborted *RetriesAbortedError
+
+	require.ErrorAs(t, err, &aborted)
+	require.ErrorIs(t, aborted.err, assert.AnError)
+	require.Zero(t, payload)
+	require.Equal(t, 1, called)
+}
+
 func TestRetryerDoWithLogFuncAllButLast(t *testing.T) {
 	var (
 		called  int

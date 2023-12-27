@@ -3,6 +3,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"math"
 	"time"
 )
@@ -64,7 +65,8 @@ func (r Retryer[T]) do(ctx *Context, fn RetryableFunc[T]) (T, bool, error) {
 
 	payload, err := fn(ctx)
 
-	if !r.retry(ctx, payload, err) {
+	// NOTE: The error returned by 'retry' may differ from the error defined above
+	if retry, err := r.retry(ctx, payload, err); !retry {
 		return payload, true, err
 	}
 
@@ -83,12 +85,19 @@ func (r Retryer[T]) do(ctx *Context, fn RetryableFunc[T]) (T, bool, error) {
 // retry returns a boolean indicating whether the function should be executed again.
 //
 // NOTE: Users may supply a custom 'ShouldRetry' function for more complex retry behavior which depends on the payload.
-func (r Retryer[T]) retry(ctx *Context, payload T, err error) bool {
-	if r.options.ShouldRetry != nil {
-		return r.options.ShouldRetry(ctx, payload, err)
+func (r Retryer[T]) retry(ctx *Context, payload T, err error) (bool, error) {
+	var abort *AbortRetriesError
+
+	// If the user has opted to abort retries, unwrap the error
+	if errors.As(err, &abort) {
+		return false, &RetriesAbortedError{attempts: ctx.attempt, err: abort.Unwrap()}
 	}
 
-	return err != nil
+	if r.options.ShouldRetry != nil {
+		return r.options.ShouldRetry(ctx, payload, err), err
+	}
+
+	return err != nil, err
 }
 
 // sleep until the next retry attempt, or the given context is cancelled.

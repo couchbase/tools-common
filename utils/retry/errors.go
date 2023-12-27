@@ -31,7 +31,8 @@ func IsRetriesExhausted(err error) bool {
 	return errors.As(err, &retriesExhausted)
 }
 
-// RetriesAbortedError is returned when retries have been aborted for some reason, likely due to a context cancellation.
+// RetriesAbortedError is returned when retries have been aborted either due to context cancellation, or through use of
+// the 'AbortRetriesError' sentinel error.
 type RetriesAbortedError struct {
 	attempts int
 	err      error
@@ -54,4 +55,25 @@ func (r *RetriesAbortedError) Unwrap() error {
 func IsRetriesAborted(err error) bool {
 	var retriesAborted *RetriesAbortedError
 	return errors.As(err, &retriesAborted)
+}
+
+// NewAbortRetriesError returns a wrapped error type, which allows aborting retries.
+func NewAbortRetriesError(err error) error {
+	return &AbortRetriesError{err: err}
+}
+
+// AbortRetriesError allows aborting retries mid-way in the event of a fatal error.
+//
+// NOTE: This error is not returned by the APIs, it's only used as a sentinel error to abort retries; expect a
+// 'RetriesAbortedError' error.
+type AbortRetriesError struct {
+	err error
+}
+
+func (a *AbortRetriesError) Error() string {
+	return fmt.Sprintf("retries aborted due to error: %s", a.err)
+}
+
+func (a *AbortRetriesError) Unwrap() error {
+	return a.err
 }

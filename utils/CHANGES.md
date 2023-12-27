@@ -3,14 +3,15 @@
 ## v3.0.0
 
 - Removed `utils/maths` in favour of `min` and `max`.
+- Retries may now be aborted early using 'AbortRetriesError'.
 
 ## v2.0.3
 
-- Upgraded dependencies
+- Upgraded dependencies.
 
 ## v2.0.2
 
-- Makes `RetryOptions` generic; missed when making `Retryer` generic
+- Makes `RetryOptions` generic; missed when making `Retryer` generic.
 
 ## v2.0.1
 
