@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // MPDownloaderOptions encapsulates the options available when creating a 'MPDownloader'.
@@ -105,7 +104,7 @@ func (m *MPDownloader) download(br *objval.ByteRange) error {
 
 	for s, e := br.Start, m.opts.PartSize-1; s <= br.End; s, e = s+m.opts.PartSize, e+m.opts.PartSize {
 		// Can ignore this error, the same error will be propagated by the call to 'Stop' below.
-		if err := queue(&objval.ByteRange{Start: s, End: maths.Min(e, br.End)}); err != nil {
+		if err := queue(&objval.ByteRange{Start: s, End: min(e, br.End)}); err != nil {
 			break
 		}
 	}

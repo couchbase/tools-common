@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/v2/maths"
-
 	"golang.org/x/time/rate"
+
+	ioiface "github.com/couchbase/tools-common/types/iface"
 )
 
 // RateLimitedReader will use its limiter as a rate limit on the number of bytes read.
@@ -244,7 +243,7 @@ func waitChunked(ctx context.Context, limiter *rate.Limiter, n int) error {
 	maxChunkSize := limiter.Burst()
 
 	for n > 0 {
-		waitFor := maths.Min(n, maxChunkSize)
+		waitFor := min(n, maxChunkSize)
 		if lErr := limiter.WaitN(ctx, waitFor); lErr != nil {
 			return fmt.Errorf("could not wait for limiter: %w", lErr)
 		}

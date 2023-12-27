@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/aws/aws-sdk-go/aws"
+
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/v2/maths"
-
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 const (
@@ -58,7 +57,7 @@ type UploadOptions struct {
 func (u *UploadOptions) defaults() {
 	u.Options.defaults()
 
-	u.MPUThreshold = maths.Max(u.MPUThreshold, MPUThreshold)
+	u.MPUThreshold = max(u.MPUThreshold, MPUThreshold)
 }
 
 // Upload an object to a remote cloud breaking it down into a multipart upload if the body is over a given size.

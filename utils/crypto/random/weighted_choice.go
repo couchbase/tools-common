@@ -1,7 +1,5 @@
 package random
 
-import "github.com/couchbase/tools-common/utils/v2/maths"
-
 // WeightedChoiceOption pairs a type with a weight.
 type WeightedChoiceOption[T any] struct {
 	// Weight of the option, a higher weight means it's more likely to be selected.
@@ -40,5 +38,5 @@ func WeightedChoice[T any](s []WeightedChoiceOption[T]) (T, error) {
 		n -= int(s[i].Weight)
 	}
 
-	return s[maths.Max(0, i-1)].Option, nil
+	return s[max(0, i-1)].Option, nil
 }

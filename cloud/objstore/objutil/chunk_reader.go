@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 
 	ioiface "github.com/couchbase/tools-common/types/iface"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // ChunkReader allows data from an 'io.Reader' in chunks of a given size.
@@ -29,7 +28,7 @@ func (c ChunkReader) ForEach(fn func(chunk *io.SectionReader) error) error {
 	}
 
 	err = chunk(length, c.size, func(start, end int64) error {
-		return fn(io.NewSectionReader(c.reader, start, maths.Min(end+1, length+1)-start))
+		return fn(io.NewSectionReader(c.reader, start, min(end+1, length+1)-start))
 	})
 
 	return err
@@ -38,7 +37,7 @@ func (c ChunkReader) ForEach(fn func(chunk *io.SectionReader) error) error {
 // chunk runs the provided function creating 'size' chunks from zero to 'length'.
 func chunk(length, size int64, fn func(start, end int64) error) error {
 	for start, end := int64(0), size-1; start < length; start, end = start+size, end+size {
-		if err := fn(start, maths.Min(end, length-1)); err != nil {
+		if err := fn(start, min(end, length-1)); err != nil {
 			return err
 		}
 	}

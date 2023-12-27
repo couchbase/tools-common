@@ -16,7 +16,6 @@ import (
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 	"github.com/couchbase/tools-common/utils/v2/retry"
 )
 
@@ -122,7 +121,7 @@ func waitForRetryAfter(resp *http.Response) {
 		return
 	}
 
-	time.Sleep(maths.Min(duration, time.Minute))
+	time.Sleep(min(duration, time.Minute))
 }
 
 // waitForRetryDuration returns the duration to wait until we've satisfied the given 'Retry-After' header.

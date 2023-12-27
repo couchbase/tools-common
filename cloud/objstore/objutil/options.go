@@ -1,10 +1,6 @@
 package objutil
 
-import (
-	"context"
-
-	"github.com/couchbase/tools-common/utils/v2/maths"
-)
+import "context"
 
 // Options contains common options for upload/download of objects.
 type Options struct {
@@ -21,7 +17,7 @@ func (o *Options) defaults() {
 		o.Context = context.Background()
 	}
 
-	o.PartSize = maths.Max(o.PartSize, MinPartSize)
+	o.PartSize = max(o.PartSize, MinPartSize)
 }
 
 // WithContext returns a copy of the options using the given context.

@@ -1,11 +1,7 @@
 // Package system provides system utility functions initially required by `cbbackupmgr`.
 package system
 
-import (
-	"sync"
-
-	"github.com/couchbase/tools-common/utils/v2/maths"
-)
+import "sync"
 
 var (
 	numCPU     int
@@ -18,7 +14,7 @@ var (
 // multiple instances of cbbackupmgr can be run on a single machine e.g. when running info during a merge.
 func NumCPU() int {
 	numCPUOnce.Do(func() {
-		numCPU = maths.Max(1, int(getMaxProcsRespectingLimit()*0.75))
+		numCPU = max(1, int(getMaxProcsRespectingLimit()*0.75))
 	})
 
 	return numCPU
@@ -30,7 +26,7 @@ func NumCPU() int {
 func NumWorkers(limit int) int {
 	numCPU := NumCPU()
 	if numCPU > 1 && limit > 0 {
-		numCPU = maths.Min(numCPU, limit)
+		numCPU = min(numCPU, limit)
 	}
 
 	return numCPU

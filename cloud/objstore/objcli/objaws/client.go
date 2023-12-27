@@ -16,7 +16,6 @@ import (
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 	"github.com/couchbase/tools-common/utils/v2/system"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -276,7 +275,7 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 	})
 
 	del := func(ctx context.Context, start, end int) error {
-		return c.deleteObjects(ctx, opts.Bucket, opts.Keys[start:maths.Min(end, len(opts.Keys))]...)
+		return c.deleteObjects(ctx, opts.Bucket, opts.Keys[start:min(end, len(opts.Keys))]...)
 	}
 
 	queue := func(start, end int) error {

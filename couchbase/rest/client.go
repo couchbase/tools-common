@@ -21,7 +21,6 @@ import (
 	envvar "github.com/couchbase/tools-common/environment/variable"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 	"github.com/couchbase/tools-common/utils/v2/retry"
 
 	"golang.org/x/exp/slices"
@@ -873,7 +872,7 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 	// We only use the custom timeout if it is bigger than the client one. This is so that it can be overridden via
 	// environmental variables.
 	if timeout == -1 || timeout > client.Timeout {
-		client = newHTTPClient(maths.Max(0, timeout), client.Transport)
+		client = newHTTPClient(max(0, timeout), client.Transport)
 	}
 
 	resp, err := client.Do(req)

@@ -5,8 +5,6 @@ import (
 	"context"
 	"math"
 	"time"
-
-	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // RetryableFunc represents a function which is retryable.
@@ -126,8 +124,8 @@ func (r Retryer[T]) duration(attempt int) time.Duration {
 		return r.options.MaxDelay
 	}
 
-	duration = maths.Max(r.options.MinDelay, duration)
-	duration = maths.Min(r.options.MaxDelay, duration)
+	duration = max(r.options.MinDelay, duration)
+	duration = min(r.options.MaxDelay, duration)
 
 	return duration
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
 	"github.com/couchbase/tools-common/sync/hofp"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 // MaxUploadParts is the hard limit on the number of parts that can be uploaded by a 'MPUploader'.
@@ -105,7 +104,7 @@ func NewMPUploader(opts MPUploaderOptions) (*MPUploader, error) {
 
 	// Continue from where the last part was uploaded (if provided)
 	for _, part := range uploader.opts.Parts {
-		uploader.number = maths.Max(uploader.number, part.Number)
+		uploader.number = max(uploader.number, part.Number)
 	}
 
 	err := uploader.createMPU()

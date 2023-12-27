@@ -1,10 +1,6 @@
 package retry
 
-import (
-	"time"
-
-	"github.com/couchbase/tools-common/utils/v2/maths"
-)
+import "time"
 
 // Algorithm represents a retry algorithm used to determine backoff before retrying function execution.
 type Algorithm int
@@ -65,7 +61,7 @@ func (r *RetryerOptions[T]) defaults() {
 
 	// NOTE: Limit the user to supplying 50 retries, this avoids the possibility for an overflow when generating the
 	// first multiplicand.
-	r.MaxRetries = maths.Min(r.MaxRetries, 50)
+	r.MaxRetries = min(r.MaxRetries, 50)
 
 	if r.MinDelay == 0 {
 		r.MinDelay = 50 * time.Millisecond

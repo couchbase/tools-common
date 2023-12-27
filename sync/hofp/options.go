@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 	"github.com/couchbase/tools-common/utils/v2/system"
 )
 
@@ -38,7 +37,7 @@ func (o *Options) defaults() {
 		o.Size = system.NumCPU()
 	}
 
-	o.BufferMultiplier = maths.Max(1, o.BufferMultiplier)
+	o.BufferMultiplier = max(1, o.BufferMultiplier)
 
 	if o.LogPrefix == "" {
 		o.LogPrefix = "(hofp)"

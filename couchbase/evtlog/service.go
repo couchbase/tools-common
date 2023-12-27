@@ -11,7 +11,6 @@ import (
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/sync/hofp"
-	"github.com/couchbase/tools-common/utils/v2/maths"
 )
 
 const (
@@ -59,8 +58,8 @@ func NewService(options ServiceOptions) (*Service, error) {
 	}
 
 	pool := hofp.NewPool(hofp.Options{
-		Size:             maths.Max(1, options.Dispatchers),
-		BufferMultiplier: maths.Max(MaxBufferedEventsPerDispatcher, options.MaxBufferedEventsPerDispatcher),
+		Size:             max(1, options.Dispatchers),
+		BufferMultiplier: max(MaxBufferedEventsPerDispatcher, options.MaxBufferedEventsPerDispatcher),
 		LogPrefix:        "(evtlog)", // Should be unused, but set for clarity
 	})
 
