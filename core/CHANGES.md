@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.0
+
+- Moved to `log/slog` (removed internal logging structures/interfaces).
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to
