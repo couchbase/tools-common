@@ -4,6 +4,7 @@
 
 - Removed `utils/maths` in favour of `min` and `max`.
 - Retries may now be aborted early using 'AbortRetriesError'.
+- Upgraded dependencies.
 
 ## v2.0.3
 
