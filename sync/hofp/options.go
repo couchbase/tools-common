@@ -2,9 +2,9 @@ package hofp
 
 import (
 	"context"
+	"log/slog"
 
-	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/utils/v2/system"
+	"github.com/couchbase/tools-common/utils/v3/system"
 )
 
 // Options encapsulates the available options which can be used when creating a worker pool.
@@ -19,12 +19,8 @@ type Options struct {
 	// before calls to 'Queue' block. This value is multiplied by the number of goroutines, and defaults to one.
 	BufferMultiplier int
 
-	// LogPrefix is the prefix used when logging errors which occur once teardown has already begun. Defaults to
-	// '(hofp)'.
-	LogPrefix string
-
 	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
-	Logger log.Logger
+	Logger *slog.Logger
 }
 
 // defaults fills any missing attributes to a sane default.
@@ -39,7 +35,7 @@ func (o *Options) defaults() {
 
 	o.BufferMultiplier = max(1, o.BufferMultiplier)
 
-	if o.LogPrefix == "" {
-		o.LogPrefix = "(hofp)"
+	if o.Logger == nil {
+		o.Logger = slog.Default()
 	}
 }

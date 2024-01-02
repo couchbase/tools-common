@@ -10,13 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/utils/v2/system"
+	"github.com/couchbase/tools-common/utils/v3/system"
 )
 
 func TestNewPool(t *testing.T) {
 	pool := NewPool(Options{Size: 1})
 	require.Equal(t, pool.opts.Size, 1)
-	require.Equal(t, "(hofp)", pool.opts.LogPrefix)
 	require.NotNil(t, pool.ctx)
 	require.NotNil(t, pool.cancel)
 	require.Equal(t, 1, cap(pool.hofs))

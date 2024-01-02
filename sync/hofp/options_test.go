@@ -2,11 +2,13 @@ package hofp
 
 import (
 	"context"
+	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/utils/v2/system"
+	"github.com/couchbase/tools-common/utils/v3/system"
 )
 
 func TestOptionsDefaults(t *testing.T) {
@@ -21,21 +23,21 @@ func TestOptionsDefaults(t *testing.T) {
 			Context:          ctx,
 			Size:             system.NumCPU(),
 			BufferMultiplier: 1,
-			LogPrefix:        "(hofp)",
+			Logger:           slog.Default(),
 		}
 
 		require.Equal(t, expected, opts)
 	})
 
 	t.Run("Size", func(t *testing.T) {
-		opts := Options{LogPrefix: "test prefix:"}
+		var opts Options
 		opts.defaults()
 
 		expected := Options{
 			Context:          context.Background(),
 			Size:             system.NumCPU(),
 			BufferMultiplier: 1,
-			LogPrefix:        "test prefix:",
+			Logger:           slog.Default(),
 		}
 
 		require.Equal(t, expected, opts)
@@ -49,21 +51,23 @@ func TestOptionsDefaults(t *testing.T) {
 			Context:          context.Background(),
 			Size:             system.NumCPU(),
 			BufferMultiplier: 42,
-			LogPrefix:        "(hofp)",
+			Logger:           slog.Default(),
 		}
 
 		require.Equal(t, expected, opts)
 	})
 
-	t.Run("LogPrefix", func(t *testing.T) {
-		opts := Options{Size: 1}
+	t.Run("Logger", func(t *testing.T) {
+		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+		opts := Options{Size: 1, Logger: logger}
 		opts.defaults()
 
 		expected := Options{
 			Context:          context.Background(),
 			Size:             1,
 			BufferMultiplier: 1,
-			LogPrefix:        "(hofp)",
+			Logger:           logger,
 		}
 
 		require.Equal(t, expected, opts)
