@@ -2,10 +2,10 @@ package system
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/strings/format"
 )
 
@@ -29,8 +29,11 @@ func (i Information) String() string {
 // GetInformation fetches and returns common system information in a platform agnostic fashion.
 //
 // NOTE: On supported platforms, the returned information may not be that of the host system but of any limits applied.
-func GetInformation(logger log.Logger) Information {
-	wrappedLogger := log.NewWrappedLogger(logger)
+func GetInformation(logger *slog.Logger) Information {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	def := func(s string) string {
 		if s == "" {
 			return "unavailable"
@@ -41,17 +44,17 @@ func GetInformation(logger log.Logger) Information {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		wrappedLogger.Errorf("failed to system hostname: %v", err)
+		logger.Error("failed to system hostname", "error", err)
 	}
 
 	version, err := Version()
 	if err != nil {
-		wrappedLogger.Errorf("failed to get system version: %v", err)
+		logger.Error("failed to get system version", "error", err)
 	}
 
 	memory, err := TotalMemory()
 	if err != nil {
-		wrappedLogger.Errorf("failed to get system total memory: %v", err)
+		logger.Error("failed to get system total memory", "error", err)
 	}
 
 	return Information{

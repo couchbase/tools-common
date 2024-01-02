@@ -1,5 +1,3 @@
-github.com/couchbase/tools-common/core v1.0.0 h1:pHz0xN+qhAd/OchSDPQKsZvIulJzFoLK95RVPLbeEBY=
-github.com/couchbase/tools-common/core v1.0.0/go.mod h1:jzRm/z2CehQ8xcUAlNL7wRz6EN3o7OPrAgncFiEEA6s=
 github.com/couchbase/tools-common/strings v1.0.0 h1:GSP3nA/dDkoLbBPt4Zezfl0KJxLiPyw61PoWrNBsK5g=
 github.com/couchbase/tools-common/strings v1.0.0/go.mod h1:946T46RH9TQ9BwDag7oJsKCJrPguvYFeLlfMir7DFAY=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

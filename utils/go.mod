@@ -3,7 +3,6 @@ module github.com/couchbase/tools-common/utils/v3
 go 1.21
 
 require (
-	github.com/couchbase/tools-common/core v1.0.0
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa

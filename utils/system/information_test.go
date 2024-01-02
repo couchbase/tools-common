@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/couchbase/tools-common/core/log"
 )
 
 func TestGetInformationHonorGOMAXPROCS(t *testing.T) {
@@ -14,7 +12,7 @@ func TestGetInformationHonorGOMAXPROCS(t *testing.T) {
 		old := runtime.GOMAXPROCS(1)
 		defer runtime.GOMAXPROCS(old)
 
-		info := GetInformation(log.StdoutLogger{})
+		info := GetInformation(nil)
 		require.Equal(t, 1, info.VCPU)
 	})
 }
