@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/cloud/v2
+module github.com/couchbase/tools-common/cloud/v3
 
 go 1.21
 
@@ -75,6 +75,3 @@ require (
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// Not correctly setup for V2 versioning, see https://go.dev/ref/mod#major-version-suffixes.
-retract v2.0.0

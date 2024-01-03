@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/ptr"

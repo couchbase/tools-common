@@ -9,8 +9,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli/objaws"
 	ioiface "github.com/couchbase/tools-common/types/iface"
 )
 

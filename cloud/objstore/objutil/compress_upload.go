@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
 	"github.com/couchbase/tools-common/strings/format"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/freelist"

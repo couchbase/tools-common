@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sns"
 
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
 	"github.com/couchbase/tools-common/types/ptr"
 )
 

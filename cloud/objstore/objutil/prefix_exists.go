@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
 )
 
 // PrefixExistsOptions encapsulates the options available when running 'PrefixExists'.
