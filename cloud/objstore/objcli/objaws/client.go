@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"path"
 	"regexp"
@@ -13,10 +14,9 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/system"
+	"github.com/couchbase/tools-common/utils/v3/system"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -26,7 +26,7 @@ import (
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in AWS S3.
 type Client struct {
 	serviceAPI serviceAPI
-	logger     log.WrappedLogger
+	logger     *slog.Logger
 }
 
 var _ objcli.Client = (*Client)(nil)
@@ -38,12 +38,30 @@ type ClientOptions struct {
 	//
 	// NOTE: Required
 	ServiceAPI serviceAPI
+
+	// Logger is the passed logger which implements a custom Log method
+	Logger *slog.Logger
+}
+
+// defaults fills any missing attributes to a sane default.
+func (c *ClientOptions) defaults() {
+	if c.Logger == nil {
+		c.Logger = slog.Default()
+	}
 }
 
 // NewClient returns a new client which uses the given 'serviceAPI', in general this should be the one created using the
 // 's3.New' function exposed by the SDK.
 func NewClient(options ClientOptions) *Client {
-	return &Client{serviceAPI: options.ServiceAPI}
+	// Fill out any missing fields with the sane defaults
+	options.defaults()
+
+	client := Client{
+		serviceAPI: options.ServiceAPI,
+		logger:     options.Logger,
+	}
+
+	return &client
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -214,8 +232,7 @@ func (c *Client) createMPUThenCopyAndAppend(
 	// NOTE: We've failed for some reason, we should try to cleanup after ourselves; the AWS client does not use the
 	// given 'parts' argument, so we can omit it here
 	if err := c.AbortMultipartUpload(ctx, aopts); err != nil {
-		c.logger.Errorf(`(Objaws) Failed to abort multipart upload, it should be aborted manually | `+
-			`{"id":"%s","key":"%s"}`, id, attrs.Key)
+		c.logger.Error("failed to abort multipart upload, it should be aborted manually", "id", id, "key", attrs.Key)
 	}
 
 	return err
@@ -269,9 +286,8 @@ func (c *Client) copyAndAppend(
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
 	pool := hofp.NewPool(hofp.Options{
-		Context:   ctx,
-		Size:      system.NumWorkers(len(opts.Keys)),
-		LogPrefix: "(objaws)",
+		Context: ctx,
+		Size:    system.NumWorkers(len(opts.Keys)),
 	})
 
 	del := func(ctx context.Context, start, end int) error {

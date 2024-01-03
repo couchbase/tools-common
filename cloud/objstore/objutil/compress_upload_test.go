@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"math"
 	"math/rand"
 	"regexp"
@@ -120,6 +121,7 @@ func TestCompressUploadOptionsDefaults(t *testing.T) {
 		Destination:       "dest",
 		PartUploadWorkers: 4,
 		Client:            opts.Client,
+		Logger:            slog.Default(),
 	}
 
 	require.Equal(t, expected, opts)

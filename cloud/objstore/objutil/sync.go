@@ -2,12 +2,12 @@ package objutil
 
 import (
 	"fmt"
+	"log/slog"
 
 	"golang.org/x/time/rate"
 
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 )
 
@@ -40,7 +40,14 @@ type SyncOptions struct {
 	MPUThreshold int64
 
 	// Logger is the passed Logger struct that impletments the Log method for logger the user wants to use.
-	Logger log.Logger
+	Logger *slog.Logger
+}
+
+// defaults fills any missing attributes to a sane default.
+func (s *SyncOptions) defaults() {
+	if s.Logger == nil {
+		s.Logger = slog.Default()
+	}
 }
 
 // Sync copies a directory to/from cloud storage from/to a filepath.
@@ -59,6 +66,9 @@ type SyncOptions struct {
 // running with SyncOptions{Source: "/tmp/data", Destination: "s3://bucket/foo/"} will result in
 // s3://bucket/foo/data/test.txt
 func Sync(opts SyncOptions) error {
+	// Fill out any missing fields with the sane defaults
+	opts.defaults()
+
 	src, dst, err := parseURLs(opts.Source, opts.Destination)
 	if err != nil {
 		return err

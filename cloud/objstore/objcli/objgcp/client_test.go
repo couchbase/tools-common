@@ -6,6 +6,8 @@ import (
 	"crypto/md5"
 	"fmt"
 	"hash/crc32"
+	"log/slog"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -21,15 +23,16 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/types/ptr"
 )
 
 func TestNewClient(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	require.Equal(
 		t,
-		&Client{serviceAPI: serviceClient{c: &storage.Client{}}, logger: log.NewWrappedLogger(log.StdoutLogger{})},
-		NewClient(ClientOptions{&storage.Client{}, log.StdoutLogger{}}),
+		&Client{serviceAPI: serviceClient{c: &storage.Client{}}, logger: logger},
+		NewClient(ClientOptions{&storage.Client{}, logger}),
 	)
 }
 

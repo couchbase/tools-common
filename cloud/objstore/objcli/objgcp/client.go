@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"strings"
+	"log/slog"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -20,16 +20,15 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/system"
+	"github.com/couchbase/tools-common/utils/v3/system"
 )
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in Google Storage.
 type Client struct {
 	serviceAPI serviceAPI
-	logger     log.WrappedLogger
+	logger     *slog.Logger
 }
 
 var _ objcli.Client = (*Client)(nil)
@@ -42,13 +41,28 @@ type ClientOptions struct {
 	Client *storage.Client
 
 	// Logger is the passed logger which implements a custom Log method
-	Logger log.Logger
+	Logger *slog.Logger
+}
+
+// defaults fills any missing attributes to a sane default.
+func (c *ClientOptions) defaults() {
+	if c.Logger == nil {
+		c.Logger = slog.Default()
+	}
 }
 
 // NewClient returns a new client which uses the given storage client, in general this should be the one created using
 // the 'storage.NewClient' function exposed by the SDK.
 func NewClient(options ClientOptions) *Client {
-	return &Client{serviceAPI: serviceClient{options.Client}, logger: log.NewWrappedLogger(options.Logger)}
+	// Fill out any missing fields with the sane defaults
+	options.defaults()
+
+	client := Client{
+		serviceAPI: serviceClient{options.Client},
+		logger:     options.Logger,
+	}
+
+	return &client
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -200,9 +214,8 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
 	pool := hofp.NewPool(hofp.Options{
-		Context:   ctx,
-		Size:      system.NumWorkers(len(opts.Keys)),
-		LogPrefix: "(objgcp)",
+		Context: ctx,
+		Size:    system.NumWorkers(len(opts.Keys)),
 	})
 
 	del := func(ctx context.Context, key string) error {
@@ -477,8 +490,7 @@ func (c *Client) cleanup(ctx context.Context, bucket string, keys ...string) {
 		return
 	}
 
-	c.logger.Errorf(`(Objaws) Failed to cleanup intermediate keys, they should be removed manually `+
-		`| {"keys":[%s],"error":"%s"}`, strings.Join(keys, ","), err)
+	c.logger.Error("failed to cleanup intermediate keys, they should be removed manually", "keys", keys, "error", err)
 }
 
 func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMultipartUploadOptions) error {

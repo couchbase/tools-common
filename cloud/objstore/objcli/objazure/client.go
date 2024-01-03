@@ -16,9 +16,9 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/system"
+	"github.com/couchbase/tools-common/utils/v3/system"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
@@ -213,9 +213,8 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
 	pool := hofp.NewPool(hofp.Options{
-		Context:   ctx,
-		Size:      system.NumWorkers(len(opts.Keys)),
-		LogPrefix: "(objazure)",
+		Context: ctx,
+		Size:    system.NumWorkers(len(opts.Keys)),
 	})
 
 	del := func(ctx context.Context, key string) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -11,9 +12,8 @@ import (
 
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
 	fsutil "github.com/couchbase/tools-common/fs/util"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 	ioiface "github.com/couchbase/tools-common/types/iface"
 	"github.com/couchbase/tools-common/types/ratelimit"
 )
@@ -21,7 +21,7 @@ import (
 // Syncer exposes the ability to sync files and directories to/from a remote cloud provider.
 type Syncer struct {
 	opts   SyncOptions
-	logger log.WrappedLogger
+	logger *slog.Logger
 }
 
 // NewSyncer creates a new syncer using the given options.
@@ -31,7 +31,7 @@ func NewSyncer(opts SyncOptions) *Syncer {
 
 	syncer := Syncer{
 		opts:   opts,
-		logger: log.NewWrappedLogger(opts.Logger),
+		logger: opts.Logger,
 	}
 
 	return &syncer
@@ -57,8 +57,7 @@ func (s *Syncer) Upload(source, destination *CloudOrFileURL) error {
 	}
 
 	pool := hofp.NewPool(hofp.Options{
-		Context:   s.opts.Context,
-		LogPrefix: "(objutil)",
+		Context: s.opts.Context,
 	})
 
 	ul := func(ctx context.Context, path string) error {
@@ -98,7 +97,7 @@ func (s *Syncer) Upload(source, destination *CloudOrFileURL) error {
 // uploadFile uploads a file to the given cloud provider. Assumes source is a file:// URL to a file, and
 // destination is a cloud path.
 func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFileURL) error {
-	s.logger.Debugf("(objutil) Uploading '%s' to '%s'", source, destination)
+	s.logger.Debug("uploading file", "source", source, "destination", destination)
 
 	file, err := fsutil.OpenRandAccess(source.Path, 0, 0)
 	if err != nil {
@@ -132,8 +131,7 @@ func (s *Syncer) Download(source, destination *CloudOrFileURL) error {
 	destination.Path = s.addTrailingPathSeparator(destination.Path)
 
 	pool := hofp.NewPool(hofp.Options{
-		Context:   s.opts.Context,
-		LogPrefix: "(objutil)",
+		Context: s.opts.Context,
 	})
 
 	keyPrefix := path.Dir(source.Path)
@@ -182,7 +180,7 @@ func (s *Syncer) Download(source, destination *CloudOrFileURL) error {
 // downloadFile downloads a file in the cloud to a file on disk. Assumes source is a cloud URL to an object and
 // destination is a file:// URL to a file.
 func (s *Syncer) downloadFile(ctx context.Context, source, destination *CloudOrFileURL) error {
-	s.logger.Debugf("(objutil) Downloading '%s' to '%s'", source, destination)
+	s.logger.Debug("downloading file", "source", source, "destination", destination)
 
 	err := fsutil.Mkdir(filepath.Dir(destination.Path), 0, true, true)
 	if err != nil {

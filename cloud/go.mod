@@ -9,16 +9,15 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Azure/go-autorest/autorest/adal v0.9.23
 	github.com/aws/aws-sdk-go v1.48.7
-	github.com/couchbase/tools-common/core v1.0.0
-	github.com/couchbase/tools-common/environment v1.0.3
+	github.com/couchbase/tools-common/environment v1.0.4
 	github.com/couchbase/tools-common/errors v1.0.0
 	github.com/couchbase/tools-common/fs v1.0.1
-	github.com/couchbase/tools-common/functional v1.0.0
+	github.com/couchbase/tools-common/functional v1.1.1
 	github.com/couchbase/tools-common/strings v1.0.0
-	github.com/couchbase/tools-common/sync v1.0.3
+	github.com/couchbase/tools-common/sync/v2 v2.0.0
 	github.com/couchbase/tools-common/testing v1.0.1
-	github.com/couchbase/tools-common/types v1.1.3
-	github.com/couchbase/tools-common/utils/v2 v2.0.3
+	github.com/couchbase/tools-common/types v1.1.4
+	github.com/couchbase/tools-common/utils/v3 v3.0.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.4.0
 	github.com/stretchr/testify v1.8.4
@@ -38,7 +37,7 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0 // indirect
-	github.com/couchbase/tools-common/http v1.0.4 // indirect
+	github.com/couchbase/tools-common/http v1.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.1.0 // indirect
@@ -53,7 +52,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect

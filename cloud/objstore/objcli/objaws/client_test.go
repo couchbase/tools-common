@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -34,9 +35,12 @@ func (m *mockError) Message() string { return m.inner }
 func (m *mockError) OrigErr() error  { return nil }
 
 func TestNewClient(t *testing.T) {
-	api := &mockServiceAPI{}
+	var (
+		api    = &mockServiceAPI{}
+		logger = slog.Default()
+	)
 
-	require.Equal(t, &Client{serviceAPI: api}, NewClient(ClientOptions{api}))
+	require.Equal(t, &Client{serviceAPI: api, logger: logger}, NewClient(ClientOptions{ServiceAPI: api}))
 }
 
 func TestClientProvider(t *testing.T) {

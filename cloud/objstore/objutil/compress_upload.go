@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"path"
 	"regexp"
@@ -16,9 +17,8 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/strings/format"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/freelist"
 	"github.com/couchbase/tools-common/types/ptr"
 )
@@ -84,9 +84,10 @@ type CompressObjectsOptions struct {
 	Destination string
 
 	// Logger is the log.Logger we should use for reporting information.
-	Logger log.Logger
+	Logger *slog.Logger
 }
 
+// defaults fills any missing attributes to a sane default.
 func (o *CompressObjectsOptions) defaults() {
 	if o.Context == nil {
 		o.Context = context.Background()
@@ -103,6 +104,10 @@ func (o *CompressObjectsOptions) defaults() {
 		//
 		// NOTE: We may reconsider this. See https://issues.couchbase.com/browse/MB-53854
 		o.PartUploadWorkers = 4
+	}
+
+	if o.Logger == nil {
+		o.Logger = slog.Default()
 	}
 }
 
@@ -133,12 +138,16 @@ func stripPrefix(prefix, fullPath string) string {
 
 // download streams the given object and writes it to zipWriter.
 func download(
-	ctx context.Context, opts CompressObjectsOptions, logger log.WrappedLogger, key string, sz int64,
+	ctx context.Context,
+	opts CompressObjectsOptions,
+	logger *slog.Logger,
+	key string,
+	sz int64,
 	zipWriter *zip.Writer,
 ) error {
 	start := time.Now()
 
-	logger.Infof("Starting download of %s", key)
+	logger.Info("starting download", "key", key)
 
 	writer, err := zipWriter.Create(stripPrefix(opts.Prefix, key))
 	if err != nil {
@@ -159,14 +168,22 @@ func download(
 		return fmt.Errorf("could not copy object into zip: %w", err)
 	}
 
-	logger.Infof("Downloaded %s (%s bytes) in %s", key, format.Bytes(uint64(sz)), time.Since(start))
+	logger.Info(
+		"completed download",
+		"key", key,
+		"size", format.Bytes(uint64(sz)),
+		"duration", time.Since(start),
+	)
 
 	return nil
 }
 
 // iterate calls download on each object that matches the iterate parameters given in opts.
 func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Writer, cb downloadCompleteFunc) error {
-	logger := log.NewWrappedLogger(opts.Logger)
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 
 	fn := func(attrs *objval.ObjectAttrs) error {
 		if attrs.IsDir() {

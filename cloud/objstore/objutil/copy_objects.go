@@ -3,13 +3,13 @@ package objutil
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 )
 
 // CopyObjectsOptions encapsulates the available options which can be used when copying objects from one prefix to
@@ -52,7 +52,16 @@ type CopyObjectsOptions struct {
 	SourceExclude []*regexp.Regexp
 
 	// Logger is the logger that'll be used.
-	Logger log.Logger
+	Logger *slog.Logger
+}
+
+// defaults fills any missing attributes to a sane default.
+func (c *CopyObjectsOptions) defaults() {
+	c.Options.defaults()
+
+	if c.Logger == nil {
+		c.Logger = slog.Default()
+	}
 }
 
 // CopyObjects from one location to another using a worker pool.
@@ -68,9 +77,8 @@ func CopyObjects(opts CopyObjectsOptions) error {
 	}
 
 	pool := hofp.NewPool(hofp.Options{
-		Context:   opts.Context,
-		LogPrefix: "(objutil)",
-		Logger:    log.NewWrappedLogger(opts.Logger),
+		Context: opts.Context,
+		Logger:  opts.Logger,
 	})
 
 	cp := func(ctx context.Context, attrs *objval.ObjectAttrs) error {

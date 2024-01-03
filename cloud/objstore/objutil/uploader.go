@@ -12,7 +12,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 )
 
 // MaxUploadParts is the hard limit on the number of parts that can be uploaded by a 'MPUploader'.
@@ -113,7 +113,7 @@ func NewMPUploader(opts MPUploaderOptions) (*MPUploader, error) {
 	}
 
 	// Only create the pool after successfully creating the multipart upload to avoid having to handle cleanup
-	uploader.pool = hofp.NewPool(hofp.Options{LogPrefix: "(objutil)"})
+	uploader.pool = hofp.NewPool(hofp.Options{})
 
 	return uploader, nil
 }

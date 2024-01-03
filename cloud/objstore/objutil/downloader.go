@@ -7,7 +7,7 @@ import (
 
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 )
 
@@ -94,8 +94,7 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 // download the given byte range using multiple concurrent requests.
 func (m *MPDownloader) download(br *objval.ByteRange) error {
 	pool := hofp.NewPool(hofp.Options{
-		Context:   m.opts.Context,
-		LogPrefix: "(objutil)",
+		Context: m.opts.Context,
 	})
 
 	queue := func(br *objval.ByteRange) error {
