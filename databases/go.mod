@@ -3,8 +3,8 @@ module github.com/couchbase/tools-common/databases
 go 1.21
 
 require (
-	github.com/couchbase/tools-common/sync v1.0.3
-	github.com/mattn/go-sqlite3 v1.14.18
+	github.com/couchbase/tools-common/sync/v2 v2.0.0
+	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/stretchr/testify v1.8.4
 )
 
