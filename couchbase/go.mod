@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/couchbase/v2
+module github.com/couchbase/tools-common/couchbase/v3
 
 go 1.21
 

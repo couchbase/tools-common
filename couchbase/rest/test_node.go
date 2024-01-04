@@ -1,6 +1,6 @@
 package rest
 
-import cbvalue "github.com/couchbase/tools-common/couchbase/v2/value"
+import cbvalue "github.com/couchbase/tools-common/couchbase/v3/value"
 
 // TestNodes is a readbility wrapper around a slice of test nodes.
 type TestNodes []*TestNode

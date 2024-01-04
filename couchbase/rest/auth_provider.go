@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/couchbase/v2/connstr"
+	"github.com/couchbase/tools-common/couchbase/v3/connstr"
 )
 
 // AuthProvider is the auth provider for the REST client which handles providing credentials/hosts required to execute

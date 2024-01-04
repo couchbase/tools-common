@@ -18,7 +18,7 @@ import (
 	"time"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/couchbase/v2/connstr"
+	"github.com/couchbase/tools-common/couchbase/v3/connstr"
 	netutil "github.com/couchbase/tools-common/http/util"
 	testutil "github.com/couchbase/tools-common/testing/util"
 

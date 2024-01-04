@@ -1,5 +1,10 @@
 # Changes
 
+## v3.0.0
+
+- Moved to `log/slog`
+- Upgraded dependencies
+
 ## v2.0.4
 
 - Upgraded dependencies
