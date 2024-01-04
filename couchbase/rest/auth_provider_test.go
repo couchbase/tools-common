@@ -1,11 +1,12 @@
 package rest
 
 import (
+	"log/slog"
 	"net/url"
+	"os"
 	"testing"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 
 	"github.com/stretchr/testify/require"
@@ -14,9 +15,9 @@ import (
 func TestNewAuthProvider(t *testing.T) {
 	actual := NewAuthProvider(
 		AuthProviderOptions{
-			&connstr.ResolvedConnectionString{},
-			provider,
-			log.StdoutLogger{},
+			resolved: &connstr.ResolvedConnectionString{},
+			provider: provider,
+			logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 		},
 	)
 
@@ -28,7 +29,7 @@ func TestNewAuthProvider(t *testing.T) {
 	expected := &AuthProvider{
 		resolved: &connstr.ResolvedConnectionString{},
 		provider: provider,
-		manager:  &ClusterConfigManager{maxAge: DefaultCCMaxAge, logger: log.NewWrappedLogger(log.StdoutLogger{})},
+		manager:  &ClusterConfigManager{maxAge: DefaultCCMaxAge},
 	}
 
 	require.Equal(t, expected, actual)

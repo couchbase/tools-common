@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,6 @@ import (
 	"time"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 	netutil "github.com/couchbase/tools-common/http/util"
 	testutil "github.com/couchbase/tools-common/testing/util"
@@ -46,7 +46,6 @@ func newTestClient(cluster *TestCluster, disableCCP bool) (*Client, error) {
 		DisableCCP:       disableCCP,
 		Provider:         provider,
 		TLSConfig:        &tls.Config{RootCAs: pool},
-		Logger:           log.StdoutLogger{},
 	})
 }
 
@@ -79,7 +78,6 @@ func TestNewClientWithThisNodeOnly(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		Provider:         provider,
 		ConnectionMode:   ConnectionModeThisNodeOnly,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 	require.Equal(t, ConnectionModeThisNodeOnly, client.connectionMode)
@@ -93,7 +91,6 @@ func TestNewClientWithThisNodeOnlyTooManyAddresses(t *testing.T) {
 		ConnectionString: fmt.Sprintf("%s,secondhostname:8091", cluster.URL()),
 		Provider:         provider,
 		ConnectionMode:   ConnectionModeThisNodeOnly,
-		Logger:           log.StdoutLogger{},
 	})
 	require.ErrorIs(t, err, ErrThisNodeOnlyExpectsASingleAddress)
 }
@@ -103,7 +100,6 @@ func TestNewClientWithLoopbackWithTLS(t *testing.T) {
 		ConnectionString: "https://localhost:8091",
 		Provider:         provider,
 		ConnectionMode:   ConnectionModeLoopback,
-		Logger:           log.StdoutLogger{},
 	})
 	require.ErrorIs(t, err, ErrConnectionModeRequiresNonTLS)
 }
@@ -138,7 +134,6 @@ func TestNewClient(t *testing.T) {
 				}},
 			},
 			maxAge: DefaultCCMaxAge,
-			logger: log.NewWrappedLogger(log.StdoutLogger{}),
 		},
 	}
 
@@ -158,7 +153,6 @@ func TestNewClientThisNodeOnly(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		Provider:         provider,
 		ConnectionMode:   ConnectionModeThisNodeOnly,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -219,7 +213,6 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 		ConnectionString: fmt.Sprintf("http://notahost:21345,%s:%d", cluster.Address(), cluster.Port()),
 		DisableCCP:       true,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -247,7 +240,6 @@ func TestNewClientFailedToBootstrapAgainstHost(t *testing.T) {
 				Nodes: cluster.Nodes(),
 			},
 			maxAge: DefaultCCMaxAge,
-			logger: log.NewWrappedLogger(log.StdoutLogger{}),
 		},
 	}
 
@@ -262,7 +254,6 @@ func TestNewClientFailedToBootstrapAgainstAnyHost(t *testing.T) {
 		ConnectionString: "http://notahost:21345,notanotherhost:12355",
 		DisableCCP:       true,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 
 	var bootstrapFailure *BootstrapFailureError
@@ -325,7 +316,6 @@ func TestNewClientForcedExternalNetworkMode(t *testing.T) {
 		ConnectionString: cluster.URL() + "?network=external",
 		DisableCCP:       true,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -353,7 +343,6 @@ func TestNewClientForcedExternalNetworkMode(t *testing.T) {
 				Nodes: cluster.Nodes(),
 			},
 			maxAge: DefaultCCMaxAge,
-			logger: log.NewWrappedLogger(log.StdoutLogger{}),
 		},
 	}
 
@@ -408,7 +397,6 @@ func TestNewClientTLS(t *testing.T) {
 				Nodes: cluster.Nodes(),
 			},
 			maxAge: DefaultCCMaxAge,
-			logger: log.NewWrappedLogger(log.StdoutLogger{}),
 		},
 	}
 
@@ -686,7 +674,6 @@ func TestClientExecuteWithModeLoopback(t *testing.T) {
 		DisableCCP:       true,
 		ConnectionMode:   ConnectionModeLoopback,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -1153,7 +1140,6 @@ func TestClientExecuteUnknownAuthority(t *testing.T) {
 		ConnectionString: cluster.URL(),
 		DisableCCP:       true,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.Error(t, err)
 
@@ -1507,7 +1493,6 @@ func TestGetServiceHostServiceConnectionMode(t *testing.T) {
 		DisableCCP:       true,
 		ConnectionMode:   ConnectionModeLoopback,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -1823,7 +1808,6 @@ func TestClientUpdateCCFromNodeThisNodeOnly(t *testing.T) {
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		DisableCCP:       true,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -1859,7 +1843,6 @@ func TestClientUpdateCCFromHostThisNodeOnly(t *testing.T) {
 		ConnectionMode:   ConnectionModeThisNodeOnly,
 		DisableCCP:       true,
 		Provider:         provider,
-		Logger:           log.StdoutLogger{},
 	})
 	require.NoError(t, err)
 
@@ -1917,12 +1900,12 @@ func TestClientValidHost(t *testing.T) {
 			client := &Client{
 				client: &http.Client{},
 				authProvider: NewAuthProvider(AuthProviderOptions{
-					&connstr.ResolvedConnectionString{},
-					provider,
-					log.StdoutLogger{},
+					resolved: &connstr.ResolvedConnectionString{},
+					provider: provider,
+					logger:   slog.Default(),
 				}),
 				clusterInfo: test.info,
-				logger:      log.NewWrappedLogger(log.StdoutLogger{}),
+				logger:      slog.Default(),
 			}
 
 			valid, err := client.validHost(fmt.Sprintf("http://localhost:%d", cluster.Port()))
@@ -2033,7 +2016,6 @@ func TestClientWaitUntilUpdated(t *testing.T) {
 				Provider:         provider,
 				ConnectionMode:   connectionMode,
 				DisableCCP:       true,
-				Logger:           log.StdoutLogger{},
 			})
 			require.NoError(t, err)
 

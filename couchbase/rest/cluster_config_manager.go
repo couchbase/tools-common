@@ -2,10 +2,10 @@ package rest
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/couchbase/tools-common/core/log"
 	envvar "github.com/couchbase/tools-common/environment/variable"
 )
 
@@ -48,20 +48,16 @@ type ClusterConfigManager struct {
 	cond   *sync.Cond
 	signal chan struct{}
 	once   sync.Once
-
-	logger log.WrappedLogger
 }
 
 // NewClusterConfigManager returns a new cluster config manager which will not immediately trigger a cluster config
 // update.
-func NewClusterConfigManager(logger log.Logger) *ClusterConfigManager {
-	wrappedLogger := log.NewWrappedLogger(logger)
+func NewClusterConfigManager(logger *slog.Logger) *ClusterConfigManager {
 	maxAge, ok := envvar.GetDuration("CB_REST_CC_MAX_AGE")
-
 	if !ok {
 		maxAge = DefaultCCMaxAge
 	} else {
-		wrappedLogger.Infof("(REST) (Cluster Config Manager) Set max cluster config age to: %s", maxAge)
+		logger.Info("set max cluster config age", "age", maxAge)
 	}
 
 	now := time.Now()
@@ -71,7 +67,6 @@ func NewClusterConfigManager(logger log.Logger) *ClusterConfigManager {
 		maxAge: maxAge,
 		cond:   sync.NewCond(&sync.Mutex{}),
 		signal: make(chan struct{}),
-		logger: wrappedLogger,
 	}
 }
 

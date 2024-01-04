@@ -7,10 +7,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/core/log"
-	"github.com/couchbase/tools-common/sync/hofp"
+	"github.com/couchbase/tools-common/sync/v2/hofp"
 )
 
 const (
@@ -30,7 +30,7 @@ type ServiceOptions struct {
 
 	// ReqResLogLevel is the level at which HTTP requests/responses will be logged; this directly maps to the 'cbrest'
 	// client value.
-	ReqResLogLevel log.Level
+	ReqResLogLevel slog.Level
 
 	// The number of goroutines to create for reporting events.
 	Dispatchers int
@@ -40,18 +40,28 @@ type ServiceOptions struct {
 	MaxBufferedEventsPerDispatcher int
 
 	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
-	Logger log.Logger
+	Logger *slog.Logger
+}
+
+// defaults fills any missing attributes to a sane default.
+func (s *ServiceOptions) defaults() {
+	if s.Logger == nil {
+		s.Logger = slog.Default()
+	}
 }
 
 // Service exposes an interface to report events to the local 'ns_server' instance.
 type Service struct {
 	pool   *hofp.Pool
 	client *Client
-	logger log.WrappedLogger
+	logger *slog.Logger
 }
 
 // NewService creates a new service using the given options.
 func NewService(options ServiceOptions) (*Service, error) {
+	// Fill out any missing fields with the sane defaults
+	options.defaults()
+
 	client, err := NewClient(options)
 	if err != nil {
 		return nil, err
@@ -60,10 +70,15 @@ func NewService(options ServiceOptions) (*Service, error) {
 	pool := hofp.NewPool(hofp.Options{
 		Size:             max(1, options.Dispatchers),
 		BufferMultiplier: max(MaxBufferedEventsPerDispatcher, options.MaxBufferedEventsPerDispatcher),
-		LogPrefix:        "(evtlog)", // Should be unused, but set for clarity
 	})
 
-	return &Service{pool: pool, client: client, logger: log.NewWrappedLogger(options.Logger)}, nil
+	service := Service{
+		pool:   pool,
+		client: client,
+		logger: options.Logger,
+	}
+
+	return &service, nil
 }
 
 // Report the given event asynchronously, logging event/error if we fail to do so.
@@ -76,7 +91,7 @@ func (s *Service) Report(event Event) {
 			return nil
 		}
 
-		s.logger.Errorf("(evtlog) Failed to report event '%#v' due to error '%s'", event, err)
+		s.logger.Error("failed to report event", "event", event, "error", err)
 
 		return nil
 	})

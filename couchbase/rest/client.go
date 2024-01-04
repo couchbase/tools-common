@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sort"
@@ -16,12 +17,11 @@ import (
 	"time"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 	envvar "github.com/couchbase/tools-common/environment/variable"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
-	"github.com/couchbase/tools-common/utils/v2/retry"
+	"github.com/couchbase/tools-common/utils/v3/retry"
 
 	"golang.org/x/exp/slices"
 )
@@ -51,10 +51,17 @@ type ClientOptions struct {
 	ConnectionMode ConnectionMode
 
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
-	ReqResLogLevel log.Level
+	ReqResLogLevel slog.Level
 
 	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
-	Logger log.Logger
+	Logger *slog.Logger
+}
+
+// defaults fills any missing attributes to a sane default.
+func (c *ClientOptions) defaults() {
+	if c.Logger == nil {
+		c.Logger = slog.Default()
+	}
 }
 
 // Client is a REST client used to retrieve/send information to/from a Couchbase Cluster.
@@ -68,13 +75,13 @@ type Client struct {
 	pollTimeout    time.Duration
 	requestRetries int
 
-	reqResLogLevel log.Level
+	reqResLogLevel slog.Level
 
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 
-	logger log.WrappedLogger
+	logger *slog.Logger
 }
 
 // NewClient creates a new REST client which will connection to the provided cluster using the given credentials.
@@ -83,6 +90,9 @@ type Client struct {
 // the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
 // goroutine.
 func NewClient(options ClientOptions) (*Client, error) {
+	// Fill out any missing fields with the sane defaults
+	options.defaults()
+
 	client, err := returnBootstrappedClient(options)
 	if err != nil {
 		return nil, err
@@ -94,7 +104,12 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, fmt.Errorf("failed to get cluster information: %w", err)
 	}
 
-	client.logConnectionInfo()
+	client.logger.Info(
+		"successfully connected to cluster",
+		"enterprise", client.clusterInfo.Enterprise,
+		"uuid", client.clusterInfo.UUID,
+		"developer_preview", client.clusterInfo.DeveloperPreview,
+	)
 
 	// Cluster config polling must not begin until we've fetched the cluster information, this is because it relies on
 	// having the cluster uuid to determine whether it's safe to use a given cluster config.
@@ -111,27 +126,30 @@ func NewClient(options ClientOptions) (*Client, error) {
 // the clients 'Close' function. For example, the 'Close' function must be called to cleanup the cluster config polling
 // goroutine.
 func returnBootstrappedClient(options ClientOptions) (*Client, error) {
-	logger := log.NewWrappedLogger(options.Logger)
+	logger := options.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 
 	clientTimeout, ok := envvar.GetDurationBC("CB_REST_CLIENT_TIMEOUT_SECS")
 	if !ok {
 		clientTimeout = DefaultClientTimeout
 	} else {
-		logger.Infof("(REST) Set HTTP client timeout to: %s", clientTimeout)
+		logger.Info("set HTTP client timeout", "timeout", clientTimeout)
 	}
 
 	requestRetries, ok := envvar.GetInt("CB_REST_CLIENT_NUM_RETRIES")
 	if !ok || requestRetries <= 0 {
 		requestRetries = DefaultRequestRetries
 	} else {
-		logger.Infof("(REST) Set number of retries for requests to: %d", requestRetries)
+		logger.Info("set number of retries for requests", "retries", requestRetries)
 	}
 
 	pollTimeout, ok := envvar.GetDuration("CB_REST_CLIENT_POLL_TIMEOUT")
 	if !ok {
 		pollTimeout = DefaultPollTimeout
 	} else {
-		logger.Infof("(REST) Set poll timeout to: %s", pollTimeout)
+		logger.Info("set poll timeout", "timeout", pollTimeout)
 	}
 
 	parsed, err := connstr.Parse(options.ConnectionString)
@@ -158,9 +176,9 @@ func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 	}
 
 	authProviderOptions := AuthProviderOptions{
-		resolved,
-		options.Provider,
-		options.Logger,
+		resolved: resolved,
+		provider: options.Provider,
+		logger:   logger,
 	}
 
 	// Added nil ClusterInfo so that it can be populated later if needed.
@@ -225,7 +243,7 @@ func (c *Client) bootstrap() error {
 		errors.As(err, &errAuthentication)
 		errors.As(err, &errAuthorization)
 
-		c.logger.Warnf("(REST) failed to bootstrap client, will retry: %v", err)
+		c.logger.Warn("failed to bootstrap client, will retry", "error", err)
 	}
 
 	return nil
@@ -258,7 +276,7 @@ func (c *Client) pollCC() {
 		}
 
 		if err := c.updateCC(); err != nil {
-			c.logger.Warnf("(REST) Failed to update cluster config, will retry: %v", err)
+			c.logger.Warn("failed to update cluster config, will retry", "error", err)
 		}
 	}
 }
@@ -285,7 +303,7 @@ func (c *Client) updateCC() error {
 		// 'UnknownAuthorityError' we continue using the next node; we do this because that node may have been removed
 		// from the cluster.
 
-		c.logger.Warnf("(REST) (CCP) Failed to update config using host '%s': %v", node.Hostname, err)
+		c.logger.Warn("failed to update config using host", "hostname", node.Hostname, "error", err)
 	}
 
 	return ErrExhaustedClusterNodes
@@ -387,7 +405,7 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 		return nil, fmt.Errorf("failed to set auth headers: %w", err)
 	}
 
-	resp, err := c.perform(retry.NewContext(context.Background()), req, log.LevelDebug, 0)
+	resp, err := c.perform(retry.NewContext(context.Background()), req, slog.LevelDebug, 0)
 	if err != nil {
 		return nil, handleRequestError(req, err) // Purposefully not wrapped
 	}
@@ -435,16 +453,6 @@ func (c *Client) unmarshalCC(host string, body []byte) (*ClusterConfig, error) {
 	}
 
 	return config, nil
-}
-
-// logConnectionInfo marshals and logs the common cluster information.
-func (c *Client) logConnectionInfo() {
-	data, err := json.Marshal(c.clusterInfo)
-	if err != nil {
-		c.logger.Warnf("(REST) Failed to marshal cluster information")
-	}
-
-	c.logger.Infof("(REST) Successfully connected to cluster | %s", data)
 }
 
 // EnterpriseCluster returns a boolean indicating whether this is an enterprise cluster.
@@ -576,8 +584,14 @@ func (c *Client) ExecuteStreamWithContext(ctx context.Context, request *Request)
 
 // beginStream constructs a stream, and kicks off a goroutine to wait for, and process mutations.
 func (c *Client) beginStream(ctx *retry.Context, request *Request, resp *http.Response) <-chan StreamingResponse {
-	c.logger.Log(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Beginning stream for endpoint '%s'",
-		ctx.Attempt(), request.Method, request.Endpoint)
+	c.logger.Log(
+		ctx,
+		c.reqResLogLevel,
+		"beginning stream for endpoint",
+		"attempt", ctx.Attempt(),
+		"method", request.Method,
+		"endpoint", request.Endpoint,
+	)
 
 	stream := make(chan StreamingResponse, 1)
 
@@ -622,14 +636,27 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 
 	// If the remote end close the connection, cleanup and return successfully
 	if err == nil || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		c.logger.Log(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Closing stream for endpoint '%s'"+
-			" which completed successfully", ctx.Attempt(), request.Method, request.Endpoint)
+		c.logger.Log(
+			ctx,
+			c.reqResLogLevel,
+			"closing stream which completed successfully",
+			"attempt", ctx.Attempt(),
+			"method", request.Method,
+			"endpoint", request.Endpoint,
+		)
 
 		return
 	}
 
-	c.logger.Log(c.reqResLogLevel, "(REST) (Attempt %d) (%s) Closing stream for endpoint '%s'"+
-		" which failed due to error: %s", ctx.Attempt(), request.Method, request.Endpoint, err)
+	c.logger.Log(
+		ctx,
+		c.reqResLogLevel,
+		"closing stream which failed due to error",
+		"attempt", ctx.Attempt(),
+		"method", request.Method,
+		"endpoint", request.Endpoint,
+		"error", err,
+	)
 
 	stream <- StreamingResponse{Error: err}
 }
@@ -648,18 +675,23 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 	}
 
 	logRetry := func(ctx *retry.Context, resp *http.Response, err error) {
-		msg := fmt.Sprintf("(REST) (Attempt %d) (%s) Retrying request to endpoint '%s'", ctx.Attempt(), request.Method,
-			request.Endpoint)
+		args := []any{
+			"attempt", ctx.Attempt(),
+			"method", request.Method,
+			"endpoint", request.Endpoint,
+		}
 
 		if err != nil {
-			msg = fmt.Sprintf("%s: which failed due to error: %s", msg, err)
-		} else {
-			msg = fmt.Sprintf("%s: which failed with status code %d", msg, resp.StatusCode)
+			args = append(args, "error", err)
+		}
+
+		if resp != nil {
+			args = append(args, "status_code", resp.StatusCode)
 		}
 
 		// We don't log at error level because we expect some requests to fail and be explicitly handled by the caller
 		// for example when checking if a bucket exists.
-		c.logger.Warnf(msg)
+		c.logger.Warn("retrying request", args...)
 	}
 
 	cleanup := func(resp *http.Response) {
@@ -699,8 +731,13 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 
 // shouldRetryWithError returns a boolean indicating whether the given error is retryable.
 func (c *Client) shouldRetryWithError(ctx *retry.Context, request *Request, err error) bool {
-	c.logger.Warnf("(REST) (Attempt %d) (%s) Request to endpoint '%s' failed due to error: %s", ctx.Attempt(),
-		request.Method, request.Endpoint, err)
+	c.logger.Warn(
+		"request failed",
+		"attempt", ctx.Attempt(),
+		"method", request.Method,
+		"endpoint", request.Endpoint,
+		"error", err,
+	)
 
 	if !shouldRetry(err) {
 		return false
@@ -723,8 +760,13 @@ func (c *Client) shouldRetryWithResponse(ctx *retry.Context, request *Request, r
 		return false
 	}
 
-	c.logger.Warnf("(REST) (Attempt %d) (%s) Request to endpoint '%s' failed with status code %d", ctx.Attempt(),
-		request.Method, request.Endpoint, resp.StatusCode)
+	c.logger.Warn(
+		"request failed",
+		"attempt", ctx.Attempt(),
+		"method", request.Method,
+		"endpoint", request.Endpoint,
+		"status_code", resp.StatusCode,
+	)
 
 	// Either this request can't be retried, or the user has explicitly stated that they don't want this status code
 	// retried, don't retry.
@@ -773,7 +815,7 @@ func (c *Client) waitUntilUpdated(ctx context.Context) {
 	// poorer performance/wasted time.
 	err := c.updateCC()
 	if err != nil {
-		c.logger.Warnf("(REST) Failed to update cluster config, will retry: %v", err)
+		c.logger.Warn("failed to update cluster config, will retry", "error", err)
 	}
 }
 
@@ -862,10 +904,20 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 
 // perform synchronously executes the provided request returning the response and any error that occurred during the
 // process.
-func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
+func (c *Client) perform(
+	ctx *retry.Context,
+	req *http.Request,
+	level slog.Level,
 	timeout time.Duration,
 ) (*http.Response, error) {
-	c.logger.Log(level, "(REST) (Attempt %d) (%s) Dispatching request to '%s'", ctx.Attempt(), req.Method, req.URL)
+	c.logger.Log(
+		ctx,
+		level,
+		"dispatching request",
+		"attempt", ctx.Attempt(),
+		"method", req.Method,
+		"url", req.URL,
+	)
 
 	client := c.client
 
@@ -877,14 +929,26 @@ func (c *Client) perform(ctx *retry.Context, req *http.Request, level log.Level,
 
 	resp, err := client.Do(req)
 	if err == nil {
-		c.logger.Log(level, "(REST) (Attempt %d) (%s) (%d) Received response from '%s'", ctx.Attempt(), req.Method,
-			resp.StatusCode, req.URL)
+		c.logger.Log(
+			ctx,
+			level,
+			"received response",
+			"attempt", ctx.Attempt(),
+			"method", req.Method,
+			"status_code", resp.StatusCode,
+			"url", req.URL,
+		)
 
 		return resp, nil
 	}
 
-	c.logger.Errorf("(REST) (Attempt %d) (%s) Failed to perform request to '%s': %s", ctx.Attempt(), req.Method,
-		req.URL, err)
+	c.logger.Error(
+		"failed to perform request",
+		"attempt", ctx.Attempt(),
+		"method", req.Method,
+		"url", req.URL,
+		"error", err,
+	)
 
 	return nil, handleRequestError(req, err)
 }
@@ -936,5 +1000,5 @@ func (c *Client) cleanupResp(resp *http.Response) {
 		return
 	}
 
-	c.logger.Warnf("(REST) Failed to drain response body due to unexpected error: %s", err)
+	c.logger.Warn("failed to drain response body", "error", err)
 }

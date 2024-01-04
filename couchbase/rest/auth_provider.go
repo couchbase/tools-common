@@ -2,10 +2,10 @@ package rest
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/core/log"
 	"github.com/couchbase/tools-common/couchbase/v2/connstr"
 )
 
@@ -27,7 +27,7 @@ type AuthProvider struct {
 type AuthProviderOptions struct {
 	resolved *connstr.ResolvedConnectionString
 	provider aprov.Provider
-	logger   log.Logger
+	logger   *slog.Logger
 }
 
 // NewAuthProvider creates a new 'AuthProvider' using the provided credentials.

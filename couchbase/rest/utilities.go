@@ -6,17 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/core/log"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
 	"github.com/couchbase/tools-common/types/ptr"
-	"github.com/couchbase/tools-common/utils/v2/retry"
+	"github.com/couchbase/tools-common/utils/v3/retry"
 )
 
 // newHTTPClient returns a new HTTP client with the given client/transport.
@@ -72,7 +72,7 @@ func readBody(method Method, endpoint Endpoint, reader io.Reader, contentLength 
 }
 
 // setAuthHeaders is a utility function which sets all the request headers which are provided by the 'AuthProvider'.
-func setAuthHeaders(host string, provider aprov.Provider, req *http.Request, logger log.WrappedLogger) error {
+func setAuthHeaders(host string, provider aprov.Provider, req *http.Request, logger *slog.Logger) error {
 	// Set the 'User-Agent' so that we can trace how these requests are handled by the cluster
 	req.Header.Set("User-Agent", provider.GetUserAgent())
 
@@ -88,9 +88,9 @@ func setAuthHeaders(host string, provider aprov.Provider, req *http.Request, log
 }
 
 // getCredentials uses a retryer to get the credentials from the given provider.
-func getCredentials(provider aprov.Provider, host string, logger log.WrappedLogger) (aprov.Credentials, error) {
+func getCredentials(provider aprov.Provider, host string, logger *slog.Logger) (aprov.Credentials, error) {
 	log := func(ctx *retry.Context, _ aprov.Credentials, err error) {
-		logger.Warnf("(REST) (Attempt %d) Failed to get credentials due to error: %s", ctx.Attempt, err)
+		logger.Warn("failed to get credentials", "attempt", ctx.Attempt, "error", err)
 	}
 
 	retryer := retry.NewRetryer[aprov.Credentials](retry.RetryerOptions[aprov.Credentials]{
