@@ -1,6 +1,6 @@
 # Changes
 
-## v1.1.2
+## v1.2.0
 
 - Added a `Map` method to `slices`.
 - Upgraded dependencies
