@@ -13,26 +13,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/ptr"
 
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type mockError struct{ inner string }
-
-func (m *mockError) Error() string   { return m.inner }
-func (m *mockError) String() string  { return m.inner }
-func (m *mockError) Code() string    { return m.inner }
-func (m *mockError) Message() string { return m.inner }
-func (m *mockError) OrigErr() error  { return nil }
 
 func TestNewClient(t *testing.T) {
 	var (
@@ -65,7 +58,7 @@ func TestClientGetObject(t *testing.T) {
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("GetObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+	api.On("GetObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -89,7 +82,7 @@ func TestClientGetObject(t *testing.T) {
 	require.Equal(t, expected, object)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "GetObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "GetObject", 1)
 }
 
 func TestClientGetObjectWithByteRange(t *testing.T) {
@@ -105,7 +98,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("GetObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+	api.On("GetObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -117,7 +110,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "GetObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "GetObject", 1)
 }
 
 func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
@@ -152,7 +145,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -172,7 +165,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	require.Equal(t, expected, attrs)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
 }
 
 func TestClientPutObject(t *testing.T) {
@@ -188,7 +181,7 @@ func TestClientPutObject(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObjectWithContext", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -200,7 +193,7 @@ func TestClientPutObject(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
 }
 
 func TestClientAppendToObjectNotFound(t *testing.T) {
@@ -215,8 +208,8 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 		return bucket && key
 	}
 
-	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).
-		Return(nil, &mockError{s3.ErrCodeNoSuchKey})
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn1)).
+		Return(nil, &types.NoSuchKey{})
 
 	fn2 := func(input *s3.PutObjectInput) bool {
 		var (
@@ -228,7 +221,7 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObjectWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn2)).Return(&s3.PutObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -240,8 +233,8 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
-	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
 }
 
 func TestClientCopyObject(t *testing.T) {
@@ -257,7 +250,7 @@ func TestClientCopyObject(t *testing.T) {
 		return bucket && key && source
 	}
 
-	api.On("CopyObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(&s3.CopyObjectOutput{}, nil)
+	api.On("CopyObject", matchers.Context, mock.MatchedBy(fn1)).Return(&s3.CopyObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -270,7 +263,7 @@ func TestClientCopyObject(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "CopyObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "CopyObject", 1)
 }
 
 func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
@@ -291,7 +284,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
 
 	fn2 := func(input *s3.GetObjectInput) bool {
 		var (
@@ -309,7 +302,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("GetObjectWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
+	api.On("GetObject", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
 
 	fn3 := func(input *s3.PutObjectInput) bool {
 		var (
@@ -321,7 +314,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObjectWithContext", matchers.Context, mock.MatchedBy(fn3)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn3)).Return(&s3.PutObjectOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -333,9 +326,9 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
-	api.AssertNumberOfCalls(t, "GetObjectWithContext", 1)
-	api.AssertNumberOfCalls(t, "PutObjectWithContext", 1)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
+	api.AssertNumberOfCalls(t, "GetObject", 1)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
 }
 
 func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
@@ -356,7 +349,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
 
 	fn2 := func(input *s3.CreateMultipartUploadInput) bool {
 		var (
@@ -371,7 +364,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		UploadId: ptr.To("id"),
 	}
 
-	api.On("CreateMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
+	api.On("CreateMultipartUpload", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
 
 	fn3 := func(input *s3.UploadPartCopyInput) bool {
 		var (
@@ -387,10 +380,10 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	}
 
 	output3 := &s3.UploadPartCopyOutput{
-		CopyPartResult: &s3.CopyPartResult{ETag: ptr.To("etag1")},
+		CopyPartResult: &types.CopyPartResult{ETag: ptr.To("etag1")},
 	}
 
-	api.On("UploadPartCopyWithContext", matchers.Context, mock.MatchedBy(fn3)).Return(output3, nil)
+	api.On("UploadPartCopy", matchers.Context, mock.MatchedBy(fn3)).Return(output3, nil)
 
 	fn4 := func(input *s3.UploadPartInput) bool {
 		var (
@@ -408,23 +401,23 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		ETag: ptr.To("etag2"),
 	}
 
-	api.On("UploadPartWithContext", matchers.Context, mock.MatchedBy(fn4)).Return(output4, nil)
+	api.On("UploadPart", matchers.Context, mock.MatchedBy(fn4)).Return(output4, nil)
 
 	fn5 := func(input *s3.CompleteMultipartUploadInput) bool {
 		var (
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
 			key    = input.Key != nil && *input.Key == "key"
 			id     = input.UploadId != nil && *input.UploadId == "id"
-			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []*s3.CompletedPart{
-				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int64](1)},
-				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int64](2)},
+			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []types.CompletedPart{
+				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int32](1)},
+				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int32](2)},
 			})
 		)
 
 		return bucket && key && id && parts
 	}
 
-	api.On("CompleteMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn5)).Return(nil, nil)
+	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn5)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -436,11 +429,11 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
-	api.AssertNumberOfCalls(t, "CreateMultipartUploadWithContext", 1)
-	api.AssertNumberOfCalls(t, "UploadPartCopyWithContext", 1)
-	api.AssertNumberOfCalls(t, "UploadPartWithContext", 1)
-	api.AssertNumberOfCalls(t, "CompleteMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
+	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
+	api.AssertNumberOfCalls(t, "UploadPart", 1)
+	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
 }
 
 func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing.T) {
@@ -461,7 +454,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
 
-	api.On("HeadObjectWithContext", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
 
 	fn2 := func(input *s3.CreateMultipartUploadInput) bool {
 		var (
@@ -476,7 +469,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		UploadId: ptr.To("id"),
 	}
 
-	api.On("CreateMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
+	api.On("CreateMultipartUpload", matchers.Context, mock.MatchedBy(fn2)).Return(output2, nil)
 
 	fn3 := func(input *s3.UploadPartCopyInput) bool {
 		var (
@@ -491,7 +484,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		return bucket && src && rnge && key && number && id
 	}
 
-	api.On("UploadPartCopyWithContext", matchers.Context, mock.MatchedBy(fn3)).Return(nil, assert.AnError)
+	api.On("UploadPartCopy", matchers.Context, mock.MatchedBy(fn3)).Return(nil, assert.AnError)
 
 	fn4 := func(input *s3.AbortMultipartUploadInput) bool {
 		var (
@@ -503,7 +496,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 		return bucket && key && id
 	}
 
-	api.On("AbortMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn4)).Return(nil, nil)
+	api.On("AbortMultipartUpload", matchers.Context, mock.MatchedBy(fn4)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -515,10 +508,10 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "HeadObjectWithContext", 1)
-	api.AssertNumberOfCalls(t, "CreateMultipartUploadWithContext", 1)
-	api.AssertNumberOfCalls(t, "UploadPartCopyWithContext", 1)
-	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
+	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
+	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
+	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
 }
 
 func TestClientDeleteObjectsNoKeys(t *testing.T) {
@@ -528,7 +521,7 @@ func TestClientDeleteObjectsNoKeys(t *testing.T) {
 	require.Equal(t, nil, client.deleteObjects(context.Background(), "bucket"))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 0)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 0)
 }
 
 func TestClientDeleteObjectsSinglePage(t *testing.T) {
@@ -538,7 +531,7 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 		var (
 			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
 			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
-			objects = input.Delete != nil && reflect.DeepEqual(input.Delete.Objects, []*s3.ObjectIdentifier{
+			objects = input.Delete != nil && reflect.DeepEqual(input.Delete.Objects, []types.ObjectIdentifier{
 				{Key: ptr.To("key1")},
 				{Key: ptr.To("key2")},
 				{Key: ptr.To("key3")},
@@ -548,7 +541,7 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjectsWithContext", matchers.Context, mock.MatchedBy(fn)).
+	api.On("DeleteObjects", matchers.Context, mock.MatchedBy(fn)).
 		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -560,7 +553,7 @@ func TestClientDeleteObjectsSinglePage(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
 }
 
 func TestClientDeleteObjectsMultiplePages(t *testing.T) {
@@ -576,7 +569,7 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjectsWithContext", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("DeleteObjects", matchers.Context, mock.MatchedBy(fn1)).
 		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	fn2 := func(input *s3.DeleteObjectsInput) bool {
@@ -589,7 +582,7 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 		return bucket && quiet && objects
 	}
 
-	api.On("DeleteObjectsWithContext", matchers.Context, mock.MatchedBy(fn2)).
+	api.On("DeleteObjects", matchers.Context, mock.MatchedBy(fn2)).
 		Return(&s3.DeleteObjectsOutput{}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -607,17 +600,17 @@ func TestClientDeleteObjectsMultiplePages(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 2)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 2)
 }
 
 func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 	api := &mockServiceAPI{}
 
 	output := &s3.DeleteObjectsOutput{
-		Errors: []*s3.Error{{Code: ptr.To(s3.ErrCodeNoSuchKey), Message: ptr.To("")}},
+		Errors: []types.Error{{Code: ptr.To("NoSuchKey"), Message: ptr.To("")}},
 	}
 
-	api.On("DeleteObjectsWithContext", matchers.Context, mock.Anything).Return(output, nil)
+	api.On("DeleteObjects", matchers.Context, mock.Anything).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -628,7 +621,7 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "DeleteObjectsWithContext", 1)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
 }
 
 func TestClientDeleteDirectory(t *testing.T) {
@@ -643,27 +636,21 @@ func TestClientDeleteDirectory(t *testing.T) {
 		return bucket && prefix
 	}
 
-	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
-		contents := []*s3.Object{
-			{
-				Key:          ptr.To("/path/to/key1"),
-				Size:         ptr.To[int64](64),
-				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-			},
-			{
-				Key:          ptr.To("/path/to/key2"),
-				Size:         ptr.To[int64](128),
-				LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
-			},
-		}
-
-		fn(&s3.ListObjectsV2Output{Contents: contents}, true)
-
-		return true
+	contents1 := []types.Object{
+		{
+			Key:          ptr.To("/path/to/key1"),
+			Size:         ptr.To[int64](64),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
+		{
+			Key:          ptr.To("/path/to/key2"),
+			Size:         ptr.To[int64](128),
+			LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+		},
 	}
 
-	api.On("ListObjectsV2PagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
-		Return(nil)
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -678,7 +665,7 @@ func TestClientDeleteDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 }
 
 func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
@@ -693,27 +680,21 @@ func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
 		return bucket && prefix
 	}
 
-	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
-		contents := []*s3.Object{
-			{
-				Key:          ptr.To("/path/to/key1"),
-				Size:         ptr.To[int64](64),
-				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-			},
-			{
-				Key:          ptr.To("/path/to/key2"),
-				Size:         ptr.To[int64](128),
-				LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
-			},
-		}
-
-		fn(&s3.ListObjectsV2Output{Contents: contents}, true)
-
-		return true
+	contents1 := []types.Object{
+		{
+			Key:          ptr.To("/path/to/key1"),
+			Size:         ptr.To[int64](64),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
+		{
+			Key:          ptr.To("/path/to/key2"),
+			Size:         ptr.To[int64](128),
+			LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+		},
 	}
 
-	api.On("ListObjectsV2PagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
-		Return(nil)
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -725,7 +706,7 @@ func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 }
 
 func TestClientIterateObjects(t *testing.T) {
@@ -741,7 +722,8 @@ func TestClientIterateObjects(t *testing.T) {
 		return bucket && prefix && delimiter
 	}
 
-	api.On("ListObjectsV2PagesWithContext", matchers.Context, mock.MatchedBy(fn), mock.Anything).Return(nil)
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn)).
+		Return(&s3.ListObjectsV2Output{}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -753,7 +735,7 @@ func TestClientIterateObjects(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 }
 
 func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
@@ -779,27 +761,23 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 		return bucket && prefix && delimiter
 	}
 
-	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
-		fn(&s3.ListObjectsV2Output{
-			CommonPrefixes: []*s3.CommonPrefix{
-				{
-					Prefix: ptr.To("/path/to/key1"),
-				},
+	output1 := &s3.ListObjectsV2Output{
+		CommonPrefixes: []types.CommonPrefix{
+			{
+				Prefix: ptr.To("/path/to/key1"),
 			},
-			Contents: []*s3.Object{
-				{
-					Key:          ptr.To("/path/to/key1"),
-					Size:         ptr.To[int64](64),
-					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-				},
+		},
+		Contents: []types.Object{
+			{
+				Key:          ptr.To("/path/to/key1"),
+				Size:         ptr.To[int64](64),
+				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			},
-		}, true)
-
-		return true
+		},
 	}
 
-	api.On("ListObjectsV2PagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
-		Return(nil)
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+		Return(output1, nil)
 
 	var (
 		client  = &Client{serviceAPI: api}
@@ -828,7 +806,7 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 	require.Equal(t, 1, objects)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 }
 
 func TestClientIterateObjectsPropagateUserError(t *testing.T) {
@@ -844,20 +822,16 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 		return bucket && prefix && delimiter
 	}
 
-	fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
-		fn(&s3.ListObjectsV2Output{Contents: []*s3.Object{
-			{
-				Key:          ptr.To("/path/to/key1"),
-				Size:         ptr.To[int64](64),
-				LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-			},
-		}}, true)
-
-		return true
+	contents1 := []types.Object{
+		{
+			Key:          ptr.To("/path/to/key1"),
+			Size:         ptr.To[int64](64),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
 	}
 
-	api.On("ListObjectsV2PagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
-		Return(nil)
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -870,7 +844,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	require.ErrorIs(t, err, assert.AnError)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 }
 
 func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
@@ -992,30 +966,26 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				return bucket && prefix
 			}
 
-			fn2 := func(fn func(page *s3.ListObjectsV2Output, _ bool) bool) bool {
-				fn(&s3.ListObjectsV2Output{Contents: []*s3.Object{
-					{
-						Key:          ptr.To("/path/to/key1"),
-						Size:         ptr.To[int64](64),
-						LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-					},
-					{
-						Key:          ptr.To("/path/to/another/key1"),
-						Size:         ptr.To[int64](128),
-						LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
-					},
-					{
-						Key:          ptr.To("/path/to/key2"),
-						Size:         ptr.To[int64](256),
-						LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
-					},
-				}}, true)
-
-				return true
+			contents1 := []types.Object{
+				{
+					Key:          ptr.To("/path/to/key1"),
+					Size:         ptr.To[int64](64),
+					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+				},
+				{
+					Key:          ptr.To("/path/to/another/key1"),
+					Size:         ptr.To[int64](128),
+					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+				},
+				{
+					Key:          ptr.To("/path/to/key2"),
+					Size:         ptr.To[int64](256),
+					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
+				},
 			}
 
-			api.On("ListObjectsV2PagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).
-				Return(nil)
+			api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+				Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 			client := &Client{serviceAPI: api}
 
@@ -1035,7 +1005,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 			require.Equal(t, test.all, all)
 
 			api.AssertExpectations(t)
-			api.AssertNumberOfCalls(t, "ListObjectsV2PagesWithContext", 1)
+			api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 		})
 	}
 }
@@ -1056,7 +1026,7 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 		UploadId: ptr.To("id"),
 	}
 
-	api.On("CreateMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn), mock.Anything).
+	api.On("CreateMultipartUpload", matchers.Context, mock.MatchedBy(fn), mock.Anything).
 		Return(output, nil)
 
 	client := &Client{serviceAPI: api}
@@ -1069,7 +1039,7 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 	require.Equal(t, "id", id)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "CreateMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
 }
 
 func TestClientListParts(t *testing.T) {
@@ -1085,24 +1055,19 @@ func TestClientListParts(t *testing.T) {
 		return bucket && id && key
 	}
 
-	fn2 := func(fn func(page *s3.ListPartsOutput, _ bool) bool) bool {
-		parts := []*s3.Part{
-			{
-				ETag: ptr.To("etag1"),
-				Size: ptr.To[int64](64),
-			},
-			{
-				ETag: ptr.To("etag2"),
-				Size: ptr.To[int64](128),
-			},
-		}
-
-		fn(&s3.ListPartsOutput{Parts: parts}, false)
-
-		return true
+	parts1 := []types.Part{
+		{
+			ETag: ptr.To("etag1"),
+			Size: ptr.To[int64](64),
+		},
+		{
+			ETag: ptr.To("etag2"),
+			Size: ptr.To[int64](128),
+		},
 	}
 
-	api.On("ListPartsPagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.MatchedBy(fn2)).Return(nil)
+	api.On("ListParts", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.ListPartsOutput{Parts: parts1}, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -1117,7 +1082,7 @@ func TestClientListParts(t *testing.T) {
 	require.Equal(t, expected, parts)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListPartsPagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListParts", 1)
 }
 
 func TestClientListPartsUploadNotFound(t *testing.T) {
@@ -1133,8 +1098,8 @@ func TestClientListPartsUploadNotFound(t *testing.T) {
 		return bucket && id && key
 	}
 
-	api.On("ListPartsPagesWithContext", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
-		Return(&mockError{inner: s3.ErrCodeNoSuchUpload})
+	api.On("ListParts", matchers.Context, mock.MatchedBy(fn1)).
+		Return(nil, &types.NoSuchUpload{})
 
 	client := &Client{serviceAPI: api}
 
@@ -1146,7 +1111,7 @@ func TestClientListPartsUploadNotFound(t *testing.T) {
 	require.True(t, objerr.IsNotFoundError(err))
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "ListPartsPagesWithContext", 1)
+	api.AssertNumberOfCalls(t, "ListParts", 1)
 }
 
 func TestClientUploadPart(t *testing.T) {
@@ -1168,7 +1133,7 @@ func TestClientUploadPart(t *testing.T) {
 		ETag: ptr.To("etag"),
 	}
 
-	api.On("UploadPartWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+	api.On("UploadPart", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -1183,7 +1148,7 @@ func TestClientUploadPart(t *testing.T) {
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 5}, part)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "UploadPartWithContext", 1)
+	api.AssertNumberOfCalls(t, "UploadPart", 1)
 }
 
 func TestClientUploadPartCopy(t *testing.T) {
@@ -1203,10 +1168,10 @@ func TestClientUploadPartCopy(t *testing.T) {
 	}
 
 	output := &s3.UploadPartCopyOutput{
-		CopyPartResult: &s3.CopyPartResult{ETag: ptr.To("etag")},
+		CopyPartResult: &types.CopyPartResult{ETag: ptr.To("etag")},
 	}
 
-	api.On("UploadPartCopyWithContext", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+	api.On("UploadPartCopy", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -1223,7 +1188,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 65}, part)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "UploadPartCopyWithContext", 1)
+	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
 }
 
 func TestClientUploadPartCopyInvalidByteRange(t *testing.T) {
@@ -1252,16 +1217,16 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 			bucket = input.Bucket != nil && *input.Bucket == "bucket"
 			key    = input.Key != nil && *input.Key == "key"
 			id     = input.UploadId != nil && *input.UploadId == "id"
-			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []*s3.CompletedPart{
-				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int64](1)},
-				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int64](2)},
+			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []types.CompletedPart{
+				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int32](1)},
+				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int32](2)},
 			})
 		)
 
 		return bucket && key && id && parts
 	}
 
-	api.On("CompleteMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
+	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -1274,7 +1239,7 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "CompleteMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
 }
 
 func TestClientAbortMultipartUpload(t *testing.T) {
@@ -1290,7 +1255,7 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 		return bucket && key && id
 	}
 
-	api.On("AbortMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
+	api.On("AbortMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
 
 	client := &Client{serviceAPI: api}
 
@@ -1302,7 +1267,7 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
 }
 
 func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
@@ -1318,8 +1283,8 @@ func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
 		return bucket && key && id
 	}
 
-	api.On("AbortMultipartUploadWithContext", matchers.Context, mock.MatchedBy(fn)).
-		Return(nil, &mockError{inner: s3.ErrCodeNoSuchUpload})
+	api.On("AbortMultipartUpload", matchers.Context, mock.MatchedBy(fn)).
+		Return(nil, &types.NoSuchUpload{})
 
 	client := &Client{serviceAPI: api}
 
@@ -1331,5 +1296,5 @@ func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
 	require.NoError(t, err)
 
 	api.AssertExpectations(t)
-	api.AssertNumberOfCalls(t, "AbortMultipartUploadWithContext", 1)
+	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
 }

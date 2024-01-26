@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 )
 

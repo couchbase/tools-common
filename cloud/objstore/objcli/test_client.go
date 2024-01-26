@@ -12,13 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/ptr"
 )
@@ -234,7 +233,7 @@ func (t *TestClient) UploadPart(_ context.Context, opts UploadPartOptions) (objv
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	size, err := aws.SeekerLen(opts.Body)
+	size, err := SeekerLength(opts.Body)
 	require.NoError(t.t, err)
 
 	part := objval.Part{

@@ -5,8 +5,9 @@ import (
 	"io"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/stretchr/testify/require"
+
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
 )
 
 func TestChunkReaderForEachAvoidEmptyChunk(t *testing.T) {
@@ -46,7 +47,7 @@ func TestChunkReaderForEachAvoidEmptyChunk(t *testing.T) {
 			require.NoError(t, reader.ForEach(func(chunk *io.SectionReader) error { all = append(all, chunk); return nil }))
 			require.Len(t, all, test.chunks)
 
-			length, err := aws.SeekerLen(all[len(all)-1])
+			length, err := objcli.SeekerLength(all[len(all)-1])
 			require.NoError(t, err)
 			require.Equal(t, test.lastSize, length)
 

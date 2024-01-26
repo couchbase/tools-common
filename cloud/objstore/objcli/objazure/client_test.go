@@ -18,8 +18,8 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/ptr"
 )

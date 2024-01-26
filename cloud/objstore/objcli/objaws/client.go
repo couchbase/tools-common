@@ -11,16 +11,16 @@ import (
 	"path"
 	"regexp"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/v3/system"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in AWS S3.
@@ -82,7 +82,7 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		input.Range = ptr.To(opts.ByteRange.ToRangeHeader())
 	}
 
-	resp, err := c.serviceAPI.GetObjectWithContext(ctx, input)
+	resp, err := c.serviceAPI.GetObject(ctx, input)
 	if err != nil {
 		return nil, handleError(input.Bucket, input.Key, err)
 	}
@@ -107,7 +107,7 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		Key:    ptr.To(opts.Key),
 	}
 
-	resp, err := c.serviceAPI.HeadObjectWithContext(ctx, input)
+	resp, err := c.serviceAPI.HeadObject(ctx, input)
 	if err != nil {
 		return nil, handleError(input.Bucket, input.Key, err)
 	}
@@ -129,7 +129,7 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		Key:    ptr.To(opts.Key),
 	}
 
-	_, err := c.serviceAPI.PutObjectWithContext(ctx, input)
+	_, err := c.serviceAPI.PutObject(ctx, input)
 
 	return handleError(input.Bucket, input.Key, err)
 }
@@ -141,7 +141,7 @@ func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) 
 		CopySource: ptr.To(url.PathEscape(opts.SourceBucket + "/" + opts.SourceKey)),
 	}
 
-	_, err := c.serviceAPI.CopyObjectWithContext(ctx, input)
+	_, err := c.serviceAPI.CopyObject(ctx, input)
 
 	return handleError(nil, nil, err)
 }
@@ -324,18 +324,14 @@ func (c *Client) deleteDirectory(
 	bucket, prefix string,
 	fn func(ctx context.Context, bucket string, keys ...string) error,
 ) error {
-	var err error
-
-	callback := func(page *s3.ListObjectsV2Output, _ bool) bool {
+	callback := func(page *s3.ListObjectsV2Output) error {
 		keys := make([]string, 0, len(page.Contents))
 
 		for _, object := range page.Contents {
 			keys = append(keys, *object.Key)
 		}
 
-		err = fn(ctx, bucket, keys...)
-
-		return err == nil
+		return fn(ctx, bucket, keys...)
 	}
 
 	input := &s3.ListObjectsV2Input{
@@ -343,8 +339,8 @@ func (c *Client) deleteDirectory(
 		Prefix: ptr.To(prefix),
 	}
 
-	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
-	if err := c.serviceAPI.ListObjectsV2PagesWithContext(ctx, input, callback); err != nil {
+	err := c.listObjects(ctx, input, callback)
+	if err != nil {
 		return handleError(input.Bucket, nil, err)
 	}
 
@@ -363,22 +359,29 @@ func (c *Client) deleteObjects(ctx context.Context, bucket string, keys ...strin
 
 	input := &s3.DeleteObjectsInput{
 		Bucket: ptr.To(bucket),
-		Delete: &s3.Delete{Quiet: ptr.To(true)},
+		Delete: &types.Delete{Quiet: ptr.To(true)},
 	}
 
 	for _, key := range keys {
-		input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: ptr.To(key)})
+		input.Delete.Objects = append(input.Delete.Objects, types.ObjectIdentifier{Key: ptr.To(key)})
 	}
 
-	resp, err := c.serviceAPI.DeleteObjectsWithContext(ctx, input)
+	resp, err := c.serviceAPI.DeleteObjects(ctx, input)
 	if err != nil {
 		return handleError(input.Bucket, nil, err)
 	}
 
 	for _, err := range resp.Errors {
-		if awsErr := awserr.New(*err.Code, *err.Message, nil); !isKeyNotFound(awsErr) {
-			return handleError(input.Bucket, err.Key, awsErr)
+		converted := &smithy.GenericAPIError{
+			Code:    *err.Code,
+			Message: *err.Message,
 		}
+
+		if isKeyNotFound(converted) {
+			continue
+		}
+
+		return handleError(input.Bucket, err.Key, converted)
 	}
 
 	return nil
@@ -389,11 +392,8 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
-	var err error
-
-	callback := func(page *s3.ListObjectsV2Output, _ bool) bool {
-		err = c.handlePage(page, opts.Include, opts.Exclude, opts.Func)
-		return err == nil
+	callback := func(page *s3.ListObjectsV2Output) error {
+		return c.handlePage(page, opts.Include, opts.Exclude, opts.Func)
 	}
 
 	input := &s3.ListObjectsV2Input{
@@ -402,12 +402,12 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 		Delimiter: ptr.To(opts.Delimiter),
 	}
 
-	// It's important we use an assignment expression here to avoid overwriting the error assigned by our callback
-	if err := c.serviceAPI.ListObjectsV2PagesWithContext(ctx, input, callback); err != nil {
+	err := c.listObjects(ctx, input, callback)
+	if err != nil {
 		return handleError(input.Bucket, nil, err)
 	}
 
-	return err
+	return nil
 }
 
 // handlePage iterates over common prefixes/objects in the given page executing the given function for each object which
@@ -441,13 +441,36 @@ func (c *Client) handlePage(
 	return nil
 }
 
+// listObjects uses the SDK paginator to run the given function on pages of objects.
+func (c *Client) listObjects(
+	ctx context.Context,
+	input *s3.ListObjectsV2Input,
+	fn func(page *s3.ListObjectsV2Output) error,
+) error {
+	paginator := s3.NewListObjectsV2Paginator(c.serviceAPI, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		err = fn(page)
+		if err != nil {
+			return fmt.Errorf("failed to process page: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMultipartUploadOptions) (string, error) {
 	input := &s3.CreateMultipartUploadInput{
 		Bucket: ptr.To(opts.Bucket),
 		Key:    ptr.To(opts.Key),
 	}
 
-	resp, err := c.serviceAPI.CreateMultipartUploadWithContext(ctx, input)
+	resp, err := c.serviceAPI.CreateMultipartUpload(ctx, input)
 	if err != nil {
 		return "", handleError(input.Bucket, input.Key, err)
 	}
@@ -456,21 +479,16 @@ func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMu
 }
 
 func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([]objval.Part, error) {
-	parts := make([]objval.Part, 0)
-
 	input := &s3.ListPartsInput{
 		Bucket:   ptr.To(opts.Bucket),
 		UploadId: ptr.To(opts.UploadID),
 		Key:      ptr.To(opts.Key),
 	}
 
-	err := c.serviceAPI.ListPartsPagesWithContext(ctx, input, func(page *s3.ListPartsOutput, _ bool) bool {
-		for _, part := range page.Parts {
-			parts = append(parts, objval.Part{ID: *part.ETag, Size: *part.Size})
-		}
-
-		return true
-	})
+	parts, err := c.listParts(
+		ctx,
+		s3.NewListPartsPaginator(c.serviceAPI, input),
+	)
 	if err == nil {
 		return parts, nil
 	}
@@ -483,8 +501,26 @@ func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([
 	return nil, handleError(input.Bucket, input.Key, err)
 }
 
+// listParts uses the SDK paginator to run the given function on pages of parts.
+func (c *Client) listParts(ctx context.Context, paginator *s3.ListPartsPaginator) ([]objval.Part, error) {
+	parts := make([]objval.Part, 0)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		for _, part := range page.Parts {
+			parts = append(parts, objval.Part{ID: *part.ETag, Size: *part.Size})
+		}
+	}
+
+	return parts, nil
+}
+
 func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) (objval.Part, error) {
-	size, err := aws.SeekerLen(opts.Body)
+	size, err := objcli.SeekerLength(opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
 	}
@@ -494,11 +530,11 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 		Bucket:        ptr.To(opts.Bucket),
 		ContentLength: ptr.To(size),
 		Key:           ptr.To(opts.Key),
-		PartNumber:    ptr.To(int64(opts.Number)),
+		PartNumber:    ptr.To(int32(opts.Number)),
 		UploadId:      ptr.To(opts.UploadID),
 	}
 
-	output, err := c.serviceAPI.UploadPartWithContext(ctx, input)
+	output, err := c.serviceAPI.UploadPart(ctx, input)
 	if err != nil {
 		return objval.Part{}, handleError(input.Bucket, input.Key, err)
 	}
@@ -516,11 +552,11 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 		CopySource:      ptr.To(path.Join(opts.SourceBucket, opts.SourceKey)),
 		CopySourceRange: ptr.To(opts.ByteRange.ToRangeHeader()),
 		Key:             ptr.To(opts.DestinationKey),
-		PartNumber:      ptr.To(int64(opts.Number)),
+		PartNumber:      ptr.To(int32(opts.Number)),
 		UploadId:        ptr.To(opts.UploadID),
 	}
 
-	output, err := c.serviceAPI.UploadPartCopyWithContext(ctx, input)
+	output, err := c.serviceAPI.UploadPartCopy(ctx, input)
 	if err != nil {
 		return objval.Part{}, handleError(input.Bucket, input.Key, err)
 	}
@@ -535,20 +571,20 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 }
 
 func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
-	converted := make([]*s3.CompletedPart, len(opts.Parts))
+	converted := make([]types.CompletedPart, len(opts.Parts))
 
 	for index, part := range opts.Parts {
-		converted[index] = &s3.CompletedPart{ETag: ptr.To(part.ID), PartNumber: ptr.To(int64(part.Number))}
+		converted[index] = types.CompletedPart{ETag: ptr.To(part.ID), PartNumber: ptr.To(int32(part.Number))}
 	}
 
 	input := &s3.CompleteMultipartUploadInput{
 		Bucket:          ptr.To(opts.Bucket),
 		Key:             ptr.To(opts.Key),
 		UploadId:        ptr.To(opts.UploadID),
-		MultipartUpload: &s3.CompletedMultipartUpload{Parts: converted},
+		MultipartUpload: &types.CompletedMultipartUpload{Parts: converted},
 	}
 
-	_, err := c.serviceAPI.CompleteMultipartUploadWithContext(ctx, input)
+	_, err := c.serviceAPI.CompleteMultipartUpload(ctx, input)
 
 	return handleError(input.Bucket, input.Key, err)
 }
@@ -560,7 +596,7 @@ func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMult
 		UploadId: ptr.To(opts.UploadID),
 	}
 
-	_, err := c.serviceAPI.AbortMultipartUploadWithContext(ctx, input)
+	_, err := c.serviceAPI.AbortMultipartUpload(ctx, input)
 	if err != nil && !isNoSuchUpload(err) {
 		return handleError(input.Bucket, input.Key, err)
 	}

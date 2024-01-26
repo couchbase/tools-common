@@ -1,8 +1,12 @@
 # Changes
 
+## v4.0.0
+
+- BREAKING: Migrated to `aws-sdk-go-v2`
+
 ## v3.0.0
 
-- Moved to `log/slog`
+- BREAKING: Moved to `log/slog`
 - Upgraded dependencies
 
 ## v2.0.6

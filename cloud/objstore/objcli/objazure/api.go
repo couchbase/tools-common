@@ -75,23 +75,18 @@ type hierarchyBlobsPager interface {
 }
 
 // blockBlobAPI is a block blob interface which allows interactions with a block blob stored in an Azure container.
+//
+//nolint:lll
 type blockBlobAPI interface {
 	Delete(ctx context.Context, options *blob.DeleteOptions) (blob.DeleteResponse, error)
 	DownloadStream(ctx context.Context, o *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error)
-	GetProperties(ctx context.Context, options *blob.GetPropertiesOptions) (blob.GetPropertiesResponse,
-		error)
-	CommitBlockList(ctx context.Context, base64BlockIDs []string, options *blockblob.CommitBlockListOptions,
-	) (blockblob.CommitBlockListResponse, error)
-	GetBlockList(ctx context.Context, listType blockblob.BlockListType, options *blockblob.GetBlockListOptions,
-	) (blockblob.GetBlockListResponse, error)
-	StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeekCloser, options *blockblob.StageBlockOptions,
-	) (blockblob.StageBlockResponse, error)
-	StageBlockFromURL(
-		ctx context.Context, base64BlockID, sourceURL string, options *blockblob.StageBlockFromURLOptions,
-	) (blockblob.StageBlockFromURLResponse, error)
+	GetProperties(ctx context.Context, options *blob.GetPropertiesOptions) (blob.GetPropertiesResponse, error)
+	CommitBlockList(ctx context.Context, base64BlockIDs []string, options *blockblob.CommitBlockListOptions) (blockblob.CommitBlockListResponse, error)
+	GetBlockList(ctx context.Context, listType blockblob.BlockListType, options *blockblob.GetBlockListOptions) (blockblob.GetBlockListResponse, error)
+	StageBlock(ctx context.Context, base64BlockID string, body io.ReadSeekCloser, options *blockblob.StageBlockOptions) (blockblob.StageBlockResponse, error)
+	StageBlockFromURL(ctx context.Context, base64BlockID, sourceURL string, options *blockblob.StageBlockFromURLOptions) (blockblob.StageBlockFromURLResponse, error)
 	URL() string
-	Upload(ctx context.Context, body io.ReadSeekCloser, options *blockblob.UploadOptions,
-	) (blockblob.UploadResponse, error)
+	Upload(ctx context.Context, body io.ReadSeekCloser, options *blockblob.UploadOptions) (blockblob.UploadResponse, error)
 }
 
 var _ blockBlobAPI = (*blockblob.Client)(nil)

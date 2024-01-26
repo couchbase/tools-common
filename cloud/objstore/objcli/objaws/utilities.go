@@ -3,45 +3,43 @@ package objaws
 import (
 	"errors"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/sns"
+	"github.com/aws/smithy-go"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
 	"github.com/couchbase/tools-common/types/ptr"
 )
 
 // handleError converts an error relating accessing an object via its key into a user friendly error where possible.
+//
+// For the full list of error codes supported by AWS S3, please see
+// https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList.
 func handleError(bucket, key *string, err error) error {
-	var awsErr awserr.Error
-	if err == nil || !errors.As(err, &awsErr) {
+	errorCode := extractErrorCode(err)
+	if errorCode == "" {
 		return objerr.HandleError(err)
 	}
 
-	switch awsErr.Code() {
+	switch errorCode {
 	case "InvalidAccessKeyId", "SignatureDoesNotMatch":
 		return objerr.ErrUnauthenticated
 	case "AccessDenied":
 		return objerr.ErrUnauthorized
-	case s3.ErrCodeNoSuchKey, sns.ErrCodeNotFoundException:
+	case "NoSuchKey", "NotFound":
 		if key == nil {
 			key = ptr.To("<empty key name>")
 		}
 
 		return &objerr.NotFoundError{Type: "key", Name: *key}
-	case s3.ErrCodeNoSuchBucket:
+	case "NoSuchBucket":
 		if bucket == nil {
 			bucket = ptr.To("<empty bucket name>")
 		}
 
 		return &objerr.NotFoundError{Type: "bucket", Name: *bucket}
-	case aws.ErrMissingEndpoint.Code():
-		return objerr.ErrEndpointResolutionFailed
 	}
 
 	// The AWS error type doesn't implement Unwrap, se we must manually unwrap and check it here
-	if err := objerr.TryHandleError(awsErr.OrigErr()); err != nil {
+	if err := objerr.TryHandleError(errors.Unwrap(err)); err != nil {
 		return err
 	}
 
@@ -49,18 +47,35 @@ func handleError(bucket, key *string, err error) error {
 	return err
 }
 
-// isKeyNotFound returns a boolean indicating whether the given error is a 'KeyNotFound' error. We also ignore the 'sns'
-// not found exception because localstack returns the wrong error string ('NotFound').
+// isKeyNotFound returns a boolean indicating whether the given error is a 'KeyNotFound' error. We also ignore the
+// 'NotFound' because localstack returns the wrong error string.
 func isKeyNotFound(err error) bool {
-	var awsErr awserr.Error
-	return errors.As(err, &awsErr) &&
-		(awsErr.Code() == sns.ErrCodeNotFoundException || awsErr.Code() == s3.ErrCodeNoSuchKey)
+	switch extractErrorCode(err) {
+	case "NoSuchKey", "NotFound":
+		return true
+	default:
+		return false
+	}
 }
 
 // isNoSuchUpload returns a boolean indicating whether the given error is an 'NoSuchUpload' error. We also ignore the
-// 'sns' not found exception because localstack returns the wrong error string ('NotFound').
+// 'NotFound' because localstack returns the wrong error string.
 func isNoSuchUpload(err error) bool {
-	var awsErr awserr.Error
-	return errors.As(err, &awsErr) && (awsErr.Code() == sns.ErrCodeNotFoundException ||
-		awsErr.Code() == s3.ErrCodeNoSuchUpload)
+	switch extractErrorCode(err) {
+	case "NoSuchUpload", "NotFound":
+		return true
+	default:
+		return false
+	}
+}
+
+// extractErrorCode returns the error code from the given SDK error.
+func extractErrorCode(err error) string {
+	var awsErr smithy.APIError
+
+	if err == nil || !errors.As(err, &awsErr) {
+		return ""
+	}
+
+	return awsErr.ErrorCode()
 }

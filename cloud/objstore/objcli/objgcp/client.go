@@ -12,14 +12,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 	"golang.org/x/exp/slices"
 	"google.golang.org/api/iterator"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/v3/system"
@@ -130,7 +129,7 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		writer = object.NewWriter(ctx)
 	)
 
-	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum, crc32c), opts.Body)
+	_, err := objcli.CopyReadSeeker(io.MultiWriter(md5sum, crc32c), opts.Body)
 	if err != nil {
 		return fmt.Errorf("failed to calculate checksums: %w", err)
 	}
@@ -364,7 +363,7 @@ func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([
 }
 
 func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) (objval.Part, error) {
-	size, err := aws.SeekerLen(opts.Body)
+	size, err := objcli.SeekerLength(opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
 	}

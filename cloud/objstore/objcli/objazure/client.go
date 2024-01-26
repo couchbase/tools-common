@@ -6,16 +6,15 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"regexp"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/google/uuid"
 
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/v3/system"
@@ -125,14 +124,14 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 
 	md5sum := md5.New()
 
-	_, err := aws.CopySeekableBody(io.MultiWriter(md5sum), opts.Body)
+	_, err := objcli.CopyReadSeeker(md5sum, opts.Body)
 	if err != nil {
 		return fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
 	_, err = blobClient.Upload(
 		ctx,
-		aws.ReadSeekCloser(opts.Body),
+		manager.ReadSeekCloser(opts.Body),
 		&blockblob.UploadOptions{TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil))},
 	)
 
@@ -442,7 +441,7 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 		return objval.Part{}, objcli.ErrExpectedNoUploadID
 	}
 
-	size, err := aws.SeekerLen(opts.Body)
+	size, err := objcli.SeekerLength(opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to determine body length: %w", err)
 	}
@@ -454,7 +453,7 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 
 	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
-	_, err = aws.CopySeekableBody(md5sum, opts.Body)
+	_, err = objcli.CopyReadSeeker(md5sum, opts.Body)
 	if err != nil {
 		return objval.Part{}, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
@@ -462,7 +461,7 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 	_, err = blobClient.StageBlock(
 		ctx,
 		blockID,
-		aws.ReadSeekCloser(opts.Body),
+		manager.ReadSeekCloser(opts.Body),
 		&blockblob.StageBlockOptions{TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil))},
 	)
 

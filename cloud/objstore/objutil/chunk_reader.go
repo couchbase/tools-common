@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go/aws"
-
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
 	ioiface "github.com/couchbase/tools-common/types/iface"
 )
 
@@ -22,7 +21,7 @@ func NewChunkReader(reader ioiface.ReadAtSeeker, size int64) ChunkReader {
 
 // ForEach breaks the 'reader' into chunks running the given function for each chunk created.
 func (c ChunkReader) ForEach(fn func(chunk *io.SectionReader) error) error {
-	length, err := aws.SeekerLen(c.reader)
+	length, err := objcli.SeekerLength(c.reader)
 	if err != nil {
 		return fmt.Errorf("failed to determine length of reader: %w", err)
 	}

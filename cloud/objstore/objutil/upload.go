@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go/aws"
-
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v3/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli/objaws"
 	ioiface "github.com/couchbase/tools-common/types/iface"
 )
 
@@ -65,7 +63,7 @@ func Upload(opts UploadOptions) error {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
-	length, err := aws.SeekerLen(opts.Body)
+	length, err := objcli.SeekerLength(opts.Body)
 	if err != nil {
 		return fmt.Errorf("failed to determine length of body: %w", err)
 	}

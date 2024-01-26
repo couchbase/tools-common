@@ -3,44 +3,26 @@ package objaws
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 //go:generate mockery --all --case underscore --inpackage
 
 // serviceAPI is the minimal subset of functions that we use from the AWS SDK, this allows for a greatly reduce surface
 // area for mock generation.
+//
+//nolint:lll
 type serviceAPI interface {
-	AbortMultipartUploadWithContext(
-		context.Context, *s3.AbortMultipartUploadInput, ...request.Option,
-	) (*s3.AbortMultipartUploadOutput, error)
-
-	CompleteMultipartUploadWithContext(
-		context.Context, *s3.CompleteMultipartUploadInput, ...request.Option,
-	) (*s3.CompleteMultipartUploadOutput, error)
-
-	CreateMultipartUploadWithContext(
-		context.Context, *s3.CreateMultipartUploadInput, ...request.Option,
-	) (*s3.CreateMultipartUploadOutput, error)
-
-	DeleteObjectsWithContext(context.Context, *s3.DeleteObjectsInput, ...request.Option) (*s3.DeleteObjectsOutput, error)
-	GetObjectWithContext(context.Context, *s3.GetObjectInput, ...request.Option) (*s3.GetObjectOutput, error)
-	HeadObjectWithContext(context.Context, *s3.HeadObjectInput, ...request.Option) (*s3.HeadObjectOutput, error)
-
-	ListObjectsV2PagesWithContext(
-		context.Context, *s3.ListObjectsV2Input, func(*s3.ListObjectsV2Output, bool) bool, ...request.Option,
-	) error
-
-	ListPartsPagesWithContext(
-		context.Context, *s3.ListPartsInput, func(*s3.ListPartsOutput, bool) bool, ...request.Option,
-	) error
-
-	PutObjectWithContext(context.Context, *s3.PutObjectInput, ...request.Option) (*s3.PutObjectOutput, error)
-	CopyObjectWithContext(context.Context, *s3.CopyObjectInput, ...request.Option) (*s3.CopyObjectOutput, error)
-	UploadPartWithContext(context.Context, *s3.UploadPartInput, ...request.Option) (*s3.UploadPartOutput, error)
-
-	UploadPartCopyWithContext(
-		context.Context, *s3.UploadPartCopyInput, ...request.Option,
-	) (*s3.UploadPartCopyOutput, error)
+	AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
+	CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error)
+	CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error)
+	DeleteObjects(ctx context.Context, params *s3.DeleteObjectsInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	ListParts(ctx context.Context, params *s3.ListPartsInput, optFns ...func(*s3.Options)) (*s3.ListPartsOutput, error)
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
+	UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options)) (*s3.UploadPartOutput, error)
+	UploadPartCopy(ctx context.Context, params *s3.UploadPartCopyInput, optFns ...func(*s3.Options)) (*s3.UploadPartCopyOutput, error)
 }
