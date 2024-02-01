@@ -102,7 +102,7 @@ func CopyObjects(opts CopyObjectsOptions) error {
 		return pool.Queue(func(ctx context.Context) error { return cp(ctx, attrs) })
 	}
 
-	err := opts.Client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+	err := opts.Client.IterateObjects(opts.Context, objcli.IterateObjectsOptions{
 		Bucket:    opts.SourceBucket,
 		Prefix:    opts.SourcePrefix,
 		Delimiter: opts.SourceDelimiter,

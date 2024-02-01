@@ -3,7 +3,6 @@
 package objutil
 
 import (
-	"context"
 	"fmt"
 	"io"
 
@@ -73,7 +72,7 @@ func Upload(opts UploadOptions) error {
 		return upload(opts)
 	}
 
-	err = opts.Client.PutObject(context.Background(), objcli.PutObjectOptions{
+	err = opts.Client.PutObject(opts.Context, objcli.PutObjectOptions{
 		Bucket: opts.Bucket,
 		Key:    opts.Key,
 		Body:   opts.Body,

@@ -3,6 +3,7 @@
 ## v4.0.0
 
 - BREAKING: Migrated to `aws-sdk-go-v2`
+- Fixes uses of `context.Background()` rather than user provided contexts
 
 ## v3.0.0
 

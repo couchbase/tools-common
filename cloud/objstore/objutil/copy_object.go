@@ -1,7 +1,6 @@
 package objutil
 
 import (
-	"context"
 	"fmt"
 	"math"
 
@@ -48,7 +47,7 @@ func CopyObject(opts CopyObjectOptions) error {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
-	attrs, err := opts.Client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+	attrs, err := opts.Client.GetObjectAttrs(opts.Context, objcli.GetObjectAttrsOptions{
 		Bucket: opts.SourceBucket,
 		Key:    opts.SourceKey,
 	})
@@ -73,7 +72,7 @@ func CopyObject(opts CopyObjectOptions) error {
 		return opts.Client.CopyObject(opts.Context, copts)
 	}
 
-	id, err := opts.Client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
+	id, err := opts.Client.CreateMultipartUpload(opts.Context, objcli.CreateMultipartUploadOptions{
 		Bucket: opts.DestinationBucket,
 		Key:    opts.DestinationKey,
 	})
@@ -96,7 +95,7 @@ func CopyObject(opts CopyObjectOptions) error {
 	// NOTE: We currently perform this operation sequentially, so we don't need to guard access to the 'parts'. There is
 	// room for improvement to do this concurrently though, so that must be considered in the future.
 	cp := func(start, end int64) error {
-		part, err := opts.Client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		part, err := opts.Client.UploadPartCopy(opts.Context, objcli.UploadPartCopyOptions{
 			DestinationBucket: opts.DestinationBucket,
 			UploadID:          id,
 			DestinationKey:    opts.DestinationKey,
@@ -120,7 +119,7 @@ func CopyObject(opts CopyObjectOptions) error {
 		return fmt.Errorf("failed to copy parts: %w", err)
 	}
 
-	err = opts.Client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	err = opts.Client.CompleteMultipartUpload(opts.Context, objcli.CompleteMultipartUploadOptions{
 		Bucket:   opts.DestinationBucket,
 		UploadID: id,
 		Key:      opts.DestinationKey,
