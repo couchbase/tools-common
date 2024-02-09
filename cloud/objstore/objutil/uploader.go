@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+  "time"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
