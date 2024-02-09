@@ -180,6 +180,8 @@ func (m *MPUploader) upload(ctx context.Context, number int, metadata any, body 
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
+  time.Sleep(30*time.Second)
+  fmt.Println("Sleeping here")
 	// Parts may be uploaded concurrently, but must be marked as completed one at a time
 	m.lock.Lock()
 	defer m.lock.Unlock()
