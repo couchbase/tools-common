@@ -9,7 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-  "time"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objcli/objaws"
 	"github.com/couchbase/tools-common/cloud/v2/objstore/objval"
@@ -115,7 +114,7 @@ func NewMPUploader(opts MPUploaderOptions) (*MPUploader, error) {
 	}
 
 	// Only create the pool after successfully creating the multipart upload to avoid having to handle cleanup
-	uploader.pool = hofp.NewPool(hofp.Options{LogPrefix: "(objutil)"})
+	uploader.pool = hofp.NewPool(hofp.Options{LogPrefix: "(objutil)", Size: 1})
 
 	return uploader, nil
 }
@@ -182,8 +181,6 @@ func (m *MPUploader) upload(ctx context.Context, number int, metadata any, body 
 		return fmt.Errorf("failed to upload part: %w", err)
 	}
 
-  time.Sleep(30*time.Second)
-  fmt.Println("Sleeping here")
 	// Parts may be uploaded concurrently, but must be marked as completed one at a time
 	m.lock.Lock()
 	defer m.lock.Unlock()
