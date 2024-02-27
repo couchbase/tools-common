@@ -45,6 +45,7 @@ sure that the commit title has the following format `MB-XXXXX Commit title` wher
 Before contributing any patches, the Git hooks should be configured to ensure code is correctly linted and formatted.
 
 The Git hooks require the following dependencies:
+
 - gofmt (Standard code formatting tool)
 - gofumpt (A more opinionated code formatting tool)
 - goimports (Automatic insertion/sorting of imported modules)
@@ -89,6 +90,13 @@ enforced by the linters, so here we will only cover ones that are not.
 
 In this section we will cover the versioning of `tools-common` sub-modules.
 
+### Permissions
+
+To be able to create/push tags for `tools-common`, you will need to be in the
+`tools-common-taggers`
+[group](https://review.couchbase.org/admin/groups/5ee5520dd89ee08a1f1d0fefae2de54fe9076291,members)
+on Gerrit; contact the build team to be added.
+
 ### Creating Tags
 
 The sub-modules in `tools-common` are versioned independently following the [semantic versioning](https://semver.org)
@@ -108,6 +116,40 @@ git push gerrit fs/v1.0.0 --no-verify
 
 The `./scripts/versioning/tag.py` script will perform some sanity checks on the provided version.
 
+#### Tag Annotations
+
+The annotation for a tag, is expected to be in the following format.
+
+```sh
+Release v${VERSION}
+
+${CHANGELOG}
+```
+
+Where `VERSION` is the version being tagged, and `CHANGELOG` is the copy+pasted changelog found in the modules
+`CHANGES.md` file.
+
+#### Major Versions
+
+When tagging, the `tag.py` script will sanity check that the major version of the target module looks correct; if you
+see an error, check the module version in `go.mod` matches with the target version.
+
+```sh
+$ ./scripts/versioning/tag.py cloud patch
+Error: Version in 'go.mod' does no match the target tag version, check versions are correct
+
+$ ./scripts/versioning/tag.py cloud minor
+Error: Version in 'go.mod' does no match the target tag version, check versions are correct
+
+$ ./scripts/versioning/tag.py cloud major
+git tag -a cloud/v4.0.0
+git push gerrit cloud/v4.0.0 --no-verify
+```
+
+In this example, the major version in `go.mod` is v4, so it's not possible to create a new patch or minor release only a
+major release; subsequent calls to `tag.py` - after the major version has been tagged - will allow patch and minor
+releases.
+
 ### Dependency Order
 
 The order in which dependencies are bumped is important to ensure all sub-modules receive the relevant bug fixes. The
@@ -117,6 +159,23 @@ order can be determine by using `./scripts/versioning/bump_order.py <module>`.
 $ ./scripts/versioning/bump_order.py sync
 sync, types, databases, http, environment, couchbase, cloud
 ```
+
+When bumping all the modules (e.g. for dependency updates) they must be bumped in the following order.
+
+```python
+[core, auth, cbbs, errors, fs, functional, strings, testing, utils, sync, databases, types, http, environment, cloud, couchbase]
+```
+
+This is the topologically sorted order of the modules, where later modules depend on those earlier in the list; an
+updated version of this order can be obtained by printing
+[this](https://github.com/couchbase/tools-common/blob/528d651071ae39ed2ac057246786bd02a1b4638e/scripts/versioning/bump_order.py#L110-L111)
+value.
+
+#### Dependency Cycles
+
+It's not possible to support dependency cycles in `tools-common`, this would occur if modules depended on each other;
+the Git hooks run `./scripts/versioning/bump_order.py` for all the available modules and will not allow you to push if a
+dependency cycle has been introduced.
 
 ### Documenting
 
@@ -136,7 +195,7 @@ generally adhere to them.
 - [`couchbase-cli`](https://github.com/couchbase/couchbase-cli)
 
 # License
-Copyright 2021 Couchbase Inc.
+Copyright 2021-2024 Couchbase Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

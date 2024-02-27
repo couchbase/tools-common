@@ -48,6 +48,15 @@ elif mode == "minor":
 elif mode == "patch":
     version = version.bump_patch()
 
+# See if the major version is sane, a non-zero exit status means that's not the case
+proc = subprocess.run(f"head -1 {module}/go.mod | grep -q /v'{str(version).split('.', 1)[0]}'",
+                       stderr=subprocess.STDOUT,
+                       shell=True)
+
+# Complain if the major version doesn't seem to match
+if version.major > 1 and proc.returncode != 0:
+    sys.exit(f"Error: Version in 'go.mod' does no match the target tag version, check versions are correct")
+
 full_version = f"{module}/v{version}"
 
 # Provide the commands to the user as it's less destructive
