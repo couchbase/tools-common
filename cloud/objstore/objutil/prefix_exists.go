@@ -52,9 +52,9 @@ func PrefixExists(opts PrefixExistsOptions) (bool, error) {
 		Func:      func(attrs *objval.ObjectAttrs) error { return sentinal },
 	})
 
-	if err != nil && err != sentinal {
+	if err != nil && !errors.Is(err, sentinal) {
 		return false, fmt.Errorf("failed to iterate objects: %w", err)
 	}
 
-	return err == sentinal, nil
+	return errors.Is(err, sentinal), nil
 }

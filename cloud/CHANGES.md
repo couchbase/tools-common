@@ -1,5 +1,9 @@
 # Changes
 
+## v4.0.1
+
+- Fix a bug in `objcli.PrefixExists` which made it always exit with an error
+
 ## v4.0.0
 
 - BREAKING: Migrated to `aws-sdk-go-v2`

@@ -2,14 +2,18 @@ package objutil
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
+	"github.com/couchbase/tools-common/testing/mock/matchers"
+	"github.com/couchbase/tools-common/types/ptr"
 )
 
 func TestPrefixExistsOptionsDefaults(t *testing.T) {
@@ -58,4 +62,29 @@ func TestPrefixExists(t *testing.T) {
 	exists, err = PrefixExists(opts)
 	require.NoError(t, err)
 	require.False(t, exists)
+}
+
+func TestPrefixExistsSentinel(t *testing.T) {
+	cli := objcli.MockClient{}
+	cli.
+		On("IterateObjects", matchers.Context, mock.Anything).
+		Return(func(_ context.Context, opts objcli.IterateObjectsOptions) error {
+			err := opts.Func(&objval.ObjectAttrs{
+				Key:  "foo",
+				Size: ptr.To[int64](147),
+			})
+			if err != nil {
+				return fmt.Errorf("failed processing page: %w", err)
+			}
+
+			return nil
+		})
+
+	exists, err := PrefixExists(PrefixExistsOptions{
+		Client: &cli,
+		Bucket: "bucket",
+		Prefix: "prefix",
+	})
+	require.NoError(t, err)
+	require.True(t, exists)
 }
