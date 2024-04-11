@@ -709,6 +709,98 @@ func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
 	api.AssertNumberOfCalls(t, "ListObjectsV2", 1)
 }
 
+func TestClientDeleteDirectoryVersions(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.ListObjectVersionsInput) bool {
+		bucket := input.Bucket != nil && *input.Bucket == "bucket"
+
+		return bucket
+	}
+
+	contents1 := []types.ObjectVersion{
+		{
+			Key:          ptr.To("/path/to/key1"),
+			VersionId:    ptr.To("0"),
+			Size:         ptr.To[int64](64),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
+		{
+			Key:          ptr.To("/path/to/key1"),
+			VersionId:    ptr.To("1"),
+			Size:         ptr.To[int64](64),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
+		{
+			Key:          ptr.To("/path/to/key2"),
+			Size:         ptr.To[int64](128),
+			LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+		},
+	}
+
+	api.On("ListObjectVersions", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.ListObjectVersionsOutput{Versions: contents1}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	callback := func(_ context.Context, bucket string, objects ...types.ObjectIdentifier) error {
+		require.Equal(t, "bucket", bucket)
+
+		expected := []types.ObjectIdentifier{
+			{Key: ptr.To("/path/to/key1"), VersionId: ptr.To("0")},
+			{Key: ptr.To("/path/to/key1"), VersionId: ptr.To("1")},
+			{Key: ptr.To("/path/to/key2")},
+		}
+		require.Equal(t, expected, objects)
+
+		return nil
+	}
+
+	err := client.deleteDirectoryVersions(context.Background(), "bucket", "", callback)
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectVersions", 1)
+}
+
+func TestClientEmptyBucketWithCallbackError(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.ListObjectVersionsInput) bool {
+		bucket := input.Bucket != nil && *input.Bucket == "bucket"
+
+		return bucket
+	}
+
+	contents1 := []types.ObjectVersion{
+		{
+			Key:          ptr.To("/path/to/key1"),
+			Size:         ptr.To[int64](64),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
+		{
+			Key:          ptr.To("/path/to/key2"),
+			Size:         ptr.To[int64](128),
+			LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+		},
+	}
+
+	api.On("ListObjectVersions", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.ListObjectVersionsOutput{Versions: contents1}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	callback := func(_ context.Context, _ string, _ ...types.ObjectIdentifier) error {
+		return assert.AnError
+	}
+
+	err := client.deleteDirectoryVersions(context.Background(), "bucket", "", callback)
+	require.ErrorIs(t, err, assert.AnError)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectVersions", 1)
+}
+
 func TestClientIterateObjects(t *testing.T) {
 	api := &mockServiceAPI{}
 

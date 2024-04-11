@@ -1,5 +1,10 @@
 # Changes
 
+## v5.0.2
+
+- Added a `DeleteVersions` parameter to the `DeleteDirectory` method which 
+  deletes all object versions if enabled.
+
 ## V5.0.1
 - Upgraded package version because it was not updated as it should have been with the breaking V5.0.0 changes.
 

@@ -30,6 +30,8 @@ type Client struct {
 	logger     *slog.Logger
 }
 
+type gcpDeleteObjectIdentifierOptions objcli.DeleteObjectIdentifierOptions[*int64]
+
 var _ objcli.Client = (*Client)(nil)
 
 // ClientOptions encapsulates the options for creating a new GCP Client.
@@ -212,31 +214,49 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 }
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
+	objectVersionsOpt := gcpDeleteObjectIdentifierOptions{
+		Bucket:  opts.Bucket,
+		Objects: make([]objcli.ObjectIdentifier[*int64], len(opts.Keys)),
+	}
+
+	for i := range opts.Keys {
+		objectVersionsOpt.Objects[i] = objcli.ObjectIdentifier[*int64]{
+			Key: opts.Keys[i],
+		}
+	}
+
+	return c.deleteObjects(ctx, objectVersionsOpt)
+}
+
+func (c *Client) deleteObjects(ctx context.Context, opts gcpDeleteObjectIdentifierOptions) error {
 	pool := hofp.NewPool(hofp.Options{
 		Context: ctx,
-		Size:    system.NumWorkers(len(opts.Keys)),
+		Size:    system.NumWorkers(len(opts.Objects)),
 	})
 
-	del := func(ctx context.Context, key string) error {
-		var (
-			// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
-			// prefix in GCP, always retry.
-			handle = c.serviceAPI.Bucket(opts.Bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
-			err    = handle.Delete(ctx)
-		)
+	del := func(ctx context.Context, obj objcli.ObjectIdentifier[*int64]) error {
+		// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
+		// prefix in GCP, always retry.
+		handle := c.serviceAPI.Bucket(opts.Bucket).Object(obj.Key).Retryer(storage.WithPolicy(storage.RetryAlways))
+
+		if obj.Version != nil {
+			handle = handle.Generation(*obj.Version)
+		}
+
+		err := handle.Delete(ctx)
 
 		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
-			return handleError(opts.Bucket, key, err)
+			return handleError(opts.Bucket, obj.Key, err)
 		}
 
 		return nil
 	}
 
-	queue := func(key string) error {
-		return pool.Queue(func(ctx context.Context) error { return del(ctx, key) })
+	queue := func(object objcli.ObjectIdentifier[*int64]) error {
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, object) })
 	}
 
-	for _, key := range opts.Keys {
+	for _, key := range opts.Objects {
 		if queue(key) != nil {
 			break
 		}
@@ -247,18 +267,34 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 
 func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
 	fn := func(attrs *objval.ObjectAttrs) error {
-		dopts := objcli.DeleteObjectsOptions{
+		dopts := gcpDeleteObjectIdentifierOptions{
 			Bucket: opts.Bucket,
-			Keys:   []string{attrs.Key},
+			Objects: []objcli.ObjectIdentifier[*int64]{
+				{
+					Key: attrs.Key,
+				},
+			},
 		}
 
-		return c.DeleteObjects(ctx, dopts)
+		if !opts.DeleteVersions {
+			return c.deleteObjects(ctx, dopts)
+		}
+
+		version, ok := attrs.Version.(*int64)
+		if !ok {
+			return objcli.ErrVersionUnexpectedType{TypeName: "int64"}
+		}
+
+		dopts.Objects[0].Version = version
+
+		return c.deleteObjects(ctx, dopts)
 	}
 
 	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
-		Bucket: opts.Bucket,
-		Prefix: opts.Prefix,
-		Func:   fn,
+		Bucket:   opts.Bucket,
+		Prefix:   opts.Prefix,
+		Versions: opts.DeleteVersions,
+		Func:     fn,
 	})
 
 	return err
@@ -273,6 +309,7 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 		Prefix:     opts.Prefix,
 		Delimiter:  opts.Delimiter,
 		Projection: storage.ProjectionNoACL,
+		Versions:   opts.Versions,
 	}
 
 	err := query.SetAttrSelection([]string{
@@ -306,6 +343,7 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 			key     = remote.Prefix
 			size    *int64
 			updated *time.Time
+			version *int64
 		)
 
 		// If "key" is empty this isn't a directory stub, treat it as a normal object
@@ -313,12 +351,17 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 			key = remote.Name
 			size = ptr.To(remote.Size)
 			updated = &remote.Updated
+
+			// We are confident the Generation number will always be returned with the response because it is created
+			// for every object even if versioning is not enabled.
+			version = &remote.Generation
 		}
 
 		attrs := &objval.ObjectAttrs{
 			Key:          key,
 			Size:         size,
 			LastModified: updated,
+			Version:      version,
 		}
 
 		// If the caller has returned an error, stop iteration, and return control to them

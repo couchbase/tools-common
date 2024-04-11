@@ -307,7 +307,13 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 	return pool.Stop()
 }
 
+// DeleteDirectory deletes all objects in a specific directory of a bucket. This does not delete old versions of objects
+// if any.
 func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
+	if opts.DeleteVersions {
+		return c.deleteDirectoryVersions(ctx, opts.Bucket, opts.Prefix, c.deleteObjectVersions)
+	}
+
 	return c.deleteDirectory(ctx, opts.Bucket, opts.Prefix, c.deleteObjects)
 }
 
@@ -347,6 +353,47 @@ func (c *Client) deleteDirectory(
 	return err
 }
 
+// deleteDirectoryVersions is a wrapper function which allows unit testing the 'DeleteDirectory' function with a mocked
+// deletion callback; this is required because the callback uses 'serviceAPI' which when mocked acquires a lock,
+// causing a deadlock.
+func (c *Client) deleteDirectoryVersions(
+	ctx context.Context,
+	bucket, prefix string,
+	deleteObjectFn func(ctx context.Context, bucket string, objects ...types.ObjectIdentifier) error,
+) error {
+	callback := func(page *s3.ListObjectVersionsOutput) error {
+		objects := make([]types.ObjectIdentifier, 0, len(page.Versions)+len(page.DeleteMarkers))
+
+		for _, object := range page.Versions {
+			objects = append(objects, types.ObjectIdentifier{
+				Key:       object.Key,
+				VersionId: object.VersionId,
+			})
+		}
+
+		for _, object := range page.DeleteMarkers {
+			objects = append(objects, types.ObjectIdentifier{
+				Key:       object.Key,
+				VersionId: object.VersionId,
+			})
+		}
+
+		return deleteObjectFn(ctx, bucket, objects...)
+	}
+
+	input := &s3.ListObjectVersionsInput{
+		Bucket: ptr.To(bucket),
+		Prefix: ptr.To(prefix),
+	}
+
+	err := c.listObjectVersions(ctx, input, callback)
+	if err != nil {
+		return handleError(input.Bucket, nil, err)
+	}
+
+	return err
+}
+
 // deleteObjects performs a batched delete operation for a single page (<=1000) of keys.
 func (c *Client) deleteObjects(ctx context.Context, bucket string, keys ...string) error {
 	// We use ListObjectsV2PagesWithContext to delete a directory. This takes deleteObjects
@@ -357,13 +404,27 @@ func (c *Client) deleteObjects(ctx context.Context, bucket string, keys ...strin
 		return nil
 	}
 
-	input := &s3.DeleteObjectsInput{
-		Bucket: ptr.To(bucket),
-		Delete: &types.Delete{Quiet: ptr.To(true)},
-	}
+	objectIdentifiers := make([]types.ObjectIdentifier, 0, len(keys))
 
 	for _, key := range keys {
-		input.Delete.Objects = append(input.Delete.Objects, types.ObjectIdentifier{Key: ptr.To(key)})
+		objectIdentifiers = append(objectIdentifiers, types.ObjectIdentifier{Key: ptr.To(key)})
+	}
+
+	return c.deleteObjectVersions(ctx, bucket, objectIdentifiers...)
+}
+
+// deleteObjectVersions performs a batched delete operation for a single page (<=1000) of object versions.
+func (c *Client) deleteObjectVersions(ctx context.Context, bucket string, objects ...types.ObjectIdentifier) error {
+	if len(objects) == 0 {
+		return nil
+	}
+
+	input := &s3.DeleteObjectsInput{
+		Bucket: ptr.To(bucket),
+		Delete: &types.Delete{
+			Quiet:   ptr.To(true),
+			Objects: objects,
+		},
 	}
 
 	resp, err := c.serviceAPI.DeleteObjects(ctx, input)
@@ -448,6 +509,29 @@ func (c *Client) listObjects(
 	fn func(page *s3.ListObjectsV2Output) error,
 ) error {
 	paginator := s3.NewListObjectsV2Paginator(c.serviceAPI, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		err = fn(page)
+		if err != nil {
+			return fmt.Errorf("failed to process page: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// listObjectVersions uses the SDK paginator to run the given function on pages of object versions.
+func (c *Client) listObjectVersions(
+	ctx context.Context,
+	input *s3.ListObjectVersionsInput,
+	fn func(page *s3.ListObjectVersionsOutput) error,
+) error {
+	paginator := s3.NewListObjectVersionsPaginator(c.serviceAPI, input)
 
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)

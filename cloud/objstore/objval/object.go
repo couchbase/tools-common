@@ -10,6 +10,9 @@ type ObjectAttrs struct {
 	// Key is the identifier for the object; a unique path.
 	Key string
 
+	// Version is the unique version of the object. This is optional.
+	Version any
+
 	// ETag is the HTTP entity tag for the object, each cloud provider uses this differently with different rules also
 	// applying to different scenarios (e.g. multipart uploads).
 	//

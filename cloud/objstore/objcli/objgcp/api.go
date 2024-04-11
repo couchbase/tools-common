@@ -57,6 +57,7 @@ type objectAPI interface {
 	ComposerFrom(srcs ...objectAPI) composeAPI
 	CopierFrom(src objectAPI) copierAPI
 	Retryer(opts ...storage.RetryOption) objectAPI
+	Generation(gen int64) objectAPI
 }
 
 // objectHandle implements the 'objectAPI' interface and encapsulates the Google Storage SDK into a unit testable
@@ -119,6 +120,10 @@ func (o objectHandle) CopierFrom(src objectAPI) copierAPI {
 
 func (o objectHandle) Retryer(opts ...storage.RetryOption) objectAPI {
 	return objectHandle{h: o.h.Retryer(opts...)}
+}
+
+func (o objectHandle) Generation(gen int64) objectAPI {
+	return objectHandle{h: o.h.Generation(gen)}
 }
 
 // readerAPI is a range aware reader API which is used to stream object data from Google Storage.

@@ -31,12 +31,19 @@ func (c *serviceClient) NewContainerClient(containerName string) containerAPI {
 type containerAPI interface {
 	NewBlobClient(blobName string) blobAPI
 	NewBlockBlobClient(blobName string) blockBlobAPI
+	NewBlockBlobVersionClient(blobName, versionID string) (blockBlobAPI, error)
 	NewListBlobsFlatPager(o *container.ListBlobsFlatOptions) flatBlobsPager
 	NewListBlobsHierarchyPager(delimiter string, o *container.ListBlobsHierarchyOptions) hierarchyBlobsPager
 }
 
 type containerClient struct {
 	client *container.Client
+}
+
+// NewBlockBlobVersionClient creates a blob block client. It creates a version specific client if the versionID is
+// provided, if not it creates a normal client.
+func (c containerClient) NewBlockBlobVersionClient(blobName, versionID string) (blockBlobAPI, error) {
+	return c.client.NewBlockBlobClient(blobName).WithVersionID(versionID)
 }
 
 func (c containerClient) NewBlockBlobClient(blobName string) blockBlobAPI {

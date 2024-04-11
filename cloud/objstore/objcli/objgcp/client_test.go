@@ -538,6 +538,86 @@ func TestClientDeleteDirectory(t *testing.T) {
 	moAPI.AssertNumberOfCalls(t, "Delete", 2)
 }
 
+func TestClientDeleteDirectoryVersions(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.Anything).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("Generation", mock.Anything).Return(moAPI)
+
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:       "/path/to/key1",
+		Size:       64,
+		Updated:    (time.Time{}).Add(24 * time.Hour),
+		Generation: 1,
+	}, nil)
+
+	call.Repeatability = 1
+
+	call = miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:       "/path/to/key2",
+		Size:       128,
+		Updated:    (time.Time{}).Add(48 * time.Hour),
+		Generation: 1,
+	}, nil)
+
+	call.Repeatability = 1
+
+	call = miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:       "/path/to/key2",
+		Size:       128,
+		Updated:    (time.Time{}).Add(48 * time.Hour),
+		Generation: 2,
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	moAPI.On("Delete", mock.Anything).Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.DeleteDirectory(context.Background(), objcli.DeleteDirectoryOptions{
+		Bucket:         "bucket",
+		Prefix:         "prefix",
+		DeleteVersions: true,
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 4)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 3)
+	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
+
+	miAPI.AssertExpectations(t)
+	miAPI.AssertNumberOfCalls(t, "Next", 4)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 3)
+	moAPI.AssertNumberOfCalls(t, "Generation", 3)
+	moAPI.AssertNumberOfCalls(t, "Delete", 3)
+}
+
 func TestClientIterateObjects(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}
@@ -705,16 +785,19 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
 					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -726,6 +809,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -737,11 +821,13 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
 					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -753,11 +839,13 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
 					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -769,6 +857,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -780,6 +869,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -791,6 +881,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
+					Version:      ptr.To[int64](0),
 				},
 			},
 		},

@@ -106,6 +106,21 @@ func (mr *MockcontainerAPIMockRecorder) NewBlockBlobClient(blobName interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlockBlobClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlockBlobClient), blobName)
 }
 
+// NewBlockBlobVersionClient mocks base method.
+func (m *MockcontainerAPI) NewBlockBlobVersionClient(blobName, versionID string) (blockBlobAPI, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewBlockBlobVersionClient", blobName, versionID)
+	ret0, _ := ret[0].(blockBlobAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewBlockBlobVersionClient indicates an expected call of NewBlockBlobVersionClient.
+func (mr *MockcontainerAPIMockRecorder) NewBlockBlobVersionClient(blobName, versionID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlockBlobVersionClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlockBlobVersionClient), blobName, versionID)
+}
+
 // NewListBlobsFlatPager mocks base method.
 func (m *MockcontainerAPI) NewListBlobsFlatPager(o *container.ListBlobsFlatOptions) flatBlobsPager {
 	m.ctrl.T.Helper()

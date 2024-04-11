@@ -44,6 +44,8 @@ type Client struct {
 
 var _ objcli.Client = (*Client)(nil)
 
+type azureDeleteObjectIdentifierOptions objcli.DeleteObjectIdentifierOptions[string]
+
 // ClientOptions encapsulates the options for creating a new Azure Client.
 type ClientOptions struct {
 	// Client represents a URL to the Azure Blob Storage service allowing you to manipulate blob containers.
@@ -61,6 +63,13 @@ func NewClient(options ClientOptions) *Client {
 func (c *Client) getBlobBlockClient(bucket, key string) blockBlobAPI {
 	container := c.serviceAPI.NewContainerClient(bucket)
 	return container.NewBlockBlobClient(key)
+}
+
+// getBlobBlockClientForObject gets the blobblock version client if the Version field in obj is not empty. If it is
+// empty it returns a normal client.
+func (c *Client) getBlobBlockClientForObject(bucket string, obj objcli.ObjectIdentifier[string]) (blockBlobAPI, error) {
+	container := c.serviceAPI.NewContainerClient(bucket)
+	return container.NewBlockBlobVersionClient(obj.Key, obj.Version)
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -242,21 +251,72 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 
 func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
 	fn := func(attrs *objval.ObjectAttrs) error {
-		dopts := objcli.DeleteObjectsOptions{
+		dopts := azureDeleteObjectIdentifierOptions{
 			Bucket: opts.Bucket,
-			Keys:   []string{attrs.Key},
+			Objects: []objcli.ObjectIdentifier[string]{
+				{
+					Key: attrs.Key,
+				},
+			},
 		}
 
-		return c.DeleteObjects(ctx, dopts)
+		if !opts.DeleteVersions {
+			return c.deleteObjects(ctx, dopts)
+		}
+
+		version, ok := attrs.Version.(*string)
+		if !ok {
+			return objcli.ErrVersionUnexpectedType{TypeName: "string"}
+		}
+
+		if version != nil {
+			dopts.Objects[0].Version = *version
+		}
+
+		return c.deleteObjects(ctx, dopts)
 	}
 
 	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
-		Bucket: opts.Bucket,
-		Prefix: opts.Prefix,
-		Func:   fn,
+		Bucket:   opts.Bucket,
+		Prefix:   opts.Prefix,
+		Versions: opts.DeleteVersions,
+		Func:     fn,
 	})
 
 	return err
+}
+
+func (c *Client) deleteObjects(ctx context.Context, opts azureDeleteObjectIdentifierOptions) error {
+	pool := hofp.NewPool(hofp.Options{
+		Context: ctx,
+		Size:    system.NumWorkers(len(opts.Objects)),
+	})
+
+	del := func(ctx context.Context, obj objcli.ObjectIdentifier[string]) error {
+		blobClient, err := c.getBlobBlockClientForObject(opts.Bucket, obj)
+		if err != nil {
+			return handleError(opts.Bucket, obj.Key, err)
+		}
+
+		_, err = blobClient.Delete(ctx, &blob.DeleteOptions{})
+		if err != nil && !isKeyNotFound(err) {
+			return handleError(opts.Bucket, obj.Key, err)
+		}
+
+		return nil
+	}
+
+	queue := func(obj objcli.ObjectIdentifier[string]) error {
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, obj) })
+	}
+
+	for _, obj := range opts.Objects {
+		if queue(obj) != nil {
+			break
+		}
+	}
+
+	return pool.Stop()
 }
 
 // Close is a no-op for Azure as this won't result in a memory leak.
@@ -273,6 +333,7 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 		containerClient = c.serviceAPI.NewContainerClient(opts.Bucket)
 		bucket          = opts.Bucket
 		prefix          = opts.Prefix
+		includeVersion  = opts.Versions
 		delimiter       = opts.Delimiter
 		include         = opts.Include
 		exclude         = opts.Exclude
@@ -280,22 +341,28 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 	)
 
 	if delimiter == "" {
-		return c.iterateObjectsFlat(ctx, containerClient, bucket, prefix, include, exclude, fn)
+		return c.iterateObjectsFlat(ctx, containerClient, includeVersion, bucket, prefix, include, exclude, fn)
 	}
 
-	return c.iterateObjectsHierarchy(ctx, containerClient, bucket, prefix, delimiter, include, exclude, fn)
+	return c.iterateObjectsHierarchy(ctx, containerClient, includeVersion, bucket, prefix, delimiter, include, exclude, fn)
 }
 
 func (c *Client) iterateObjectsFlat(
 	ctx context.Context,
 	containerClient containerAPI,
+	includeVersion bool,
 	bucket, prefix string,
 	include, exclude []*regexp.Regexp,
 	fn objcli.IterateFunc,
 ) error {
 	var (
-		options = container.ListBlobsFlatOptions{Prefix: &prefix}
-		pager   = containerClient.NewListBlobsFlatPager(&options)
+		options = container.ListBlobsFlatOptions{
+			Prefix: &prefix,
+			Include: container.ListBlobsInclude{
+				Versions: includeVersion,
+			},
+		}
+		pager = containerClient.NewListBlobsFlatPager(&options)
 	)
 
 	for pager.More() {
@@ -319,11 +386,17 @@ func (c *Client) iterateObjectsFlat(
 func (c *Client) iterateObjectsHierarchy(
 	ctx context.Context,
 	containerClient containerAPI,
+	includeVersion bool,
 	bucket, prefix, delimiter string,
 	include, exclude []*regexp.Regexp,
 	fn objcli.IterateFunc,
 ) error {
-	options := container.ListBlobsHierarchyOptions{Prefix: &prefix}
+	options := container.ListBlobsHierarchyOptions{
+		Prefix: &prefix,
+		Include: container.ListBlobsInclude{
+			Versions: includeVersion,
+		},
+	}
 
 	pager := containerClient.NewListBlobsHierarchyPager(delimiter, &options)
 	for pager.More() {
@@ -367,6 +440,7 @@ func (c *Client) convertBlobsToObjectAttrs(
 			Key:          *b.Name,
 			Size:         b.Properties.ContentLength,
 			LastModified: b.Properties.LastModified,
+			Version:      b.VersionID,
 		})
 	}
 
