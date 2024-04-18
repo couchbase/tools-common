@@ -1,5 +1,10 @@
 # Changes
 
+## v1.0.6
+
+- A HTTP 403 error is no longer considered a temporary error in
+`TemporaryFailureStatusCodes` or `IsTemporaryFailure`.
+
 ## v1.0.5
 
 - Upgraded dependencies

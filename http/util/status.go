@@ -9,8 +9,6 @@ var TemporaryFailureStatusCodes = map[int]struct{}{
 	// This error response means that the server, while working as a gateway to get a response needed to handle the
 	// request, got an invalid response.
 	http.StatusBadGateway: {},
-	// The request contained valid data and was understood by the server, but the server is refusing action.
-	http.StatusForbidden: {},
 	// This error response is given when the server is acting as a gateway and cannot get a response in time.
 	http.StatusGatewayTimeout: {},
 	// The server has encountered a situation it doesn't know how to handle.

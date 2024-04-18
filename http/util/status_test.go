@@ -23,7 +23,7 @@ func TestIsTemporaryFailure(t *testing.T) {
 	}
 
 	// Ensure we're adding an expected number of test cases below
-	require.Len(t, TemporaryFailureStatusCodes, 7)
+	require.Len(t, TemporaryFailureStatusCodes, 6)
 
 	for status := range TemporaryFailureStatusCodes {
 		tests = append(tests, &test{
