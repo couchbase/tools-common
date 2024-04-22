@@ -1,5 +1,9 @@
 # Changes
 
+## v4.0.2
+
+- Upgraded dependencies
+
 ## v4.0.1
 
 - Fix a bug in `objcli.PrefixExists` which made it always exit with an error

@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.15.15
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.48.1
 	github.com/aws/smithy-go v1.19.0
-	github.com/couchbase/tools-common/environment v1.0.4
+	github.com/couchbase/tools-common/environment v1.0.5
 	github.com/couchbase/tools-common/errors v1.0.0
 	github.com/couchbase/tools-common/fs v1.0.1
 	github.com/couchbase/tools-common/functional v1.1.1
@@ -48,7 +48,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.2.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.10 // indirect
-	github.com/couchbase/tools-common/http v1.0.5 // indirect
+	github.com/couchbase/tools-common/http v1.0.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
