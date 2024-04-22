@@ -1,5 +1,9 @@
 # Changes
 
+## v3.0.2
+
+- Retry on 403 responses
+
 ## v3.0.1
 
 - Upgraded dependencies

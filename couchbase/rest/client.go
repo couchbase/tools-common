@@ -776,8 +776,10 @@ func (c *Client) shouldRetryWithResponse(ctx *retry.Context, request *Request, r
 
 	var (
 		updateCC = slices.Contains([]int{http.StatusUnauthorized}, resp.StatusCode)
-		retry    = updateCC || netutil.IsTemporaryFailure(resp.StatusCode) ||
-			slices.Contains(request.RetryOnStatusCodes, resp.StatusCode)
+		// As of httpv1.0.6, 403s are no longer considered temporary failures, so we do an additional check for them
+		// here.
+		retry = updateCC || netutil.IsTemporaryFailure(resp.StatusCode) ||
+			resp.StatusCode == http.StatusForbidden || slices.Contains(request.RetryOnStatusCodes, resp.StatusCode)
 	)
 
 	if !retry {
