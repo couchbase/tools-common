@@ -56,6 +56,11 @@ func TestVersionOlder(t *testing.T) {
 			second:   Version("42.1.5"),
 			expected: true,
 		},
+		{
+			name:   "Columnar1.0.0To7.2.0",
+			first:  VersionColumnar1_0_0,
+			second: Version7_2_0,
+		},
 	}
 
 	for _, tc := range tests {
@@ -113,6 +118,12 @@ func TestVersionNewer(t *testing.T) {
 			name:   "10.2.4To42.1.5",
 			first:  Version("10.2.4"),
 			second: Version("42.1.5"),
+		},
+		{
+			name:     "Columnar1.0.0To7.2.0",
+			first:    VersionColumnar1_0_0,
+			second:   Version7_2_0,
+			expected: true,
 		},
 	}
 
@@ -196,6 +207,12 @@ func TestVersionAtLeast(t *testing.T) {
 			name:   "10.2.4To42.1.5",
 			first:  Version("10.2.4"),
 			second: Version("42.1.5"),
+		},
+		{
+			name:     "7.6.0ToColumnar1.0.0",
+			first:    Version7_6_0,
+			second:   VersionColumnar1_0_0,
+			expected: true,
 		},
 	}
 
