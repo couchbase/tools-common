@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"io"
 	"log/slog"
 	"math"
@@ -128,15 +129,15 @@ func TestCompressUploadOptionsDefaults(t *testing.T) {
 }
 
 func TestCompressUploadOptionsMissing(t *testing.T) {
-	require.Error(t, CompressObjects(CompressObjectsOptions{}))
+	_, err := CompressObjects(CompressObjectsOptions{})
+	require.Error(t, err)
 }
 
 // TestCompressUploadIterateError tests to see that CompressObjects doesn't hang
 // when iterate returns an error (MB-55967)
 func TestCompressUploadIterateError(t *testing.T) {
 	cli := objcli.NewTestClient(t, objval.ProviderAWS)
-
-	require.Error(t, CompressObjects(CompressObjectsOptions{
+	_, err := CompressObjects(CompressObjectsOptions{
 		Client:            cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
@@ -145,19 +146,24 @@ func TestCompressUploadIterateError(t *testing.T) {
 		// Include and Exclude both being non-nil means iterate will return an error
 		Include: []*regexp.Regexp{{}},
 		Exclude: []*regexp.Regexp{{}},
-	}))
+	})
+
+	require.Error(t, err)
 }
 
 func TestCompressUpload(t *testing.T) {
 	cli := setupTestClient(t)
-	require.NoError(t, CompressObjects(CompressObjectsOptions{
+	_, err := CompressObjects(CompressObjectsOptions{
 		Options:           Options{PartSize: partSize},
 		Client:            cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",
 		Destination:       "export.zip",
-	}))
+		Checksum:          sha256.New(),
+	})
+
+	require.NoError(t, err)
 
 	require.Contains(t, cli.Buckets["bucket"], "export.zip")
 
@@ -190,7 +196,7 @@ func TestCompressUploadProgressReporting(t *testing.T) {
 		fn      = func(progress float64) { reports = append(reports, progress) }
 	)
 
-	require.NoError(t, CompressObjects(CompressObjectsOptions{
+	_, err := CompressObjects(CompressObjectsOptions{
 		Options:                Options{PartSize: partSize},
 		Client:                 cli,
 		SourceBucket:           "bucket",
@@ -198,7 +204,10 @@ func TestCompressUploadProgressReporting(t *testing.T) {
 		DestinationBucket:      "bucket",
 		Destination:            "export.zip",
 		ProgressReportCallback: fn,
-	}))
+		Checksum:               sha256.New(),
+	})
+
+	require.NoError(t, err)
 
 	var total float64
 	for _, path := range paths {
@@ -283,15 +292,41 @@ func TestCompressUploadUploadError(t *testing.T) {
 		On("AbortMultipartUpload", matchers.Context, mock.Anything).
 		Return(nil)
 
-	err := CompressObjects(CompressObjectsOptions{
+	_, err := CompressObjects(CompressObjectsOptions{
 		Options:           Options{PartSize: 1024},
 		Client:            &cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",
 		Destination:       "export.zip",
+		Checksum:          sha256.New(),
 	})
 	require.ErrorIs(t, err, ErrMPUploaderExceededMaxPartCount)
 
 	cli.AssertExpectations(t)
+}
+
+func TestUploadFromReader(t *testing.T) {
+	client := setupTestClient(t)
+	options := CompressObjectsOptions{
+		Options:           Options{PartSize: partSize},
+		Client:            client,
+		Prefix:            "avocados.png",
+		SourceBucket:      "bucket-source",
+		DestinationBucket: "bucket-destination",
+		Destination:       "avocados.zip",
+		Checksum:          sha256.New(),
+	}
+
+	checksum, err := CompressObjects(options)
+	require.NoError(t, err)
+
+	data := client.Buckets["bucket-destination"]["avocados.zip"].Body
+	require.NotNil(t, data)
+
+	hasher := sha256.New()
+	_, err = hasher.Write(data)
+	require.NoError(t, err)
+
+	require.Equal(t, checksum, hasher.Sum(nil), "checksums mismatch")
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"log/slog"
 	"math"
@@ -85,6 +86,9 @@ type CompressObjectsOptions struct {
 
 	// Logger is the log.Logger we should use for reporting information.
 	Logger *slog.Logger
+
+	// Checksum is a variable of type hash.Hash used to compute checksums for data validation.
+	Checksum hash.Hash
 }
 
 // defaults fills any missing attributes to a sane default.
@@ -223,8 +227,15 @@ func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Wr
 // NOTE: It does this by keeping opts.PartUploadWorkers internal buffers, reading into those and uploading them as parts
 // of the final object. Having multiple buffers means we do not need to wait for a part to be uploaded to start reading
 // from reader again.
-func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader io.ReadCloser) error {
+func uploadFromReader(
+	ctx context.Context,
+	opts CompressObjectsOptions,
+	reader io.ReadCloser,
+) ([]byte, error) {
 	defer reader.Close()
+
+	// opts.Checksum contains the hashing algorithm of choice to check file integrity.
+	checksumAlgorithm := opts.Checksum
 
 	fl := freelist.NewFreeListWithFactory(opts.PartUploadWorkers, func() []byte { return make([]byte, opts.PartSize) })
 
@@ -257,7 +268,7 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 		Options:        Options{Context: ctx, PartSize: opts.PartSize},
 	})
 	if err != nil {
-		return fmt.Errorf("could not create uploader: %w", err)
+		return nil, fmt.Errorf("could not create uploader: %w", err)
 	}
 	defer mp.Abort() //nolint:errcheck,wsl
 
@@ -265,18 +276,23 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 	for {
 		slice, err := fl.Get(ctx)
 		if err != nil {
-			return fmt.Errorf("could not get buffer from freelist: %w", err)
+			return nil, fmt.Errorf("could not get buffer from freelist: %w", err)
 		}
 
 		pos, readErr := io.ReadFull(reader, slice)
 		if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
-			return fmt.Errorf("could not read: %w", readErr)
+			return nil, fmt.Errorf("could not read: %w", readErr)
+		}
+
+		_, err = checksumAlgorithm.Write(slice[:pos])
+		if err != nil {
+			return nil, fmt.Errorf("could not write the part into the hashing algorithm: %w", err)
 		}
 
 		buf := bytes.NewReader(slice[:pos])
 
 		if err = mp.UploadWithMeta(&payload{buf: slice, size: pos}, buf); err != nil {
-			return fmt.Errorf("could not upload part: %w", err)
+			return nil, fmt.Errorf("could not upload part: %w", err)
 		}
 
 		// If readErr != nil and we didn't return early it means we hit an EOF
@@ -286,10 +302,11 @@ func uploadFromReader(ctx context.Context, opts CompressObjectsOptions, reader i
 	}
 
 	if err = mp.Commit(); err != nil {
-		return fmt.Errorf("could not commit upload: %w", err)
+		return nil, fmt.Errorf("could not commit upload: %w", err)
 	}
 
-	return nil
+	// Calculate and return the checksum for the entire ZIP file.
+	return checksumAlgorithm.Sum(nil), nil
 }
 
 // calculateSize calculates the total size of all objects with the given prefix.
@@ -314,10 +331,10 @@ func calculateSize(opts CompressObjectsOptions) (int64, error) {
 // CompressObjects takes an object storage prefix and a destination. It will create a zip in destination and compress
 // and upload every object with the given prefix there. Each object will be streamed from cloud storage, through a
 // ZipWriter and back to cloud storage.
-func CompressObjects(opts CompressObjectsOptions) error {
+func CompressObjects(opts CompressObjectsOptions) ([]byte, error) {
 	if opts.Client == nil || opts.SourceBucket == "" || opts.Prefix == "" || opts.DestinationBucket == "" ||
-		opts.Destination == "" {
-		return fmt.Errorf("missing required parameters")
+		opts.Destination == "" || opts.Checksum == nil {
+		return nil, fmt.Errorf("missing required parameters")
 	}
 
 	opts.defaults()
@@ -329,7 +346,7 @@ func CompressObjects(opts CompressObjectsOptions) error {
 
 		totalSize, err = calculateSize(opts)
 		if err != nil {
-			return fmt.Errorf("could not calculate size of objects with path prefix: %w", err)
+			return nil, fmt.Errorf("could not calculate size of objects with path prefix: %w", err)
 		}
 	}
 
@@ -371,7 +388,18 @@ func CompressObjects(opts CompressObjectsOptions) error {
 		return nil
 	})
 
-	pool.Queue(func(ctx context.Context) error { return uploadFromReader(ctx, opts, r) }) //nolint:errcheck
+	var checksum []byte
+	pool.Queue(func(ctx context.Context) error {
+		var err error
+		checksum, err = uploadFromReader(ctx, opts, r)
 
-	return pool.Stop()
+		return err
+	}) //nolint:errcheck
+
+	err := pool.Stop()
+	if err != nil {
+		return nil, fmt.Errorf("could not stop the worker pool gracefully: %w", err)
+	}
+
+	return checksum, nil
 }
