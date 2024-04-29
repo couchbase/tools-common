@@ -78,6 +78,7 @@ func TestDequeIter(t *testing.T) {
 
 	d.Iter(func(v int) {
 		require.Equal(t, i, v)
+
 		i++
 	})
 }

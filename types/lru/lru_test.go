@@ -90,7 +90,9 @@ func TestCacheForEach(t *testing.T) {
 	err := cache.ForEach(func(key, value string) error {
 		require.Equal(t, fmt.Sprintf("key%d", i), key)
 		require.Equal(t, fmt.Sprintf("value%d", i), value)
+
 		i--
+
 		return nil
 	})
 	require.NoError(t, err)
@@ -105,7 +107,7 @@ func TestCacheForEachPropagateUserError(t *testing.T) {
 
 	var called int
 
-	err := cache.ForEach(func(key, value string) error { called++; return assert.AnError })
+	err := cache.ForEach(func(_, _ string) error { called++; return assert.AnError })
 	require.ErrorIs(t, err, assert.AnError)
 	require.Equal(t, 1, called)
 }

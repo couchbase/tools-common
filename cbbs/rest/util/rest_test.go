@@ -133,6 +133,7 @@ func TestHandleErrorWithExtras(t *testing.T) {
 			require.NotEqual(t, 0, res.ContentLength)
 
 			var outRes ErrorResponse
+
 			require.NoError(t, json.NewDecoder(res.Body).Decode(&outRes))
 			require.Equal(t, tc.errRes, outRes)
 		})
@@ -211,6 +212,7 @@ func TestMarshalAndSendResponse(t *testing.T) {
 			}
 
 			var errResponse ErrorResponse
+
 			require.NoError(t, json.Unmarshal(body, &errResponse))
 			require.Equal(t, tc.statusCode, errResponse.Status)
 			require.NotZero(t, errResponse.Msg)
@@ -221,11 +223,14 @@ func TestMarshalAndSendResponse(t *testing.T) {
 func TestDecodeJSONRequestBody(t *testing.T) {
 	t.Run("invalidJSON", func(t *testing.T) {
 		responseRecoder := httptest.NewRecorder()
+
 		var dest map[string]int
+
 		require.False(t, DecodeJSONRequestBody(io.NopCloser(bytes.NewReader([]byte(`{"x":1`))), &dest, responseRecoder))
 		require.Equal(t, http.StatusBadRequest, responseRecoder.Code)
 
 		var errResponse ErrorResponse
+
 		require.NoError(t, json.NewDecoder(responseRecoder.Body).Decode(&errResponse))
 		require.Equal(t, "invalid request body", errResponse.Msg)
 		require.Equal(t, http.StatusBadRequest, errResponse.Status)
@@ -233,6 +238,7 @@ func TestDecodeJSONRequestBody(t *testing.T) {
 
 	t.Run("validJSON", func(t *testing.T) {
 		var dest map[string]int
+
 		require.True(t, DecodeJSONRequestBody(io.NopCloser(bytes.NewReader([]byte(`{"x":1}`))), &dest,
 			httptest.NewRecorder()))
 		require.Equal(t, map[string]int{"x": 1}, dest)

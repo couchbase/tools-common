@@ -675,7 +675,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 		Bucket:    "bucket",
 		Prefix:    "prefix",
 		Delimiter: "delimiter",
-		Func:      func(attrs *objval.ObjectAttrs) error { return assert.AnError },
+		Func:      func(_ *objval.ObjectAttrs) error { return assert.AnError },
 	})
 
 	require.ErrorIs(t, err, assert.AnError)

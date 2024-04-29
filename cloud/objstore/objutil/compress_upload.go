@@ -247,7 +247,7 @@ func uploadFromReader(
 	}
 
 	// onComplete returns the slice to the freelist and calls the user's callback.
-	onComplete := func(metadata any, part objval.Part) error {
+	onComplete := func(metadata any, _ objval.Part) error {
 		payload, _ := metadata.(*payload)
 		if err := fl.Put(ctx, payload.buf); err != nil {
 			return fmt.Errorf("could not return buffer to freelist: %w", err)
@@ -270,7 +270,8 @@ func uploadFromReader(
 	if err != nil {
 		return nil, fmt.Errorf("could not create uploader: %w", err)
 	}
-	defer mp.Abort() //nolint:errcheck,wsl
+
+	defer mp.Abort() //nolint:errcheck
 
 	// Repeatedly fill up parts (slices from the freelist) and upload them until we reach the end of reader
 	for {
@@ -389,12 +390,13 @@ func CompressObjects(opts CompressObjectsOptions) ([]byte, error) {
 	})
 
 	var checksum []byte
-	pool.Queue(func(ctx context.Context) error {
+
+	pool.Queue(func(ctx context.Context) error { //nolint:errcheck
 		var err error
 		checksum, err = uploadFromReader(ctx, opts, r)
 
 		return err
-	}) //nolint:errcheck
+	})
 
 	err := pool.Stop()
 	if err != nil {

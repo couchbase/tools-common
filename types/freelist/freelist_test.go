@@ -123,7 +123,7 @@ func BenchmarkFreeList(b *testing.B) {
 func runBenchmark(fl FreeList[*int], workers int) {
 	pool := hofp.NewPool(hofp.Options{Size: workers})
 
-	fn := func(ctx context.Context) error {
+	fn := func(_ context.Context) error {
 		for i := 0; i < 1000; i++ {
 			v, _ := fl.Get(context.Background())
 			*v = i

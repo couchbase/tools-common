@@ -47,6 +47,7 @@ func TestSetIfNil(t *testing.T) {
 			if test.ptrToPtr == nil {
 				SetIfNil(test.ptrToPtr, test.otherPtr)
 				require.Nil(t, test.ptrToPtr)
+
 				return
 			}
 

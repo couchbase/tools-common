@@ -35,7 +35,7 @@ func (e TestHandlers) Handle(writer http.ResponseWriter, request *http.Request) 
 
 // NewTestHandler creates the most basic type of handler which will respond with the provided status/body.
 func NewTestHandler(t *testing.T, status int, body []byte) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(status)
 
 		_, err := writer.Write(body)
@@ -46,7 +46,7 @@ func NewTestHandler(t *testing.T, status int, body []byte) http.HandlerFunc {
 // NewTestHandlerWithStream creates a handler which will respond with a streaming response writing the provided body a
 // given number of times.
 func NewTestHandlerWithStream(t *testing.T, responses int, body []byte) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Transfer-Encoding", "chunked")
 		writer.WriteHeader(http.StatusOK)
 
@@ -66,7 +66,7 @@ func NewTestHandlerWithStream(t *testing.T, responses int, body []byte) http.Han
 // NewTestHandlerWithStreamHijack creates a handler which will respond with a streaming response which will be
 // immediately closed.
 func NewTestHandlerWithStreamHijack(t *testing.T) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Transfer-Encoding", "chunked")
 		writer.WriteHeader(http.StatusOK)
 
@@ -86,7 +86,7 @@ func NewTestHandlerWithRetries(t *testing.T, numRetries, retryStatus, successSta
 ) http.HandlerFunc {
 	var retries int
 
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		defer func() { retries++ }()
 
 		status := retryStatus
@@ -104,7 +104,7 @@ func NewTestHandlerWithRetries(t *testing.T, numRetries, retryStatus, successSta
 
 // NewTestHandlerWithEOF creates a handler which will cause an EOF error when attempting to read the body.
 func NewTestHandlerWithEOF(t *testing.T) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Length", "1")
 
 		writer.WriteHeader(http.StatusOK)
@@ -117,7 +117,7 @@ func NewTestHandlerWithEOF(t *testing.T) http.HandlerFunc {
 // NewTestHandlerWithHijack creates a handler which will hijack the connection an immediately close it; this is
 // simulating a socket closed in flight error.
 func NewTestHandlerWithHijack(t *testing.T) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		hijacker, ok := writer.(http.Hijacker)
 		require.True(t, ok)
 

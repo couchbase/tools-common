@@ -13,7 +13,7 @@ func TestPoll(t *testing.T) {
 		pollTimeout: time.Minute,
 	}
 
-	timeout, err := client.Poll(func(attempt int) (bool, error) { return true, nil })
+	timeout, err := client.Poll(func(_ int) (bool, error) { return true, nil })
 	require.NoError(t, err)
 	require.False(t, timeout)
 }
@@ -24,7 +24,7 @@ func TestPollWithContext(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFunc()
 
-	timeout, err := client.PollWithContext(ctx, func(attempt int) (bool, error) { return true, nil })
+	timeout, err := client.PollWithContext(ctx, func(_ int) (bool, error) { return true, nil })
 	require.NoError(t, err)
 	require.False(t, timeout)
 }
@@ -40,7 +40,7 @@ func TestPollWithContextCancel(t *testing.T) {
 		cancelFunc()
 	}()
 
-	timeout, err := client.PollWithContext(ctx, func(attempt int) (bool, error) { return false, nil })
+	timeout, err := client.PollWithContext(ctx, func(_ int) (bool, error) { return false, nil })
 	require.NoError(t, err)
 	require.True(t, timeout)
 }

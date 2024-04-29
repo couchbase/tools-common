@@ -200,7 +200,7 @@ func (t *TestCluster) Buckets(writer http.ResponseWriter, _ *http.Request) {
 // Bucket implements the /pools/default/buckets/<bucket> endpoint, values can be modified by modifying the buckets in
 // the cluster using the cluster options.
 func (t *TestCluster) Bucket(name string) func(writer http.ResponseWriter, request *http.Request) {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		b, ok := t.options.Buckets[name]
 		require.True(t.t, ok)
 
@@ -216,7 +216,7 @@ func (t *TestCluster) Bucket(name string) func(writer http.ResponseWriter, reque
 // BucketManifest implements the /pools/default/buckets/<bucket>/scopes endpoint. The returned manifest may be set using
 // the cluster options.
 func (t *TestCluster) BucketManifest(name string) func(writer http.ResponseWriter, request *http.Request) {
-	return func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, _ *http.Request) {
 		b, ok := t.options.Buckets[name]
 		require.True(t.t, ok)
 

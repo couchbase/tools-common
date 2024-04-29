@@ -58,7 +58,7 @@ func TestPriorityQueueDrainNoItems(t *testing.T) {
 
 	var run bool
 
-	require.NoError(t, queue.Drain(func(item Item[int]) error { run = true; return nil }))
+	require.NoError(t, queue.Drain(func(_ Item[int]) error { run = true; return nil }))
 	require.False(t, run)
 }
 
@@ -67,7 +67,7 @@ func TestPriorityQueueDrainWithError(t *testing.T) {
 
 	var run int
 
-	err := queue.Drain(func(item Item[int]) error { run++; return assert.AnError })
+	err := queue.Drain(func(_ Item[int]) error { run++; return assert.AnError })
 	require.NoError(t, err)
 	require.Zero(t, run)
 
@@ -75,7 +75,7 @@ func TestPriorityQueueDrainWithError(t *testing.T) {
 		queue.Enqueue(Item[int]{Payload: i})
 	}
 
-	err = queue.Drain(func(item Item[int]) error { run++; return assert.AnError })
+	err = queue.Drain(func(_ Item[int]) error { run++; return assert.AnError })
 	require.ErrorIs(t, err, assert.AnError)
 	require.Equal(t, 1, run)
 }

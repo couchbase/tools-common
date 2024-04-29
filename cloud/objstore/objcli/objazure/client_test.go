@@ -58,7 +58,7 @@ func TestClientGetObject(t *testing.T) {
 	bAPI.
 		EXPECT().
 		DownloadStream(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, opts *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error) {
+		DoAndReturn(func(_ context.Context, opts *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error) {
 			require.Equal(t, int64(0), opts.Range.Count)
 			require.Equal(t, int64(0), opts.Range.Offset)
 
@@ -95,7 +95,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 	bAPI.
 		EXPECT().
 		DownloadStream(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, opts *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error) {
+		DoAndReturn(func(_ context.Context, opts *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error) {
 			require.Equal(t, int64(65), opts.Range.Count)
 			require.Equal(t, int64(64), opts.Range.Offset)
 
@@ -168,7 +168,7 @@ func TestClientPutObject(t *testing.T) {
 	output := blockblob.UploadResponse{}
 
 	fn := func(
-		ctx context.Context, body io.ReadSeekCloser, opts *blockblob.UploadOptions,
+		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
 	) (blockblob.UploadResponse, error) {
 		b := md5.Sum([]byte("value"))
 		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
@@ -200,7 +200,7 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 	output := blockblob.UploadResponse{}
 
 	fn := func(
-		ctx context.Context, body io.ReadSeekCloser, opts *blockblob.UploadOptions,
+		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
 	) (blockblob.UploadResponse, error) {
 		b := md5.Sum([]byte("value"))
 		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
@@ -241,9 +241,9 @@ func TestClientCopyObject(t *testing.T) {
 	client := &Client{serviceAPI: sAPI}
 
 	fn := func(
-		ctx context.Context,
-		copySource string,
-		opts *blob.CopyFromURLOptions,
+		_ context.Context,
+		_ string,
+		_ *blob.CopyFromURLOptions,
 	) (blob.CopyFromURLResponse, error) {
 		return blob.CopyFromURLResponse{}, nil
 	}
@@ -281,7 +281,7 @@ func TestClientAppendToObject(t *testing.T) {
 		EXPECT().
 		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockID, sourceURL string, options *blockblob.StageBlockFromURLOptions,
+			_ context.Context, _, _ string, options *blockblob.StageBlockFromURLOptions,
 		) (blockblob.StageBlockFromURLResponse, error) {
 			require.Equal(t, int64(0), options.Range.Offset)
 			require.Equal(t, int64(blob.CountToEnd), options.Range.Count)
@@ -298,7 +298,7 @@ func TestClientAppendToObject(t *testing.T) {
 		EXPECT().
 		CommitBlockList(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockIDs []string, options *blockblob.CommitBlockListOptions,
+			_ context.Context, base64BlockIDs []string, _ *blockblob.CommitBlockListOptions,
 		) (blockblob.CommitBlockListResponse, error) {
 			require.Len(t, base64BlockIDs, 2)
 			return blockblob.CommitBlockListResponse{}, nil
@@ -421,7 +421,7 @@ func TestClientUploadPart(t *testing.T) {
 		EXPECT().
 		StageBlock(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockID string, body io.ReadSeekCloser, options *blockblob.StageBlockOptions,
+			_ context.Context, _ string, _ io.ReadSeekCloser, _ *blockblob.StageBlockOptions,
 		) (blockblob.StageBlockResponse, error) {
 			return blockblob.StageBlockResponse{}, nil
 		})
@@ -491,7 +491,7 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 				EXPECT().
 				StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(
-					ctx context.Context, base64BlockID, url string, options *blockblob.StageBlockFromURLOptions,
+					_ context.Context, base64BlockID, _ string, options *blockblob.StageBlockFromURLOptions,
 				) (blockblob.StageBlockFromURLResponse, error) {
 					require.Equal(t, test.eOffset, options.Range.Offset)
 					require.Equal(t, test.eLength, options.Range.Count)
@@ -546,7 +546,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 		EXPECT().
 		StageBlockFromURL(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockID, url string, options *blockblob.StageBlockFromURLOptions,
+			_ context.Context, base64BlockID, _ string, options *blockblob.StageBlockFromURLOptions,
 		) (blockblob.StageBlockFromURLResponse, error) {
 			require.Equal(t, int64(0), options.Range.Count)
 
@@ -621,7 +621,7 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		EXPECT().
 		CommitBlockList(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(
-			ctx context.Context, base64BlockIDs []string, options *blockblob.CommitBlockListOptions,
+			_ context.Context, base64BlockIDs []string, _ *blockblob.CommitBlockListOptions,
 		) (blockblob.CommitBlockListResponse, error) {
 			require.Equal(t, []string{"blob1", "blob2", "blob3"}, base64BlockIDs)
 

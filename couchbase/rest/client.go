@@ -409,7 +409,7 @@ func (c *Client) get(host string, endpoint Endpoint) ([]byte, error) {
 	if err != nil {
 		return nil, handleRequestError(req, err) // Purposefully not wrapped
 	}
-	defer c.cleanupResp(resp) //nolint:wsl
+	defer c.cleanupResp(resp)
 
 	body, err := readBody(http.MethodGet, endpoint, resp.Body, resp.ContentLength)
 	if err != nil {
@@ -520,7 +520,7 @@ func (c *Client) ExecuteWithContext(ctx context.Context, request *Request) (*Res
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer c.cleanupResp(resp) //nolint:wsl
+	defer c.cleanupResp(resp)
 
 	response := &Response{StatusCode: resp.StatusCode}
 

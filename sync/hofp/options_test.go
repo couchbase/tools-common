@@ -31,6 +31,7 @@ func TestOptionsDefaults(t *testing.T) {
 
 	t.Run("Size", func(t *testing.T) {
 		var opts Options
+
 		opts.defaults()
 
 		expected := Options{
@@ -45,6 +46,7 @@ func TestOptionsDefaults(t *testing.T) {
 
 	t.Run("BufferMultiplier", func(t *testing.T) {
 		opts := Options{BufferMultiplier: 42}
+
 		opts.defaults()
 
 		expected := Options{
@@ -61,6 +63,7 @@ func TestOptionsDefaults(t *testing.T) {
 		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 		opts := Options{Size: 1, Logger: logger}
+
 		opts.defaults()
 
 		expected := Options{

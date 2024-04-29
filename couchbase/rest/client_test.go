@@ -168,7 +168,7 @@ func TestNewClientBeginCCPAfterClusterInfo(t *testing.T) {
 
 	handlers := make(TestHandlers)
 
-	handlers.Add(http.MethodGet, string(EndpointPoolsDefault), func(writer http.ResponseWriter, request *http.Request) {
+	handlers.Add(http.MethodGet, string(EndpointPoolsDefault), func(writer http.ResponseWriter, _ *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 
 		testutil.EncodeJSON(t, writer, struct {
@@ -614,7 +614,7 @@ func TestClientExecuteWithSkipRetry(t *testing.T) {
 		handlers = make(TestHandlers)
 	)
 
-	handlers.Add(http.MethodGet, "/test", func(writer http.ResponseWriter, request *http.Request) {
+	handlers.Add(http.MethodGet, "/test", func(writer http.ResponseWriter, _ *http.Request) {
 		attempts++
 
 		writer.WriteHeader(http.StatusGatewayTimeout)
@@ -1324,6 +1324,7 @@ func TestClientExecuteStreamCloseOnContextCancel(t *testing.T) {
 		require.Equal(t, []byte(`"payload"`), response.Payload)
 
 		cancel()
+
 		responses++
 	}
 
@@ -1402,6 +1403,7 @@ func TestClientExecuteStreamWithBinaryPayload(t *testing.T) {
 
 	for response := range stream {
 		require.NoError(t, response.Error)
+
 		responses++
 	}
 
@@ -1588,15 +1590,18 @@ func TestGetAllServiceHostsTLS(t *testing.T) {
 				require.Error(t, err)
 
 				var notAvailable *ServiceNotAvailableError
+
 				require.ErrorAs(t, err, &notAvailable)
 
 				return
 			}
 
 			require.NoError(t, err)
+
 			defer client.Close()
 
 			hosts, err := client.GetAllServiceHosts(ServiceManagement)
+
 			require.NoError(t, err)
 			require.Len(t, hosts, test.expected)
 		})

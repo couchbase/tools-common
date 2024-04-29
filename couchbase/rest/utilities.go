@@ -100,7 +100,7 @@ func getCredentials(provider aprov.Provider, host string, logger *slog.Logger) (
 		Log:        log,
 	})
 
-	return retryer.Do(func(ctx *retry.Context) (aprov.Credentials, error) { return provider.GetCredentials(host) })
+	return retryer.Do(func(_ *retry.Context) (aprov.Credentials, error) { return provider.GetCredentials(host) })
 }
 
 // waitForRetryAfter sleeps until we can retry the request for the given response.

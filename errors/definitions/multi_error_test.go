@@ -68,6 +68,7 @@ func TestMultiErrorStrings(t *testing.T) {
 			for _, err := range tc.errs {
 				me.Add(err)
 			}
+
 			require.Equal(t, tc.expected, me.Error())
 		})
 	}

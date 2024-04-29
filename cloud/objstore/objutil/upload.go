@@ -92,7 +92,7 @@ func upload(opts UploadOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to create uploader: %w", err)
 	}
-	defer mpu.Abort() //nolint:errcheck,wsl
+	defer mpu.Abort() //nolint:errcheck
 
 	reader := NewChunkReader(opts.Body, opts.PartSize)
 

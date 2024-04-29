@@ -585,6 +585,7 @@ func TestWriteJSONFile(t *testing.T) {
 		require.Equal(t, DefaultFileMode, stats.Mode())
 
 		var actual map[string]string
+
 		require.NoError(t, ReadJSONFile(path, &actual))
 		require.Equal(t, map[string]string{"key": "value"}, actual)
 	})

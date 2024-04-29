@@ -262,6 +262,7 @@ func TestCGroupCPULimit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := strings.NewReader(test.file)
 			limit, err := readCGroup2CPULimit(r)
+
 			if test.works {
 				require.NoError(t, err)
 				require.Equal(t, limit, test.result)

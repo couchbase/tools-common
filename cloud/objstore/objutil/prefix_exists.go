@@ -49,7 +49,7 @@ func PrefixExists(opts PrefixExistsOptions) (bool, error) {
 		Bucket:    opts.Bucket,
 		Prefix:    opts.Prefix,
 		Delimiter: "/",
-		Func:      func(attrs *objval.ObjectAttrs) error { return sentinal },
+		Func:      func(_ *objval.ObjectAttrs) error { return sentinal },
 	})
 
 	if err != nil && !errors.Is(err, sentinal) {

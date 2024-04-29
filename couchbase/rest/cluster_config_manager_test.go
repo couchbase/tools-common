@@ -82,6 +82,7 @@ func TestClusterConfigManagerUpdate(t *testing.T) {
 			last := manager.last
 
 			err := manager.Update(test.updated)
+
 			if test.old {
 				var oldClusterConfig *OldClusterConfigError
 

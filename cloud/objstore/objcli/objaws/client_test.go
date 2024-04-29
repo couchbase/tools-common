@@ -698,7 +698,7 @@ func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
 
 	client := &Client{serviceAPI: api}
 
-	callback := func(_ context.Context, bucket string, keys ...string) error {
+	callback := func(_ context.Context, _ string, _ ...string) error {
 		return assert.AnError
 	}
 
@@ -839,7 +839,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 		Bucket:    "bucket",
 		Prefix:    "prefix",
 		Delimiter: "delimiter",
-		Func:      func(attrs *objval.ObjectAttrs) error { return assert.AnError },
+		Func:      func(_ *objval.ObjectAttrs) error { return assert.AnError },
 	})
 	require.ErrorIs(t, err, assert.AnError)
 

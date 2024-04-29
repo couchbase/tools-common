@@ -87,7 +87,9 @@ func TestServiceReportIsAsync(t *testing.T) {
 
 	handlers.Add(http.MethodPost, string(EndpointPostEvent), func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(250 * time.Millisecond)
+
 		gr = "2"
+
 		w.WriteHeader(http.StatusOK)
 	})
 
