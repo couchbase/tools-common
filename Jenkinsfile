@@ -14,7 +14,7 @@ pipeline {
         GOBIN = "${GOROOT}/bin"
         PATH="${PATH}:${GOBIN}:${WORKSPACE}/bin"
 
-        GOLANGCI_LINT_VERSION = "v1.55.2"
+        GOLANGCI_LINT_VERSION = "v1.57.2"
 
         PROJECT = "${WORKSPACE}/tools-common"
     }
@@ -82,6 +82,8 @@ pipeline {
             steps {
                 timeout(time: 10, unit: "MINUTES") {
                     dir("${PROJECT}") {
+                        sh "golangci-lint cache clean"
+
                         sh "./scripts/cv/lint.sh"
                     }
                 }
