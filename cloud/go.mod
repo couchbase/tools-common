@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/cloud/v4
+module github.com/couchbase/tools-common/cloud/v5
 
 go 1.21
 

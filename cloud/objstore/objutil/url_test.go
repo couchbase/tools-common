@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
 	errutil "github.com/couchbase/tools-common/errors/util"
 )
 

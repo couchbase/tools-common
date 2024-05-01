@@ -3,8 +3,8 @@ package objutil
 import (
 	"io"
 
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
 )
 
 // DownloadOptions encapsulates the options available when using the 'Download' function to download data from a remote

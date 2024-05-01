@@ -1,5 +1,8 @@
 # Changes
 
+## V5.0.1
+- Upgraded package version because it was not updated as it should have been with the breaking V5.0.0 changes.
+
 ## V5.0.0
 - BREAKING: The compression and uploads to CSPs within `objutil` returns SHA-256 checksum 
   to provide file integrity assurance.

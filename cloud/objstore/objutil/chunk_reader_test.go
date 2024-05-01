@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objcli"
 )
 
 func TestChunkReaderForEachAvoidEmptyChunk(t *testing.T) {

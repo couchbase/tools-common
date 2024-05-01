@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli/objaws"
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
 	"github.com/couchbase/tools-common/functional/slices"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/ptr"

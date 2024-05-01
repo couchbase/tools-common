@@ -12,9 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/google/uuid"
 
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v4/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/ptr"
 	"github.com/couchbase/tools-common/utils/v3/system"
