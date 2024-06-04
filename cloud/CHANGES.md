@@ -1,15 +1,19 @@
 # Changes
 
+## v5.0.3
+
+- Fixed `IterateObjects` when using a `Delimiter` on the `TestClient`.
+
 ## v5.0.2
 
-- Added a `DeleteVersions` parameter to the `DeleteDirectory` method which 
+- Added a `DeleteVersions` parameter to the `DeleteDirectory` method which
   deletes all object versions if enabled.
 
 ## V5.0.1
 - Upgraded package version because it was not updated as it should have been with the breaking V5.0.0 changes.
 
 ## V5.0.0
-- BREAKING: The compression and uploads to CSPs within `objutil` returns SHA-256 checksum 
+- BREAKING: The compression and uploads to CSPs within `objutil` returns SHA-256 checksum
   to provide file integrity assurance.
 
 ## v4.0.2

@@ -168,23 +168,29 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 
 	t.lock.RUnlock()
 
+	seen := make(map[string]struct{})
+
 	for key, object := range cpy {
 		if !strings.HasPrefix(key, opts.Prefix) || ShouldIgnore(key, opts.Include, opts.Exclude) {
 			continue
 		}
 
-		var (
-			trimmed = strings.TrimPrefix(key, opts.Prefix)
-			attrs   = object.ObjectAttrs
-		)
+		attrs := object.ObjectAttrs
 
 		// If this is a nested key, convert it into a directory stub
-		if opts.Delimiter != "" && strings.Count(trimmed, opts.Delimiter) > 1 {
-			attrs.Key = rootDirectory(trimmed)
+		if opts.Delimiter != "" && strings.Count(key, opts.Delimiter) > 1 {
+			attrs.Key = parentDirectory(key)
 			attrs.ETag = nil
 			attrs.Size = nil
 			attrs.LastModified = nil
 		}
+
+		// Don't return duplicate values
+		if _, ok := seen[attrs.Key]; ok {
+			continue
+		}
+
+		seen[attrs.Key] = struct{}{}
 
 		if err := opts.Func(&attrs); err != nil {
 			return err
@@ -373,12 +379,12 @@ func partPrefix(id, key string) string {
 	return fmt.Sprintf("%s-mpu-%s", key, id)
 }
 
-// rootDirectory returns the root directory for the provided key.
-func rootDirectory(key string) string {
+// parentDirectory returns the root directory for the provided key, or the key itself if it's the top-level.
+func parentDirectory(key string) string {
 	dir := path.Dir(key)
 	if dir == "." || dir == "/" {
 		return key
 	}
 
-	return rootDirectory(dir)
+	return dir
 }
