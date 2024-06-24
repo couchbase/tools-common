@@ -1,5 +1,9 @@
 # Changes
 
+## v1.3.0
+
+- Added a `Difference` method to `maps`.
+
 ## v1.2.0
 
 - Added a `Map` method to `slices`.
