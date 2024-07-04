@@ -20,7 +20,10 @@ func TestHandleError(t *testing.T) {
 	err := handleError("", "", &net.DNSError{IsNotFound: true})
 	require.ErrorIs(t, err, objerr.ErrEndpointResolutionFailed)
 
-	var notFound *objerr.NotFoundError
+	var (
+		notFound       *objerr.NotFoundError
+		archiveStorage *objerr.ErrArchiveStorage
+	)
 
 	err = handleError("container1", "blob1", nil)
 	require.NoError(t, err)
@@ -54,6 +57,10 @@ func TestHandleError(t *testing.T) {
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "container", notFound.Type)
 	require.Equal(t, "<empty container name>", notFound.Name)
+
+	err = handleError("container1", "blob1", respError(bloberror.BlobArchived))
+	require.ErrorAs(t, err, &archiveStorage)
+	require.Equal(t, "blob1", archiveStorage.Key)
 }
 
 func TestIsKeyNotFound(t *testing.T) {

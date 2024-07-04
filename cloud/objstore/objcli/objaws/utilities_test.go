@@ -14,7 +14,10 @@ import (
 )
 
 func TestHandleError(t *testing.T) {
-	var notFound *objerr.NotFoundError
+	var (
+		notFound       *objerr.NotFoundError
+		archiveStorage *objerr.ErrArchiveStorage
+	)
 
 	err := handleError(ptr.To("bucket1"), ptr.To("key1"), nil)
 	require.NoError(t, err)
@@ -54,6 +57,10 @@ func TestHandleError(t *testing.T) {
 
 	err = handleError(nil, nil, &net.DNSError{IsNotFound: true})
 	require.ErrorIs(t, err, objerr.ErrEndpointResolutionFailed)
+
+	err = handleError(nil, ptr.To("key1"), &s3types.InvalidObjectState{})
+	require.ErrorAs(t, err, &archiveStorage)
+	require.Equal(t, "key1", archiveStorage.Key)
 }
 
 func TestIsKeyNotFound(t *testing.T) {

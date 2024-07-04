@@ -3,6 +3,7 @@
 ## v5.0.3
 
 - Fixed `IterateObjects` when using a `Delimiter` on the `TestClient`.
+- Add error for accessing objects in long-term storage
 
 ## v5.0.2
 

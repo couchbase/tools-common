@@ -34,6 +34,15 @@ func handleError(bucket, key string, err error) error {
 		return &objerr.NotFoundError{Type: "container", Name: bucket}
 	}
 
+	if bloberror.HasCode(err, bloberror.BlobArchived) {
+		// This shouldn't trigger but may aid in debugging in the future
+		if key == "" {
+			key = "<empty blob name>"
+		}
+
+		return &objerr.ErrArchiveStorage{Key: key}
+	}
+
 	return objerr.HandleError(err)
 }
 

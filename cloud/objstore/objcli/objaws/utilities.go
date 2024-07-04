@@ -36,6 +36,12 @@ func handleError(bucket, key *string, err error) error {
 		}
 
 		return &objerr.NotFoundError{Type: "bucket", Name: *bucket}
+	case "InvalidObjectState":
+		if key == nil {
+			key = ptr.To("<empty key name>")
+		}
+
+		return &objerr.ErrArchiveStorage{Key: *key}
 	}
 
 	// The AWS error type doesn't implement Unwrap, se we must manually unwrap and check it here
