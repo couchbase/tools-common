@@ -175,10 +175,15 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 			continue
 		}
 
-		attrs := object.ObjectAttrs
+		var (
+			attrs   = object.ObjectAttrs
+			trimmed = strings.TrimPrefix(key, opts.Prefix)
+		)
 
-		// If this is a nested key, convert it into a directory stub
-		if opts.Delimiter != "" && strings.Count(key, opts.Delimiter) > 1 {
+		// If this is a nested key, convert it into a directory stub. AWS allows a filesystem style API when you pass a
+		// delimiter - if your prefix has a "directory" in it we get a stub, rather than the actual object which could
+		// be nested.
+		if opts.Delimiter != "" && strings.Count(trimmed, opts.Delimiter) > 1 {
 			attrs.Key = parentDirectory(key)
 			attrs.ETag = nil
 			attrs.Size = nil
