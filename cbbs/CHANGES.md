@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.0
+
+- Add cbauth middleware to `rest` package
+
 ## v1.0.2
 
 - Upgraded dependencies
