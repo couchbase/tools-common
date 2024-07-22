@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.1
+
+- Send a user-friendly permission name in the `cbauth` middleware
+
 ## v1.1.0
 
 - Add cbauth middleware to `rest` package

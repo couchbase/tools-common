@@ -19,13 +19,17 @@ type cbAuthoriser interface {
 }
 
 func AuthMiddlewareHandler(
-	noAuth bool, permission string, w http.ResponseWriter, r *http.Request,
+	noAuth bool, permission, userFriendlyName string, w http.ResponseWriter, r *http.Request,
 ) error {
-	return authMiddlewareHandler(cbauth.Default, noAuth, permission, w, r)
+	if cbauth.Default == nil {
+		return cbauth.ErrNotInitialized
+	}
+
+	return authMiddlewareHandler(cbauth.Default, noAuth, permission, userFriendlyName, w, r)
 }
 
 func authMiddlewareHandler(
-	authoriser cbAuthoriser, noAuth bool, permission string, w http.ResponseWriter, r *http.Request,
+	authoriser cbAuthoriser, noAuth bool, permission, userFriendlyName string, w http.ResponseWriter, r *http.Request,
 ) error {
 	if noAuth {
 		return nil
@@ -61,7 +65,7 @@ func authMiddlewareHandler(
 	}
 
 	if !canAccess {
-		if err := cbauth.SendForbidden(w, permission); err != nil {
+		if err := cbauth.SendForbidden(w, userFriendlyName); err != nil {
 			return fmt.Errorf("could not send response: %w", ErrForbidden)
 		}
 
