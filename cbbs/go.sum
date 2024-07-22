@@ -8,6 +8,12 @@ github.com/couchbase/gomemcached v0.3.1 h1:jfspNuQIXgWy+5GUPQrsQ6yC5uJCfMmd/JKvK
 github.com/couchbase/gomemcached v0.3.1/go.mod h1:mxliKQxOv84gQ0bJWbI+w9Wxdpt9HjDvgW9MjCym5Vo=
 github.com/couchbase/goutils v0.1.2 h1:gWr8B6XNWPIhfalHNog3qQKfGiYyh4K4VhO3P2o9BCs=
 github.com/couchbase/goutils v0.1.2/go.mod h1:h89Ek/tiOxxqjz30nPPlwZdQbdB8BwgnuBxeoUe/ViE=
+github.com/couchbase/tools-common/couchbase/v2 v2.0.4 h1:4lqWcTgmhE8XgHPMmkXbueRDQCKYVscg/ohKlfiMt1A=
+github.com/couchbase/tools-common/couchbase/v2 v2.0.4/go.mod h1:mbkJe/mwMYj7iV2EsC06bWzkiV4ACrnL+WqR8pIqPjw=
+github.com/couchbase/tools-common/errors v1.0.0 h1:lEPRdPrk7iHOiZIJspEH7OnywxRR+SKlrG78KkOWnXA=
+github.com/couchbase/tools-common/errors v1.0.0/go.mod h1:9or/a3TpNd/1aZIUr/a8y0uF03O9hachXFCnu6Y3sjM=
+github.com/couchbase/tools-common/fs v1.0.2 h1:rmHHed8HCbIriTHVVTpDvWyUAvG0Xfq/hD4Altet2w0=
+github.com/couchbase/tools-common/fs v1.0.2/go.mod h1:+aQlBU/0OpWmvJ7EQNhZM51oysy7zoL96ltXleZusDM=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
@@ -20,6 +26,8 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 golang.org/x/crypto v0.25.0 h1:ypSNr+bnYL2YhwoMt2zPxHFmbAN1KZs/njMG3hxUp30=
 golang.org/x/crypto v0.25.0/go.mod h1:T+wALwcMOSE0kXgUAnPAHqTLW+XHgcELELW8VaDgm/M=
+golang.org/x/sys v0.22.0 h1:RI27ohtqKCnwULzJLqkv897zojh5/DwS/ENaMzUOaWI=
+golang.org/x/sys v0.22.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 google.golang.org/grpc v1.60.1 h1:26+wFr+cNqSGFcOXcabYC0lUVJVRa2Sb2ortSK7VrEU=
 google.golang.org/grpc v1.60.1/go.mod h1:OlCHIeLYqSSsLi6i49B5QGdzaMZK9+M7LXN2FKz4eGM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=

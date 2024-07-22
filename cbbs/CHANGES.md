@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.0
+
+- Add metrics generation tool `genmetrics`
+
 ## v1.1.2
 
 - Do not check `cbauth.Default` if not doing authentication
