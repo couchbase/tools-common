@@ -98,7 +98,7 @@ func TestAuthMiddlewareHandler(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			err := authMiddlewareHandler(authoriser, test.noAuth, "", w, nil)
+			err := authMiddlewareHandler(authoriser, test.noAuth, "", "", w, nil)
 			if test.resultErr == nil {
 				require.NoError(t, err)
 				return
