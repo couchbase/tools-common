@@ -39,8 +39,7 @@ var _ cbAuthoriser = &authoriser{}
 
 func TestAuthMiddlewareHandler(t *testing.T) {
 	tests := []struct {
-		name   string
-		noAuth bool
+		name string
 
 		creds   *creds
 		authErr error
@@ -48,11 +47,6 @@ func TestAuthMiddlewareHandler(t *testing.T) {
 		resultErr  error
 		statusCode int
 	}{
-		{
-			name:    "UnauthorisedButNoAuth",
-			noAuth:  true,
-			authErr: cbauth.ErrNoAuth,
-		},
 		{
 			name:       "Unauthorised",
 			authErr:    cbauth.ErrNoAuth,
@@ -98,7 +92,7 @@ func TestAuthMiddlewareHandler(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			err := authMiddlewareHandler(authoriser, test.noAuth, "", "", w, nil)
+			err := authMiddlewareHandler(authoriser, "", "", w, nil)
 			if test.resultErr == nil {
 				require.NoError(t, err)
 				return

@@ -21,20 +21,20 @@ type cbAuthoriser interface {
 func AuthMiddlewareHandler(
 	noAuth bool, permission, userFriendlyName string, w http.ResponseWriter, r *http.Request,
 ) error {
-	if cbauth.Default == nil {
-		return cbauth.ErrNotInitialized
-	}
-
-	return authMiddlewareHandler(cbauth.Default, noAuth, permission, userFriendlyName, w, r)
-}
-
-func authMiddlewareHandler(
-	authoriser cbAuthoriser, noAuth bool, permission, userFriendlyName string, w http.ResponseWriter, r *http.Request,
-) error {
 	if noAuth {
 		return nil
 	}
 
+	if cbauth.Default == nil {
+		return cbauth.ErrNotInitialized
+	}
+
+	return authMiddlewareHandler(cbauth.Default, permission, userFriendlyName, w, r)
+}
+
+func authMiddlewareHandler(
+	authoriser cbAuthoriser, permission, userFriendlyName string, w http.ResponseWriter, r *http.Request,
+) error {
 	cred, err := authoriser.AuthWebCreds(r)
 	// for some reason cbauth does not return the ErrNoAuth when no credentials are provided, it only does when
 	// the provided credentials are invalid so we have to manually check for the no credentials find error

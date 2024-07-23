@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.2
+
+- Do not check `cbauth.Default` if not doing authentication
+
 ## v1.1.1
 
 - Send a user-friendly permission name in the `cbauth` middleware
