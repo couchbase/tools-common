@@ -1486,6 +1486,22 @@ func TestGetServiceHost(t *testing.T) {
 	require.Equal(t, cluster.URL(), host)
 }
 
+func TestGetServiceHostAltHost(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	defer client.Close()
+
+	client.altHost = func(host string) string { return "test" }
+
+	host, err := client.GetServiceHost(ServiceManagement)
+	require.NoError(t, err)
+	require.Equal(t, "test", host)
+}
+
 func TestGetServiceHostServiceConnectionMode(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
