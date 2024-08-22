@@ -1,5 +1,9 @@
 # Changes
 
+## v3.1.0
+
+- Add new cbrest client option to alter hostnames
+
 ## v3.0.2
 
 - Retry on 403 responses

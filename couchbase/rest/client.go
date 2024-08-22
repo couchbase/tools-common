@@ -53,14 +53,27 @@ type ClientOptions struct {
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
 	ReqResLogLevel slog.Level
 
+	// AltHost is a function that will be called before completing any request. The user can use this to alter the
+	// cluster hostnames however they wish before they are called.
+	AltHost AltHost
+
 	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
 	Logger *slog.Logger
 }
+
+// AltHost is the function type used for the AltHost option in the ClientOptions
+type AltHost func(host string) string
 
 // defaults fills any missing attributes to a sane default.
 func (c *ClientOptions) defaults() {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
+	}
+
+	if c.AltHost == nil {
+		c.AltHost = func(host string) string {
+			return host
+		}
 	}
 }
 
@@ -71,6 +84,8 @@ type Client struct {
 	clusterInfo  *clusterInfo
 
 	connectionMode ConnectionMode
+
+	altHost AltHost
 
 	pollTimeout    time.Duration
 	requestRetries int
@@ -190,6 +205,7 @@ func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 		requestRetries: requestRetries,
 		reqResLogLevel: options.ReqResLogLevel,
 		clusterInfo:    &clusterInfo{},
+		altHost:        options.AltHost,
 		logger:         logger,
 	}
 
@@ -892,7 +908,7 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 	}
 
 	if c.connectionMode != ConnectionModeLoopback {
-		return host, nil
+		return c.altHost(host), nil
 	}
 
 	// This shouldn't really fail since we should be constructing valid hosts in the auth provider
