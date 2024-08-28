@@ -1486,7 +1486,7 @@ func TestGetServiceHost(t *testing.T) {
 	require.Equal(t, cluster.URL(), host)
 }
 
-func TestGetServiceHostAltHost(t *testing.T) {
+func TestGetServiceHostHostnameTransform(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
 
@@ -1495,11 +1495,11 @@ func TestGetServiceHostAltHost(t *testing.T) {
 
 	defer client.Close()
 
-	client.altHost = func(_ string) string { return "test" }
+	client.hostnameTransform = func(_ string) string { return "public" }
 
 	host, err := client.GetServiceHost(ServiceManagement)
 	require.NoError(t, err)
-	require.Equal(t, "test", host)
+	require.Equal(t, fmt.Sprintf("http://public:%d", cluster.Port()), host)
 }
 
 func TestGetServiceHostServiceConnectionMode(t *testing.T) {

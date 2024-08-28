@@ -32,3 +32,7 @@ require (
 	golang.org/x/sys v0.15.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Retracted in MB-63328 as the release contained an API that we weren't
+// committed to supporting.
+retract v3.1.0

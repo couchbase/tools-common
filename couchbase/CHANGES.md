@@ -1,6 +1,11 @@
 # Changes
 
-## v3.1.0
+## v3.2.0
+
+- Add a `HostnameTransform` option to allow modifying hostnames prior to
+  dispatching requests
+
+## v3.1.0 (Retracted)
 
 - Add new cbrest client option to alter hostnames
 

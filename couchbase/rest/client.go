@@ -35,6 +35,10 @@ import (
 //
 // This is done in an effort to differentiate requests/responses from different modules.
 
+// HostnameTransform exposes an API to modify/transform the hostname that a request is being dispatched to; this may be
+// used in cases where private hostnames need remapping into public hostnames or vice versa.
+type HostnameTransform func(string) string
+
 // ClientOptions encapsulates the options for creating a new REST client.
 type ClientOptions struct {
 	ConnectionString string
@@ -50,30 +54,24 @@ type ClientOptions struct {
 	// REST requests are dispatched.
 	ConnectionMode ConnectionMode
 
+	// HostnameTransform is called for each request dispatched (when not in 'ConnectionModeLoopback') with the hostname
+	// the request is being dispatched to; the value returned by this function will be used instead.
+	//
+	// NOTE: Here be dragons, this API allows modifying the hostname requests are dispatched to on the fly which may
+	// have detrimental effects in cases where the transformed hostname isn't running the required service.
+	HostnameTransform HostnameTransform
+
 	// ReqResLogLevel is the level at which to the dispatching and receiving of requests/responses.
 	ReqResLogLevel slog.Level
-
-	// AltHost is a function that will be called before completing any request. The user can use this to alter the
-	// cluster hostnames however they wish before they are called.
-	AltHost AltHost
 
 	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
 	Logger *slog.Logger
 }
 
-// AltHost is the function type used for the AltHost option in the ClientOptions
-type AltHost func(host string) string
-
 // defaults fills any missing attributes to a sane default.
 func (c *ClientOptions) defaults() {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
-	}
-
-	if c.AltHost == nil {
-		c.AltHost = func(host string) string {
-			return host
-		}
 	}
 }
 
@@ -85,7 +83,7 @@ type Client struct {
 
 	connectionMode ConnectionMode
 
-	altHost AltHost
+	hostnameTransform HostnameTransform
 
 	pollTimeout    time.Duration
 	requestRetries int
@@ -198,15 +196,15 @@ func returnBootstrappedClient(options ClientOptions) (*Client, error) {
 
 	// Added nil ClusterInfo so that it can be populated later if needed.
 	client := &Client{
-		client:         newHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, timeouts)),
-		authProvider:   NewAuthProvider(authProviderOptions),
-		connectionMode: options.ConnectionMode,
-		pollTimeout:    pollTimeout,
-		requestRetries: requestRetries,
-		reqResLogLevel: options.ReqResLogLevel,
-		clusterInfo:    &clusterInfo{},
-		altHost:        options.AltHost,
-		logger:         logger,
+		client:            newHTTPClient(clientTimeout, netutil.NewHTTPTransport(options.TLSConfig, timeouts)),
+		authProvider:      NewAuthProvider(authProviderOptions),
+		connectionMode:    options.ConnectionMode,
+		hostnameTransform: options.HostnameTransform,
+		pollTimeout:       pollTimeout,
+		requestRetries:    requestRetries,
+		reqResLogLevel:    options.ReqResLogLevel,
+		clusterInfo:       &clusterInfo{},
+		logger:            logger,
 	}
 
 	err = client.bootstrap()
@@ -902,19 +900,33 @@ func (c *Client) serviceHostForRequest(request *Request, attempt int) (string, e
 
 // serviceHost returns a host that's running the given service.
 func (c *Client) serviceHost(service Service, attempt int) (string, error) {
+	transform := func(before string) string {
+		if c.hostnameTransform == nil {
+			return before
+		}
+
+		after := c.hostnameTransform(before)
+
+		if after != before {
+			c.logger.Info("successfully transformed hostname", "before", before, "after", after)
+		}
+
+		return after
+	}
+
 	host, err := c.authProvider.GetServiceHost(service, attempt)
 	if err != nil {
 		return "", fmt.Errorf("failed to get host for service '%s': %w", service, err)
-	}
-
-	if c.connectionMode != ConnectionModeLoopback {
-		return c.altHost(host), nil
 	}
 
 	// This shouldn't really fail since we should be constructing valid hosts in the auth provider
 	parsed, err := url.Parse(host)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse host '%s': %w", host, err)
+	}
+
+	if c.connectionMode != ConnectionModeLoopback {
+		return fmt.Sprintf("%s://%s:%s", parsed.Scheme, transform(parsed.Hostname()), parsed.Port()), nil
 	}
 
 	return "http://localhost:" + parsed.Port(), nil
