@@ -250,11 +250,51 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 }
 
 func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
+	var (
+		// size matches the batch deletion size in AWS/Azure.
+		size  = 1000
+		batch = make([]attrs, 0, size)
+	)
+
 	fn := func(obj attrs) error {
-		return c.deleteObjects(ctx, opts.Bucket, obj)
+		batch = append(batch, obj)
+
+		if len(batch) < size {
+			return nil
+		}
+
+		err := c.deleteObjects(ctx, opts.Bucket, batch...)
+		if err != nil {
+			return fmt.Errorf("failed to delete batch: %w", err)
+		}
+
+		clear(batch)
+		batch = batch[:0]
+
+		return nil
 	}
 
-	return c.iterateObjects(ctx, opts.Bucket, opts.Prefix, "", opts.Versions, nil, nil, fn)
+	err := c.iterateObjects(
+		ctx,
+		opts.Bucket,
+		opts.Prefix,
+		"",
+		opts.Versions,
+		nil,
+		nil,
+		fn,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to iterate objects: %w", err)
+	}
+
+	// Ensure we flush the last batch
+	err = c.deleteObjects(ctx, opts.Bucket, batch...)
+	if err != nil {
+		return fmt.Errorf("failed to flush batch: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) deleteObjects(ctx context.Context, bucket string, objects ...attrs) error {

@@ -5,6 +5,7 @@
 - BREAKING: Removed partial support for object versioning and limited scope to
   the only supported public API (i.e. `DeleteDirectory`).
 - BREAKING: Renamed `DeleteVersions` to `Versions` in `DeleteDirectoryOptions`.
+- `DeleteDirectory` now correctly uses the worker pools for GCP/Azure.
 
 ## v5.0.3
 
