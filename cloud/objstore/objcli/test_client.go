@@ -300,14 +300,18 @@ func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMul
 
 	_ = t.putObjectLocked(opts.Bucket, opts.Key, bytes.NewReader(buffer.Bytes()))
 
-	return t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+
+	return nil
 }
 
 func (t *TestClient) AbortMultipartUpload(_ context.Context, opts AbortMultipartUploadOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+
+	return nil
 }
 
 func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {
@@ -361,7 +365,7 @@ func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) str
 	return attrs.Key
 }
 
-func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []*regexp.Regexp) error {
+func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []*regexp.Regexp) {
 	b := t.getBucketLocked(bucket)
 
 	for key := range b {
@@ -369,8 +373,6 @@ func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []
 			delete(b, key)
 		}
 	}
-
-	return nil
 }
 
 // partKey returns a key which should be used for an in-progress multipart upload. This function should be used to

@@ -73,24 +73,6 @@ type AppendToObjectOptions struct {
 	Body io.ReadSeeker
 }
 
-// ObjectIdentifier contains information to uniquely identify an object in the CSP storage.
-type ObjectIdentifier[T any] struct {
-	// Key is the unique key of the object.
-	Key string
-
-	// Version is the unique version number of the object. This is optional.
-	Version T
-}
-
-// DeleteObjectsIdentifierOptions encapsulates the options available when using the 'DeleteObjectsVersions' function.
-type DeleteObjectIdentifierOptions[T any] struct {
-	// Bucket is the bucket being operated on.
-	Bucket string
-
-	// Objects are the Objects that will be deleted.
-	Objects []ObjectIdentifier[T]
-}
-
 // DeleteObjectsOptions encapsulates the options available when using the 'DeleteObjects' function.
 type DeleteObjectsOptions struct {
 	// Bucket is the bucket being operated on.
@@ -108,9 +90,10 @@ type DeleteDirectoryOptions struct {
 	// Prefix is the prefix that will be operated on.
 	Prefix string
 
-	// DeleteVersions deletes all versions of the objects instead of the latest version. This has no effect if
-	// versioning is not enabled on the target bucket.
-	DeleteVersions bool
+	// Versions deletes all versions of the objects rather than just the latest version.
+	//
+	/// NOTE: This has no effect if versioning is not enabled on the target bucket.
+	Versions bool
 }
 
 // IterateFunc is the function used when iterating over objects, this function will be called once for each object whose
@@ -127,9 +110,6 @@ type IterateObjectsOptions struct {
 
 	// Delimiter use to group keys e.g. '/' causes listing to only occur within a "directory".
 	Delimiter string
-
-	// Versions iterate over different versions of each object too.
-	Versions bool
 
 	// Include objects where the keys match any of the given regular expressions.
 	Include []*regexp.Regexp

@@ -596,9 +596,9 @@ func TestClientDeleteDirectoryVersions(t *testing.T) {
 	client := &Client{serviceAPI: msAPI}
 
 	err := client.DeleteDirectory(context.Background(), objcli.DeleteDirectoryOptions{
-		Bucket:         "bucket",
-		Prefix:         "prefix",
-		DeleteVersions: true,
+		Bucket:   "bucket",
+		Prefix:   "prefix",
+		Versions: true,
 	})
 	require.NoError(t, err)
 
@@ -785,19 +785,16 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
 					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -809,7 +806,6 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -821,13 +817,11 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
 					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -839,13 +833,11 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key1",
 					Size:         ptr.To[int64](64),
 					LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 				{
 					Key:          "/path/to/another/key1",
 					Size:         ptr.To[int64](128),
 					LastModified: ptr.To((time.Time{}).Add(48 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -857,7 +849,6 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -869,7 +860,6 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},
@@ -881,7 +871,6 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 					Key:          "/path/to/key2",
 					Size:         ptr.To[int64](256),
 					LastModified: ptr.To((time.Time{}).Add(72 * time.Hour)),
-					Version:      ptr.To[int64](0),
 				},
 			},
 		},

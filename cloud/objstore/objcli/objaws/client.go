@@ -310,7 +310,7 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 // DeleteDirectory deletes all objects in a specific directory of a bucket. This does not delete old versions of objects
 // if any.
 func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
-	if opts.DeleteVersions {
+	if opts.Versions {
 		return c.deleteDirectoryVersions(ctx, opts.Bucket, opts.Prefix, c.deleteObjectVersions)
 	}
 
@@ -359,7 +359,7 @@ func (c *Client) deleteDirectory(
 func (c *Client) deleteDirectoryVersions(
 	ctx context.Context,
 	bucket, prefix string,
-	deleteObjectFn func(ctx context.Context, bucket string, objects ...types.ObjectIdentifier) error,
+	fn func(ctx context.Context, bucket string, objects ...types.ObjectIdentifier) error,
 ) error {
 	callback := func(page *s3.ListObjectVersionsOutput) error {
 		objects := make([]types.ObjectIdentifier, 0, len(page.Versions)+len(page.DeleteMarkers))
@@ -378,7 +378,7 @@ func (c *Client) deleteDirectoryVersions(
 			})
 		}
 
-		return deleteObjectFn(ctx, bucket, objects...)
+		return fn(ctx, bucket, objects...)
 	}
 
 	input := &s3.ListObjectVersionsInput{
@@ -508,21 +508,7 @@ func (c *Client) listObjects(
 	input *s3.ListObjectsV2Input,
 	fn func(page *s3.ListObjectsV2Output) error,
 ) error {
-	paginator := s3.NewListObjectsV2Paginator(c.serviceAPI, input)
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get next page: %w", err)
-		}
-
-		err = fn(page)
-		if err != nil {
-			return fmt.Errorf("failed to process page: %w", err)
-		}
-	}
-
-	return nil
+	return listObjects[*s3.ListObjectsV2Output](ctx, s3.NewListObjectsV2Paginator(c.serviceAPI, input), fn)
 }
 
 // listObjectVersions uses the SDK paginator to run the given function on pages of object versions.
@@ -531,21 +517,7 @@ func (c *Client) listObjectVersions(
 	input *s3.ListObjectVersionsInput,
 	fn func(page *s3.ListObjectVersionsOutput) error,
 ) error {
-	paginator := s3.NewListObjectVersionsPaginator(c.serviceAPI, input)
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get next page: %w", err)
-		}
-
-		err = fn(page)
-		if err != nil {
-			return fmt.Errorf("failed to process page: %w", err)
-		}
-	}
-
-	return nil
+	return listObjects[*s3.ListObjectVersionsOutput](ctx, s3.NewListObjectVersionsPaginator(c.serviceAPI, input), fn)
 }
 
 func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMultipartUploadOptions) (string, error) {
@@ -683,6 +655,29 @@ func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMult
 	_, err := c.serviceAPI.AbortMultipartUpload(ctx, input)
 	if err != nil && !isNoSuchUpload(err) {
 		return handleError(input.Bucket, input.Key, err)
+	}
+
+	return nil
+}
+
+// paginator wraps the AWS paginator API in an interface.
+type paginator[T any] interface {
+	HasMorePages() bool
+	NextPage(context.Context, ...func(*s3.Options)) (T, error)
+}
+
+// listObjects runs the given function for each page in the paginator.
+func listObjects[O any](ctx context.Context, pgn paginator[O], fn func(O) error) error {
+	for pgn.HasMorePages() {
+		page, err := pgn.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get next page: %w", err)
+		}
+
+		err = fn(page)
+		if err != nil {
+			return fmt.Errorf("failed to process page: %w", err)
+		}
 	}
 
 	return nil

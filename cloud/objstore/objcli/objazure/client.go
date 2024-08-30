@@ -37,14 +37,18 @@ const sasErrString = "credential is not a SharedKeyCredential. SAS can only be s
 // NOTE: As apposed to AWS/GCP, Azure use the container/blob naming convention, however, for consistency the Azure
 // client implementation continues to use the bucket/key names.
 
+// attrs wraps object attributes with internal attributes (e.g. version).
+type attrs struct {
+	objval.ObjectAttrs
+	Version *string
+}
+
 // Client implements the 'objcli.Client' interface allowing the creation/management of blobs stored in Azure blob store.
 type Client struct {
 	serviceAPI serviceAPI
 }
 
 var _ objcli.Client = (*Client)(nil)
-
-type azureDeleteObjectIdentifierOptions objcli.DeleteObjectIdentifierOptions[string]
 
 // ClientOptions encapsulates the options for creating a new Azure Client.
 type ClientOptions struct {
@@ -61,15 +65,11 @@ func NewClient(options ClientOptions) *Client {
 }
 
 func (c *Client) getBlobBlockClient(bucket, key string) blockBlobAPI {
-	container := c.serviceAPI.NewContainerClient(bucket)
-	return container.NewBlockBlobClient(key)
+	return c.serviceAPI.NewContainerClient(bucket).NewBlockBlobClient(key)
 }
 
-// getBlobBlockClientForObject gets the blobblock version client if the Version field in obj is not empty. If it is
-// empty it returns a normal client.
-func (c *Client) getBlobBlockClientForObject(bucket string, obj objcli.ObjectIdentifier[string]) (blockBlobAPI, error) {
-	container := c.serviceAPI.NewContainerClient(bucket)
-	return container.NewBlockBlobVersionClient(obj.Key, obj.Version)
+func (c *Client) getBlobBlockVersionClient(bucket, key, version string) (blockBlobAPI, error) {
+	return c.serviceAPI.NewContainerClient(bucket).NewBlockBlobVersionClient(key, version)
 }
 
 func (c *Client) Provider() objval.Provider {
@@ -250,67 +250,38 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 }
 
 func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirectoryOptions) error {
-	fn := func(attrs *objval.ObjectAttrs) error {
-		dopts := azureDeleteObjectIdentifierOptions{
-			Bucket: opts.Bucket,
-			Objects: []objcli.ObjectIdentifier[string]{
-				{
-					Key: attrs.Key,
-				},
-			},
-		}
-
-		if !opts.DeleteVersions {
-			return c.deleteObjects(ctx, dopts)
-		}
-
-		version, ok := attrs.Version.(*string)
-		if !ok {
-			return objcli.ErrVersionUnexpectedType{TypeName: "string"}
-		}
-
-		if version != nil {
-			dopts.Objects[0].Version = *version
-		}
-
-		return c.deleteObjects(ctx, dopts)
+	fn := func(obj attrs) error {
+		return c.deleteObjects(ctx, opts.Bucket, obj)
 	}
 
-	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
-		Bucket:   opts.Bucket,
-		Prefix:   opts.Prefix,
-		Versions: opts.DeleteVersions,
-		Func:     fn,
-	})
-
-	return err
+	return c.iterateObjects(ctx, opts.Bucket, opts.Prefix, "", opts.Versions, nil, nil, fn)
 }
 
-func (c *Client) deleteObjects(ctx context.Context, opts azureDeleteObjectIdentifierOptions) error {
+func (c *Client) deleteObjects(ctx context.Context, bucket string, objects ...attrs) error {
 	pool := hofp.NewPool(hofp.Options{
 		Context: ctx,
-		Size:    system.NumWorkers(len(opts.Objects)),
+		Size:    system.NumWorkers(len(objects)),
 	})
 
-	del := func(ctx context.Context, obj objcli.ObjectIdentifier[string]) error {
-		blobClient, err := c.getBlobBlockClientForObject(opts.Bucket, obj)
+	del := func(ctx context.Context, obj attrs) error {
+		blobClient, err := c.getBlobBlockVersionClient(bucket, obj.Key, ptr.From(obj.Version))
 		if err != nil {
-			return handleError(opts.Bucket, obj.Key, err)
+			return handleError(bucket, obj.Key, err)
 		}
 
 		_, err = blobClient.Delete(ctx, &blob.DeleteOptions{})
 		if err != nil && !isKeyNotFound(err) {
-			return handleError(opts.Bucket, obj.Key, err)
+			return handleError(bucket, obj.Key, err)
 		}
 
 		return nil
 	}
 
-	queue := func(obj objcli.ObjectIdentifier[string]) error {
+	queue := func(obj attrs) error {
 		return pool.Queue(func(ctx context.Context) error { return del(ctx, obj) })
 	}
 
-	for _, obj := range opts.Objects {
+	for _, obj := range objects {
 		if queue(obj) != nil {
 			break
 		}
@@ -325,45 +296,57 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
-	if opts.Include != nil && opts.Exclude != nil {
+	var (
+		bucket    = opts.Bucket
+		prefix    = opts.Prefix
+		delimiter = opts.Delimiter
+		include   = opts.Include
+		exclude   = opts.Exclude
+		fn        = func(obj attrs) error { return opts.Func(&obj.ObjectAttrs) }
+	)
+
+	return c.iterateObjects(ctx, bucket, prefix, delimiter, false, include, exclude, fn)
+}
+
+// iterateObjects is an internal object iteration function which also support enabling listing object versions.
+func (c *Client) iterateObjects(
+	ctx context.Context,
+	bucket string,
+	prefix string,
+	delimiter string,
+	versions bool,
+	include []*regexp.Regexp,
+	exclude []*regexp.Regexp,
+	fn func(attrs) error,
+) error {
+	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
-	var (
-		containerClient = c.serviceAPI.NewContainerClient(opts.Bucket)
-		bucket          = opts.Bucket
-		prefix          = opts.Prefix
-		includeVersion  = opts.Versions
-		delimiter       = opts.Delimiter
-		include         = opts.Include
-		exclude         = opts.Exclude
-		fn              = opts.Func
-	)
+	containerClient := c.serviceAPI.NewContainerClient(bucket)
 
 	if delimiter == "" {
-		return c.iterateObjectsFlat(ctx, containerClient, includeVersion, bucket, prefix, include, exclude, fn)
+		return c.iterateObjectsFlat(ctx, containerClient, bucket, prefix, versions, include, exclude, fn)
 	}
 
-	return c.iterateObjectsHierarchy(ctx, containerClient, includeVersion, bucket, prefix, delimiter, include, exclude, fn)
+	return c.iterateObjectsHierarchy(ctx, containerClient, bucket, prefix, delimiter, versions, include, exclude, fn)
 }
 
+// iterateObjectsFlat iterates the given prefix as if it were flat (e.g. recursively).
 func (c *Client) iterateObjectsFlat(
 	ctx context.Context,
 	containerClient containerAPI,
-	includeVersion bool,
 	bucket, prefix string,
+	versions bool,
 	include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc,
+	fn func(attrs) error,
 ) error {
-	var (
-		options = container.ListBlobsFlatOptions{
-			Prefix: &prefix,
-			Include: container.ListBlobsInclude{
-				Versions: includeVersion,
-			},
-		}
-		pager = containerClient.NewListBlobsFlatPager(&options)
-	)
+	options := container.ListBlobsFlatOptions{
+		Prefix:  &prefix,
+		Include: container.ListBlobsInclude{Versions: versions},
+	}
+
+	pager := containerClient.NewListBlobsFlatPager(&options)
 
 	for pager.More() {
 		resp, err := pager.NextPage(ctx)
@@ -372,9 +355,10 @@ func (c *Client) iterateObjectsFlat(
 		}
 
 		var prefixes []*string
-		objects := c.convertBlobsToObjectAttrs(prefixes, resp.Segment.BlobItems)
 
-		err = c.iterateObjects(objects, include, exclude, fn)
+		objects := c.blobsToAttrs(prefixes, resp.Segment.BlobItems)
+
+		err = c.iterateSegment(objects, include, exclude, fn)
 		if err != nil {
 			return handleError(bucket, "", err)
 		}
@@ -383,22 +367,22 @@ func (c *Client) iterateObjectsFlat(
 	return nil
 }
 
+// iterateObjectsHierarchy iterates the given "directory".
 func (c *Client) iterateObjectsHierarchy(
 	ctx context.Context,
 	containerClient containerAPI,
-	includeVersion bool,
 	bucket, prefix, delimiter string,
+	versions bool,
 	include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc,
+	fn func(attrs) error,
 ) error {
 	options := container.ListBlobsHierarchyOptions{
-		Prefix: &prefix,
-		Include: container.ListBlobsInclude{
-			Versions: includeVersion,
-		},
+		Prefix:  &prefix,
+		Include: container.ListBlobsInclude{Versions: versions},
 	}
 
 	pager := containerClient.NewListBlobsHierarchyPager(delimiter, &options)
+
 	for pager.More() {
 		resp, err := pager.NextPage(ctx)
 		if err != nil {
@@ -410,13 +394,14 @@ func (c *Client) iterateObjectsHierarchy(
 		// The type of BlobPrefixes (BlobPrefix) is not exported from the Azure SDK. That means we can't use it as a
 		// parameter type in convertBlobsToObjectAttrs. To work around this, turn the prefixes to strings.
 		stringPrefixes := make([]*string, len(prefixes))
+
 		for i, prefix := range prefixes {
 			stringPrefixes[i] = prefix.Name
 		}
 
-		objects := c.convertBlobsToObjectAttrs(stringPrefixes, blobs)
+		objects := c.blobsToAttrs(stringPrefixes, blobs)
 
-		err = c.iterateObjects(objects, include, exclude, fn)
+		err = c.iterateSegment(objects, include, exclude, fn)
 		if err != nil {
 			return handleError(bucket, "", err)
 		}
@@ -425,34 +410,38 @@ func (c *Client) iterateObjectsHierarchy(
 	return nil
 }
 
-func (c *Client) convertBlobsToObjectAttrs(
-	prefixes []*string,
-	blobs []*container.BlobItem,
-) []*objval.ObjectAttrs {
-	converted := make([]*objval.ObjectAttrs, 0, len(prefixes)+len(blobs))
+// blobsToAttrs converts the given blob items into internal objects.
+func (c *Client) blobsToAttrs(prefixes []*string, blobs []*container.BlobItem) []attrs {
+	converted := make([]attrs, 0, len(prefixes)+len(blobs))
 
 	for _, p := range prefixes {
-		converted = append(converted, &objval.ObjectAttrs{Key: *p})
+		converted = append(converted, attrs{ObjectAttrs: objval.ObjectAttrs{Key: *p}})
 	}
 
 	for _, b := range blobs {
-		converted = append(converted, &objval.ObjectAttrs{
+		oa := objval.ObjectAttrs{
 			Key:          *b.Name,
 			Size:         b.Properties.ContentLength,
 			LastModified: b.Properties.LastModified,
-			Version:      b.VersionID,
-		})
+		}
+
+		attrs := attrs{
+			ObjectAttrs: oa,
+			Version:     b.VersionID,
+		}
+
+		converted = append(converted, attrs)
 	}
 
 	return converted
 }
 
-// iterateObjects iterates over the given segment (<=5000) of objects executing the given function for each object which
+// iterateSegment iterates over the given segment (<=5000) of objects executing the given function for each object which
 // has not been explicitly ignored by the user.
-func (c *Client) iterateObjects(
-	objects []*objval.ObjectAttrs,
+func (c *Client) iterateSegment(
+	objects []attrs,
 	include, exclude []*regexp.Regexp,
-	fn objcli.IterateFunc,
+	fn func(attrs) error,
 ) error {
 	for _, attrs := range objects {
 		if objcli.ShouldIgnore(attrs.Key, include, exclude) {

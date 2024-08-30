@@ -1,9 +1,15 @@
 # Changes
 
+## v6.0.0
+
+- BREAKING: Removed partial support for object versioning and limited scope to
+  the only supported public API (i.e. `DeleteDirectory`).
+- BREAKING: Renamed `DeleteVersions` to `Versions` in `DeleteDirectoryOptions`.
+
 ## v5.0.3
 
 - Fixed `IterateObjects` when using a `Delimiter` on the `TestClient`.
-- Add error for accessing objects in long-term storage
+- Add error for accessing objects in long-term storage.
 
 ## v5.0.2
 
