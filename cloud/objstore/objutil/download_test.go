@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/couchbase/tools-common/cloud/v5/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 
 	"github.com/stretchr/testify/require"

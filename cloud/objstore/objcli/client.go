@@ -6,7 +6,7 @@ import (
 	"io"
 	"regexp"
 
-	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 )
 
 //go:generate mockery --name Client --case underscore --inpackage

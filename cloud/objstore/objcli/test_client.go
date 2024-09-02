@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/couchbase/tools-common/cloud/v5/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v5/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/ptr"
 )

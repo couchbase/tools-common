@@ -5,7 +5,7 @@ import (
 
 	"github.com/aws/smithy-go"
 
-	"github.com/couchbase/tools-common/cloud/v5/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
 	"github.com/couchbase/tools-common/types/ptr"
 )
 
