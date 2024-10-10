@@ -82,3 +82,10 @@ func TestDequeIter(t *testing.T) {
 		i++
 	})
 }
+
+// Validates the return types are pointers to ensure modifications are reflected correctly in 'Len'.
+func TestNewDeque(_ *testing.T) {
+	do := func(_ *Deque[int]) {}
+	do(NewDeque[int]())
+	do(NewDequeWithCapacity[int](42))
+}

@@ -2,7 +2,7 @@
 package deque
 
 import (
-	"github.com/couchbase/tools-common/types/ringbuf"
+	"github.com/couchbase/tools-common/types/v2/ringbuf"
 )
 
 const (
@@ -27,13 +27,13 @@ type Deque[T any] struct {
 }
 
 // NewDeque creates a deque of Ts with a default capacity.
-func NewDeque[T any]() Deque[T] {
+func NewDeque[T any]() *Deque[T] {
 	return NewDequeWithCapacity[T](defaultInitialCapacity)
 }
 
 // NewDequeWithCapacity creates a new deque of Ts with the given initial capacity.
-func NewDequeWithCapacity[T any](capacity int) Deque[T] {
-	return Deque[T]{rb: ringbuf.NewRingbuf[T](capacity)}
+func NewDequeWithCapacity[T any](capacity int) *Deque[T] {
+	return &Deque[T]{rb: ringbuf.NewRingbuf[T](capacity)}
 }
 
 // Len returns the number of items currently in the deque.

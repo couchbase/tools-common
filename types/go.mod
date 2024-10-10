@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/types
+module github.com/couchbase/tools-common/types/v2
 
 go 1.21
 

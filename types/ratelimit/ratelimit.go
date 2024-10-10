@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	ioiface "github.com/couchbase/tools-common/types/iface"
+	ioiface "github.com/couchbase/tools-common/types/v2/iface"
 )
 
 // RateLimitedReader will use its limiter as a rate limit on the number of bytes read.

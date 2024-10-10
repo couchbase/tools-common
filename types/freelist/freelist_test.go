@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/couchbase/tools-common/sync/v2/hofp"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 func TestFreeListLengthOne(t *testing.T) {

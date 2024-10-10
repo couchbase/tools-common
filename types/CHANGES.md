@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.0
+
+- The `deque.NewDeque` function now returns a pointer.
+
 ## v1.1.4
 
 - Upgraded dependencies
