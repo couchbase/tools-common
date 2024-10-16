@@ -1,5 +1,10 @@
 # Changes
 
+## v2.1.0
+
+- Add `UserDataValue` in `log` to tag user data in the format cbcollect's
+  redaction expects
+
 ## v2.0.0
 
 - Moved to `log/slog` (removed internal logging structures/interfaces).
