@@ -221,7 +221,7 @@ func TestRetryerDuration(t *testing.T) {
 				require.Equal(
 					t,
 					test.expected[i],
-					NewRetryer[int](RetryerOptions[int]{Algorithm: test.algorithm}).duration(i+1),
+					NewRetryer[int](RetryerOptions[int]{Algorithm: test.algorithm}).Duration(i+1),
 				)
 			}
 		})
@@ -232,6 +232,6 @@ func TestRetryerDurationWithOverflow(t *testing.T) {
 	require.Equal(
 		t,
 		2*time.Second+500*time.Millisecond,
-		NewRetryer[int](RetryerOptions[int]{Algorithm: AlgorithmExponential}).duration(42),
+		NewRetryer[int](RetryerOptions[int]{Algorithm: AlgorithmExponential}).Duration(42),
 	)
 }

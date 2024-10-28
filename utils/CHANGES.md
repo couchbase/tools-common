@@ -1,5 +1,9 @@
 # Changes
 
+## v3.0.1
+
+- Expose retry delay calculation as a method.
+
 ## v3.0.0
 
 - Removed `utils/maths` in favour of `min` and `max`.

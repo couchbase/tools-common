@@ -102,7 +102,7 @@ func (r Retryer[T]) retry(ctx *Context, payload T, err error) (bool, error) {
 
 // sleep until the next retry attempt, or the given context is cancelled.
 func (r Retryer[T]) sleep(ctx *Context) error {
-	timer := time.NewTimer(r.duration(ctx.Attempt()))
+	timer := time.NewTimer(r.Duration(ctx.Attempt()))
 	defer timer.Stop()
 
 	select {
@@ -114,7 +114,7 @@ func (r Retryer[T]) sleep(ctx *Context) error {
 }
 
 // duration returns the duration to sleep for, this may be calculated using one of a number of different algorithms.
-func (r Retryer[T]) duration(attempt int) time.Duration {
+func (r Retryer[T]) Duration(attempt int) time.Duration {
 	var n time.Duration
 
 	switch r.options.Algorithm {
