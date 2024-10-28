@@ -101,3 +101,18 @@ func GetBytes(varName string) (uint64, bool) {
 
 	return b, true
 }
+
+// GetFloat64 returns the float64 value of the environmental variable varName if the env var is empty or not a valid.
+func GetFloat64(varName string) (float64, bool) {
+	val, ok := os.LookupEnv(varName)
+	if !ok {
+		return 0, false
+	}
+
+	ret, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return ret, true
+}

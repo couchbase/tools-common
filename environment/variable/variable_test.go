@@ -296,3 +296,44 @@ func TestGetBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestGetFloat64(t *testing.T) {
+	type test struct {
+		name         string
+		expectedVal  float64
+		expectedBool bool
+		envName      string
+		envValue     string
+	}
+
+	tests := []test{
+		{
+			name:         "ValidEnv",
+			expectedVal:  1.47,
+			expectedBool: true,
+			envName:      "CB_TEST_ENVAR_VALID_CASE",
+			envValue:     "1.47",
+		},
+		{
+			name:    "EnvNotSet",
+			envName: "CB_TEST_ENVAR_NO_ENV_CASE",
+		},
+		{
+			name:     "EnvIsNotAFloat",
+			envName:  "CB_TEST_ENVAR_NOT_AN_INT_CASE",
+			envValue: "this is not a float but does have one in: 77.777",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.NoError(t, os.Setenv(test.envName, test.envValue))
+			defer os.Unsetenv(test.envName)
+
+			val, ok := GetFloat64(test.envName)
+
+			require.Equal(t, test.expectedBool, ok)
+			require.Equal(t, test.expectedVal, val)
+		})
+	}
+}

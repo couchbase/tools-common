@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.0
+
+- Add function to get float from an environment variable.
+
 ## v1.0.5
 
 - Upgraded dependencies
