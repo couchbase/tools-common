@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	netutil "github.com/couchbase/tools-common/http/util"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 func TestGetHTTPTimeouts(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"os"
 
 	netutil "github.com/couchbase/tools-common/http/util"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 // GetHTTPTimeouts returns the timeouts that should be used for a HTTP client from the environment or uses provided
