@@ -1,5 +1,9 @@
 # Changes
 
+## v3.3.0
+
+- Add (8.0) Morpheus to versions
+
 ## v3.2.0
 
 - Add a `HostnameTransform` option to allow modifying hostnames prior to
