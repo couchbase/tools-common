@@ -6,7 +6,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
-	"github.com/couchbase/tools-common/types/ratelimit"
+	"github.com/couchbase/tools-common/types/v2/ratelimit"
 )
 
 // RateLimitedClient implements objcli.Client interface mostly by deferring to the underlying Client, but where the

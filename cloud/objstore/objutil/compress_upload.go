@@ -20,8 +20,8 @@ import (
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 	"github.com/couchbase/tools-common/strings/format"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
-	"github.com/couchbase/tools-common/types/freelist"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/freelist"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 // PartCompleteFunc is called once a part of the zip file has been uploaded. size is the size of the part uploaded.

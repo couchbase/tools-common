@@ -18,7 +18,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	testutil "github.com/couchbase/tools-common/testing/util"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -649,7 +649,7 @@ func TestClientDeleteDirectory(t *testing.T) {
 		},
 	}
 
-	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 		Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -693,7 +693,7 @@ func TestClientDeleteDirectoryWithCallbackError(t *testing.T) {
 		},
 	}
 
-	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 		Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -814,7 +814,7 @@ func TestClientIterateObjects(t *testing.T) {
 		return bucket && prefix && delimiter
 	}
 
-	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn)).
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn), mock.Anything).
 		Return(&s3.ListObjectsV2Output{}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -868,7 +868,7 @@ func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 		},
 	}
 
-	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 		Return(output1, nil)
 
 	var (
@@ -922,7 +922,7 @@ func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 		},
 	}
 
-	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 		Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -1076,7 +1076,7 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 				},
 			}
 
-			api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1)).
+			api.On("ListObjectsV2", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 				Return(&s3.ListObjectsV2Output{Contents: contents1}, nil)
 
 			client := &Client{serviceAPI: api}
@@ -1158,7 +1158,7 @@ func TestClientListParts(t *testing.T) {
 		},
 	}
 
-	api.On("ListParts", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("ListParts", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 		Return(&s3.ListPartsOutput{Parts: parts1}, nil)
 
 	client := &Client{serviceAPI: api}
@@ -1190,7 +1190,7 @@ func TestClientListPartsUploadNotFound(t *testing.T) {
 		return bucket && id && key
 	}
 
-	api.On("ListParts", matchers.Context, mock.MatchedBy(fn1)).
+	api.On("ListParts", matchers.Context, mock.MatchedBy(fn1), mock.Anything).
 		Return(nil, &types.NoSuchUpload{})
 
 	client := &Client{serviceAPI: api}

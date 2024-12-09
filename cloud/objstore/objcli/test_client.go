@@ -19,7 +19,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 // TestClient implementation of the 'Client' interface which stores state in memory, and can be used to avoid having to

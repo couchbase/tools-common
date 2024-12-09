@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
-	ioiface "github.com/couchbase/tools-common/types/iface"
+	ioiface "github.com/couchbase/tools-common/types/v2/iface"
 )
 
 // ChunkReader allows data from an 'io.Reader' in chunks of a given size.

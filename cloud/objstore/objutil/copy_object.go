@@ -6,7 +6,7 @@ import (
 
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 // CopyObjectOptions encapsulates the available options which can be used when copying an object.

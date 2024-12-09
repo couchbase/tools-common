@@ -23,7 +23,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 func TestNewClient(t *testing.T) {

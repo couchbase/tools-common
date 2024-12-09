@@ -21,7 +21,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
 	"github.com/couchbase/tools-common/functional/slices"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 const partSize = 1024

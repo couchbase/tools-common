@@ -6,7 +6,7 @@ import (
 	"github.com/aws/smithy-go"
 
 	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
 // handleError converts an error relating accessing an object via its key into a user friendly error where possible.
