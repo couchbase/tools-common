@@ -42,12 +42,6 @@ pipeline {
                     ])])
                 }
 
-                slackSend(
-                    channel: "#tooling-cv",
-                    color: "good",
-                    message: "Build for '<${GERRIT_CHANGE_URL}|${GERRIT_CHANGE_SUBJECT}>' by '${GERRIT_CHANGE_OWNER_NAME}' started (${env.BUILD_URL})"
-                )
-
                 timeout(time: 5, unit: "MINUTES") {
                     // Install Golang locally
                     sh "wget -q -O- ${GO_TARBALL_URL} | tar xz"
@@ -126,38 +120,6 @@ pipeline {
 
             // Post the test coverage
             cobertura autoUpdateStability: false, autoUpdateHealth: false, onlyStable: false, coberturaReportFile: "reports/coverage.xml", conditionalCoverageTargets: "70, 10, 30", failNoReports: false, failUnhealthy: true, failUnstable: true, lineCoverageTargets: "70, 10, 30", methodCoverageTargets: "70, 10, 30", maxNumberOfBuilds: 0, sourceEncoding: "ASCII", zoomCoverageChart: false
-        }
-
-        success {
-            slackSend(
-                channel: "#tooling-cv",
-                color: "good",
-                message: "Build for '<${GERRIT_CHANGE_URL}|${GERRIT_CHANGE_SUBJECT}>' by '${GERRIT_CHANGE_OWNER_NAME}' succeeded (${env.BUILD_URL})"
-            )
-        }
-
-        unstable {
-            slackSend(
-                channel: "#tooling-cv",
-                color: "bad",
-                message: "Build for '<${GERRIT_CHANGE_URL}|${GERRIT_CHANGE_SUBJECT}>' by '${GERRIT_CHANGE_OWNER_NAME}' is unstable (${env.BUILD_URL})"
-            )
-        }
-
-        failure {
-            slackSend(
-                channel: "#tooling-cv",
-                color: "bad",
-                message: "Build for '<${GERRIT_CHANGE_URL}|${GERRIT_CHANGE_SUBJECT}>' by '${GERRIT_CHANGE_OWNER_NAME}' failed (${env.BUILD_URL})"
-            )
-        }
-
-        aborted {
-            slackSend(
-                channel: "#tooling-cv",
-                color: "bad",
-                message: "Build for '<${GERRIT_CHANGE_URL}|${GERRIT_CHANGE_SUBJECT}>' by '${GERRIT_CHANGE_OWNER_NAME}' aborted (${env.BUILD_URL})"
-            )
         }
 
         cleanup {
