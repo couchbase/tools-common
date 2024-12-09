@@ -9,7 +9,7 @@ import (
 	"strings"
 	"text/template"
 
-	cbvalue "github.com/couchbase/tools-common/couchbase/v2/value"
+	cbvalue "github.com/couchbase/tools-common/couchbase/v3/value"
 	"github.com/couchbase/tools-common/errors/definitions"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 )

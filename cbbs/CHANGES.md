@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.1
+
+- Upgraded dependencies
+
 ## v1.2.0
 
 - Add metrics generation tool `genmetrics`
