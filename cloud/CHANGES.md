@@ -1,5 +1,9 @@
 # Changes
 
+## v6.0.1
+
+- Upgraded dependencies
+
 ## v6.0.0
 
 - BREAKING: Removed partial support for object versioning and limited scope to
