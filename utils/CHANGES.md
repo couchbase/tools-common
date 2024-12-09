@@ -1,5 +1,9 @@
 # Changes
 
+## v3.0.2
+
+- Upgraded dependencies.
+
 ## v3.0.1
 
 - Expose retry delay calculation as a method.
