@@ -1,5 +1,8 @@
 # Changes
 
+## v3.3.1
+- Upgraded dependencies
+
 ## v3.3.0
 
 - Add (8.0) Morpheus to versions

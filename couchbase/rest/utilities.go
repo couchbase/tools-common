@@ -15,7 +15,7 @@ import (
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
-	"github.com/couchbase/tools-common/types/ptr"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/utils/v3/retry"
 )
 

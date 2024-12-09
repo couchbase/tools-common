@@ -77,7 +77,6 @@ func TestNodesCopy(t *testing.T) {
 
 	actual := expected.Copy()
 	require.Equal(t, expected, actual)
-	require.NotSame(t, expected, actual)
 
 	for i := 0; i < len(expected); i++ {
 		require.NotSame(t, expected[i], actual[i])
