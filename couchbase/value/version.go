@@ -56,8 +56,11 @@ const (
 	// Version7_6_0 represents the 7.6.0 release of Couchbase Server (Trinity).
 	Version7_6_0 = Version("7.6.0")
 
+	// Version8_0_0 represents the 7.6.0 release of Couchbase Server (Morpheus).
+	Version8_0_0 = Version("8.0.0")
+
 	// VersionLatest represents the latest known version of Couchbase server, this may be an unreleased version.
-	VersionLatest = Version7_6_0
+	VersionLatest = Version8_0_0
 
 	// VersionColumnarUnknown indicates the cluster is running an unknown version of Couchbase Columnar; this is
 	// usually a development build and therefore is treated as being the latest version during comparisons.
