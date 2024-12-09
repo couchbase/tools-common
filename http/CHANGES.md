@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.7
+
+- Upgraded dependencies
+
 ## v1.0.6
 
 - A HTTP 403 error is no longer considered a temporary error in
