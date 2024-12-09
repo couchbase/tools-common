@@ -1,5 +1,9 @@
 # Changes
 
+## v1.3.1
+
+- Upgraded dependencies
+
 ## v1.3.0
 
 - Added a `Difference` method to `maps`.
