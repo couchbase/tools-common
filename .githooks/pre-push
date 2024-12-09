@@ -20,3 +20,19 @@ done
 # runs), therefore, this should mean less wasted time spent fixing mistakes picked up when it's least convenient to fix
 # them.
 ./scripts/cv/lint.sh
+
+# ensure that 'CHANGES.md' has been updated, run this last so that a false-positive (and use of '--no-verify') doesn't
+# skip the prior checks, which are also important.
+for MOD in $(find . -name 'go.mod' | xargs dirname | grep -v 'scripts' | tr -d './'); do
+    if ! git diff --name-only HEAD^ | grep -q $MOD; then
+        continue
+    fi
+
+    if git diff --name-only HEAD^ | grep -q 'CHANGES.md'; then
+        continue
+    fi
+
+    echo "Error: It looks like you've missed updating the 'CHANGES.md' file, please confirm and use '--no-verify' if this is a false positive"
+
+    exit 1
+done
