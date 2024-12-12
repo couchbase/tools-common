@@ -333,8 +333,8 @@ func calculateSize(opts CompressObjectsOptions) (int64, error) {
 // and upload every object with the given prefix there. Each object will be streamed from cloud storage, through a
 // ZipWriter and back to cloud storage.
 func CompressObjects(opts CompressObjectsOptions) ([]byte, error) {
-	if opts.Client == nil || opts.SourceBucket == "" || opts.Prefix == "" || opts.DestinationBucket == "" ||
-		opts.Destination == "" || opts.Checksum == nil {
+	if opts.Client == nil || opts.SourceBucket == "" || opts.DestinationBucket == "" || opts.Destination == "" ||
+		opts.Checksum == nil {
 		return nil, fmt.Errorf("missing required parameters")
 	}
 

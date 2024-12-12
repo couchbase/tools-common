@@ -1,5 +1,10 @@
 # Changes
 
+## v6.1.0
+
+- Updated `objutil` `CompressObjects` to allow for an empty prefix.
+  I.e. options validation no longer checks for if `prefix == ""` as it's a valid input.
+
 ## v6.0.1
 
 - Upgraded dependencies

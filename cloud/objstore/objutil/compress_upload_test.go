@@ -188,6 +188,42 @@ func TestCompressUpload(t *testing.T) {
 	}
 }
 
+func TestCompressUploadNoPrefix(t *testing.T) {
+	cli := setupTestClient(t)
+	_, err := CompressObjects(CompressObjectsOptions{
+		Options:           Options{PartSize: partSize},
+		Client:            cli,
+		SourceBucket:      "bucket",
+		DestinationBucket: "bucket",
+		Destination:       "export.zip",
+		Checksum:          sha256.New(),
+	})
+
+	require.NoError(t, err)
+
+	require.Contains(t, cli.Buckets["bucket"], "export.zip")
+
+	data := cli.Buckets["bucket"]["export.zip"].Body
+
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	require.NoError(t, err)
+
+	for _, path := range paths {
+		file, err := zr.Open(path.path)
+		require.NoError(t, err)
+
+		defer file.Close()
+
+		stat, err := file.Stat()
+		require.NoError(t, err)
+		require.Equal(t, path.size, stat.Size())
+
+		buf, err := io.ReadAll(file)
+		require.NoError(t, err)
+		require.Equal(t, cli.Buckets["bucket"][path.path].Body, buf)
+	}
+}
+
 func TestCompressUploadProgressReporting(t *testing.T) {
 	var (
 		cli = setupTestClient(t)
