@@ -946,7 +946,7 @@ func (c *Client) perform(
 		"dispatching request",
 		"attempt", ctx.Attempt(),
 		"method", req.Method,
-		"url", req.URL,
+		"url", req.URL.String(),
 	)
 
 	client := c.client
@@ -966,7 +966,7 @@ func (c *Client) perform(
 			"attempt", ctx.Attempt(),
 			"method", req.Method,
 			"status_code", resp.StatusCode,
-			"url", req.URL,
+			"url", req.URL.String(),
 		)
 
 		return resp, nil
@@ -976,7 +976,7 @@ func (c *Client) perform(
 		"failed to perform request",
 		"attempt", ctx.Attempt(),
 		"method", req.Method,
-		"url", req.URL,
+		"url", req.URL.String(),
 		"error", err,
 	)
 

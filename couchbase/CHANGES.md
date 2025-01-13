@@ -1,6 +1,11 @@
 # Changes
 
+## v3.3.2
+
+- Call `.String()` on `dispatching request` log statements
+
 ## v3.3.1
+
 - Upgraded dependencies
 
 ## v3.3.0
