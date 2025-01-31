@@ -1,5 +1,8 @@
 # Changes
 
+## v6.1.1
+- Send a CRC32 checksum when uploading objects.
+
 ## v6.1.0
 
 - Updated `objutil` `CompressObjects` to allow for an empty prefix.

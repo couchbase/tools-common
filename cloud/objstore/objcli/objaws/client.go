@@ -124,9 +124,10 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 
 func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
 	input := &s3.PutObjectInput{
-		Body:   opts.Body,
-		Bucket: ptr.To(opts.Bucket),
-		Key:    ptr.To(opts.Key),
+		Body:              opts.Body,
+		Bucket:            ptr.To(opts.Bucket),
+		Key:               ptr.To(opts.Key),
+		ChecksumAlgorithm: types.ChecksumAlgorithmCrc32,
 	}
 
 	_, err := c.serviceAPI.PutObject(ctx, input)
@@ -588,6 +589,9 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 		Key:           ptr.To(opts.Key),
 		PartNumber:    ptr.To(int32(opts.Number)),
 		UploadId:      ptr.To(opts.UploadID),
+		// We only specify the checksum for the upload of parts as AWS supports combining the CRC32 checksums to find the full
+		// object checksum. Furthermore the SDK doesn't appear to calculate the full checksum for us.
+		ChecksumAlgorithm: types.ChecksumAlgorithmCrc32,
 	}
 
 	output, err := c.serviceAPI.UploadPart(ctx, input)
