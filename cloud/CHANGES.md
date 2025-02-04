@@ -1,5 +1,8 @@
 # Changes
 
+## v6.1.2
+- Ensured GCP IterateObjects returns a handled error when the bucket does not exist.
+
 ## v6.1.1
 - Send a CRC32 checksum when uploading objects.
 

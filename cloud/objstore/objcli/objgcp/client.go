@@ -364,7 +364,7 @@ func (c *Client) iterateObjects(
 		}
 
 		if err != nil {
-			return fmt.Errorf("failed to get next object: %w", err)
+			return handleError(bucket, "", fmt.Errorf("failed to get next object: %w", err))
 		}
 
 		if objcli.ShouldIgnore(remote.Name, include, exclude) {

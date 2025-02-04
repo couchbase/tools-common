@@ -732,6 +732,33 @@ func TestClientIterateObjectsBothIncludeExcludeSupplied(t *testing.T) {
 	require.ErrorIs(t, err, objcli.ErrIncludeAndExcludeAreMutuallyExclusive)
 }
 
+func TestClientIterateObjectsNotFoundErr(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+	)
+
+	msAPI.On("Bucket", "bucket").Return(mbAPI)
+
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Delimiter == "delimiter" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
+
+	miAPI.On("Next").Return(nil, storage.ErrObjectNotExist)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+	})
+	require.True(t, objerr.IsNotFoundError(err))
+}
+
 func TestClientIterateObjectsPropagateUserError(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}
