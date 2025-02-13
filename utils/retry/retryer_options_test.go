@@ -16,6 +16,8 @@ func TestRetryerOptionsDefaults(t *testing.T) {
 		MaxRetries: 3,
 		MinDelay:   50 * time.Millisecond,
 		MaxDelay:   2*time.Second + 500*time.Millisecond,
+		MinJitter:  50 * time.Millisecond,
+		MaxJitter:  250 * time.Millisecond,
 	}
 
 	require.Equal(t, expected, options)

@@ -44,6 +44,12 @@ type RetryerOptions[T any] struct {
 	// MaxDelay is the maximum delay to use for backoff.
 	MaxDelay time.Duration
 
+	// MinJitter is the minimum amount of jitter to apply before backing off.
+	MinJitter time.Duration
+
+	// MaxJitter is the maximum amount of jitter to apply before backing off.
+	MaxJitter time.Duration
+
 	// ShouldRetry is a custom retry function, when not supplied, this will be defaulted to 'err != nil'.
 	ShouldRetry ShouldRetryFunc[T]
 
@@ -65,5 +71,13 @@ func (r *RetryerOptions[T]) defaults() {
 
 	if r.MaxDelay == 0 {
 		r.MaxDelay = 2*time.Second + 500*time.Millisecond
+	}
+
+	if r.MinJitter == 0 {
+		r.MinJitter = 50 * time.Millisecond
+	}
+
+	if r.MaxJitter == 0 {
+		r.MaxJitter = 250 * time.Millisecond
 	}
 }

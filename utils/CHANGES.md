@@ -4,6 +4,8 @@
 
 - `Retryer` now allows more than 50 retries, after which a constant back-off is
   applied (depending on the retry algorithm).
+- `Retryer` now adds some random jitter before backing off, reducing the
+  likelihood of multiple simultaneous retries all retrying in sync.
 
 ## v3.0.2
 

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"math"
 	"time"
+
+	"github.com/couchbase/tools-common/utils/v3/crypto/random"
 )
 
 // RetryableFunc represents a function which is retryable.
@@ -75,7 +77,14 @@ func (r Retryer[T]) do(ctx *Context, fn RetryableFunc[T]) (T, bool, error) {
 		r.options.Cleanup(payload)
 	}
 
-	if err := r.sleep(ctx); err != nil {
+	// We ignore this error, worst case, no jitter occurs
+	dur, _ := r.Jitter()
+
+	if err := r.sleep(ctx, dur); err != nil {
+		return *new(T), true, err
+	}
+
+	if err := r.sleep(ctx, r.Duration(ctx.Attempt())); err != nil {
 		return *new(T), true, err
 	}
 
@@ -100,9 +109,9 @@ func (r Retryer[T]) retry(ctx *Context, payload T, err error) (bool, error) {
 	return err != nil, err
 }
 
-// sleep until the next retry attempt, or the given context is cancelled.
-func (r Retryer[T]) sleep(ctx *Context) error {
-	timer := time.NewTimer(r.Duration(ctx.Attempt()))
+// sleep for the given duration, or the given context is cancelled.
+func (r Retryer[T]) sleep(ctx *Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
 	defer timer.Stop()
 
 	select {
@@ -113,7 +122,12 @@ func (r Retryer[T]) sleep(ctx *Context) error {
 	}
 }
 
-// duration returns the duration to sleep for, this may be calculated using one of a number of different algorithms.
+// Jitter returns the jitter, between the users provided min/max values.
+func (r Retryer[T]) Jitter() (time.Duration, error) {
+	return random.Integer(r.options.MinJitter, r.options.MaxJitter+1)
+}
+
+// Duration returns the duration to sleep for, this may be calculated using one of a number of different algorithms.
 //
 // NOTE: After fifty attempts, a constant duration is returned (the max available, or the chosen max delay).
 func (r Retryer[T]) Duration(attempt int) time.Duration {
