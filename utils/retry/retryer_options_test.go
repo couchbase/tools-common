@@ -20,17 +20,3 @@ func TestRetryerOptionsDefaults(t *testing.T) {
 
 	require.Equal(t, expected, options)
 }
-
-func TestRetryerOptionsLimitRetries(t *testing.T) {
-	options := RetryerOptions[int]{MaxRetries: 51}
-	options.defaults()
-
-	expected := RetryerOptions[int]{
-		Algorithm:  AlgorithmFibonacci,
-		MaxRetries: 50,
-		MinDelay:   50 * time.Millisecond,
-		MaxDelay:   2*time.Second + 500*time.Millisecond,
-	}
-
-	require.Equal(t, expected, options)
-}

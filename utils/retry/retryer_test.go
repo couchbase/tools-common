@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -222,6 +223,56 @@ func TestRetryerDuration(t *testing.T) {
 					t,
 					test.expected[i],
 					NewRetryer[int](RetryerOptions[int]{Algorithm: test.algorithm}).Duration(i+1),
+				)
+			}
+		})
+	}
+}
+
+func TestRetryerDurationOverFifty(t *testing.T) {
+	const (
+		maxFib = 12586269025 * 50 * time.Millisecond
+		maxExp = math.MaxInt64
+		expLin = 2*time.Second + 500*time.Millisecond
+	)
+
+	type test struct {
+		name      string
+		algorithm Algorithm
+		expected  []time.Duration
+	}
+
+	tests := []*test{
+		{
+			name:      "Fibonacci",
+			algorithm: AlgorithmFibonacci,
+			expected:  []time.Duration{maxFib, maxFib, maxFib},
+		},
+		{
+			name:      "Exponential",
+			algorithm: AlgorithmExponential,
+			expected:  []time.Duration{maxExp, maxExp, maxExp},
+		},
+		{
+			name:      "Linear",
+			algorithm: AlgorithmLinear,
+			expected:  []time.Duration{expLin, expLin, expLin},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := RetryerOptions[int]{
+				Algorithm:  test.algorithm,
+				MaxRetries: 100,
+				MaxDelay:   math.MaxInt64,
+			}
+
+			for i := 50; i < 53; i++ {
+				require.Equal(
+					t,
+					test.expected[i-50],
+					NewRetryer[int](options).Duration(i+1),
 				)
 			}
 		})

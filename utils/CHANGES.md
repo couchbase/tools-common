@@ -1,5 +1,10 @@
 # Changes
 
+## v3.1.0
+
+- `Retryer` now allows more than 50 retries, after which a constant back-off is
+  applied (depending on the retry algorithm).
+
 ## v3.0.2
 
 - Upgraded dependencies.

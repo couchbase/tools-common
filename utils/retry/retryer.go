@@ -114,7 +114,13 @@ func (r Retryer[T]) sleep(ctx *Context) error {
 }
 
 // duration returns the duration to sleep for, this may be calculated using one of a number of different algorithms.
+//
+// NOTE: After fifty attempts, a constant duration is returned (the max available, or the chosen max delay).
 func (r Retryer[T]) Duration(attempt int) time.Duration {
+	// We truncate the attempt to fifty, to avoid overflowing the first multiplicand; this allows people to retry more
+	// that fifty times but just hit a point where back-off is constant (or sits at their chosen max back-off).
+	attempt = min(attempt, 50)
+
 	var n time.Duration
 
 	switch r.options.Algorithm {

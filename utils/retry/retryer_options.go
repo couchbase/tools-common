@@ -59,10 +59,6 @@ func (r *RetryerOptions[T]) defaults() {
 		r.MaxRetries = 3
 	}
 
-	// NOTE: Limit the user to supplying 50 retries, this avoids the possibility for an overflow when generating the
-	// first multiplicand.
-	r.MaxRetries = min(r.MaxRetries, 50)
-
 	if r.MinDelay == 0 {
 		r.MinDelay = 50 * time.Millisecond
 	}
