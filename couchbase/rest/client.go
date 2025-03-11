@@ -625,7 +625,9 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 	)
 
 	for {
-		payload, err := reader.ReadBytes('\n')
+		var payload []byte
+
+		payload, err = reader.ReadBytes('\n')
 		if err != nil {
 			break
 		}
@@ -649,7 +651,7 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 	}
 
 	// If the remote end close the connection, cleanup and return successfully
-	if err == nil || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		c.logger.Log(
 			ctx,
 			c.reqResLogLevel,

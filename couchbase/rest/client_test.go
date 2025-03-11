@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -21,7 +22,9 @@ import (
 	"github.com/couchbase/tools-common/couchbase/v3/connstr"
 	netutil "github.com/couchbase/tools-common/http/util"
 	testutil "github.com/couchbase/tools-common/testing/util"
+	"github.com/couchbase/tools-common/utils/v3/retry"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,6 +32,15 @@ import (
 var provider = &aprov.Static{
 	UserAgent:   "user-agent",
 	Credentials: aprov.Credentials{Username: "username", Password: "password"},
+}
+
+// ErrReader implements the 'io.Reader' interface, always returning an error.
+type ErrReader struct {
+	err error
+}
+
+func (e *ErrReader) Read([]byte) (int, error) {
+	return 0, e.err
 }
 
 // newTestClient returns a client which is boostrapped against the provided cluster.
@@ -1470,6 +1482,29 @@ func TestClientExecuteStreamWithUnexpectedStatusCode(t *testing.T) {
 	var unexpectedStatus *UnexpectedStatusCodeError
 
 	require.ErrorAs(t, err, &unexpectedStatus)
+}
+
+func TestClientStreamWithStreamError(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	request := &Request{}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	defer client.Close()
+
+	resp := http.Response{
+		Body: io.NopCloser(&ErrReader{err: assert.AnError}),
+	}
+
+	stream := make(chan StreamingResponse, 1)
+
+	client.stream(retry.NewContext(context.Background()), request, &resp, stream)
+
+	require.Len(t, stream, 1)
+	require.Error(t, (<-stream).Error)
 }
 
 func TestGetServiceHost(t *testing.T) {

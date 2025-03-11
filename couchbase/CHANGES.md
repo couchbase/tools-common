@@ -1,5 +1,9 @@
 # Changes
 
+## v3.3.3
+
+- Fixed a case where errors would be swallowed by `ExecuteStream`
+
 ## v3.3.2
 
 - Call `.String()` on `dispatching request` log statements
