@@ -6,7 +6,7 @@ toolchain go1.23.4
 
 require (
 	github.com/couchbase/cbauth v0.1.12
-	github.com/couchbase/tools-common/couchbase/v3 v3.3.1
+	github.com/couchbase/tools-common/couchbase/v3 v3.3.4
 	github.com/couchbase/tools-common/errors v1.0.0
 	github.com/couchbase/tools-common/fs v1.0.2
 	github.com/stretchr/testify v1.10.0

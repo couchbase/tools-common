@@ -10,6 +10,10 @@ github.com/couchbase/goutils v0.1.2 h1:gWr8B6XNWPIhfalHNog3qQKfGiYyh4K4VhO3P2o9B
 github.com/couchbase/goutils v0.1.2/go.mod h1:h89Ek/tiOxxqjz30nPPlwZdQbdB8BwgnuBxeoUe/ViE=
 github.com/couchbase/tools-common/couchbase/v3 v3.3.1 h1:EvkuPknVjquGM2MHKE0cQ6SDXyVhlSxfgPoPeQJLnro=
 github.com/couchbase/tools-common/couchbase/v3 v3.3.1/go.mod h1:HxgL+2z2dKh7951YViYYiOJK50RgOki63meeks6Vtw4=
+github.com/couchbase/tools-common/couchbase/v3 v3.3.2 h1:BIrL6+8pK91d7R4n4uZNE7P1fLGum7Aj8n1+ekjRKwY=
+github.com/couchbase/tools-common/couchbase/v3 v3.3.2/go.mod h1:HxgL+2z2dKh7951YViYYiOJK50RgOki63meeks6Vtw4=
+github.com/couchbase/tools-common/couchbase/v3 v3.3.4 h1:sw/k7dvAHl8JtVprVKcecFkRvAEzulObaIxddTLe2BU=
+github.com/couchbase/tools-common/couchbase/v3 v3.3.4/go.mod h1:HxgL+2z2dKh7951YViYYiOJK50RgOki63meeks6Vtw4=
 github.com/couchbase/tools-common/errors v1.0.0 h1:lEPRdPrk7iHOiZIJspEH7OnywxRR+SKlrG78KkOWnXA=
 github.com/couchbase/tools-common/errors v1.0.0/go.mod h1:9or/a3TpNd/1aZIUr/a8y0uF03O9hachXFCnu6Y3sjM=
 github.com/couchbase/tools-common/fs v1.0.2 h1:rmHHed8HCbIriTHVVTpDvWyUAvG0Xfq/hD4Altet2w0=
