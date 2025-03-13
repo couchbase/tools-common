@@ -927,8 +927,9 @@ func (c *Client) serviceHost(service Service, attempt int) (string, error) {
 		return "", fmt.Errorf("failed to parse host '%s': %w", host, err)
 	}
 
+	hostname := netutil.ReconstructIPV6(parsed.Hostname())
 	if c.connectionMode != ConnectionModeLoopback {
-		return fmt.Sprintf("%s://%s:%s", parsed.Scheme, transform(parsed.Hostname()), parsed.Port()), nil
+		return fmt.Sprintf("%s://%s:%s", parsed.Scheme, transform(hostname), parsed.Port()), nil
 	}
 
 	return "http://localhost:" + parsed.Port(), nil

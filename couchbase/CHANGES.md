@@ -1,5 +1,9 @@
 # Changes
 
+## v3.3.4
+
+- Fix incorrectly constructed IPv6 address in cbrest
+
 ## v3.3.3
 
 - Fixed a case where errors would be swallowed by `ExecuteStream`

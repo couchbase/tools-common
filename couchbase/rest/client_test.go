@@ -1521,6 +1521,28 @@ func TestGetServiceHost(t *testing.T) {
 	require.Equal(t, cluster.URL(), host)
 }
 
+func TestGetServiceHostIPv6(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		DisableCCP:       true,
+		ConnectionMode:   ConnectionModeThisNodeOnly,
+		Provider:         provider,
+	})
+	require.NoError(t, err)
+
+	// Ideally we would have the nodes endpoint respond with '::1'. Unfortunately this result is used to then call other
+	// endpoints during bootstrapping which would fail, as 'NewTestCluster' uses 'httptest' which does not listen on
+	// IPv6.
+	client.authProvider.manager.config.Nodes[0].Hostname = "::1"
+
+	host, err := client.GetServiceHost(ServiceManagement)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("http://[::1]:%d", cluster.Port()), host)
+}
+
 func TestGetServiceHostHostnameTransform(t *testing.T) {
 	cluster := NewTestCluster(t, TestClusterOptions{})
 	defer cluster.Close()
