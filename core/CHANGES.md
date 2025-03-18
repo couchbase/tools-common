@@ -1,5 +1,10 @@
 # Changes
 
+## v2.1.1
+
+- Fix flag matching in args logging: When a flag starts with '--' we
+  should match the entire flag and not only the prefix.
+
 ## v2.1.0
 
 - Add `UserDataValue` in `log` to tag user data in the format cbcollect's

@@ -68,9 +68,15 @@ func MaskAndUserTagCBMArguments(args []string) string {
 	return MaskAndUserTagArguments(args, cbmFlagsToTag, cbmFlagsToMask)
 }
 
-func flagMatches(flag string, flags []string) bool {
-	for _, prefix := range flags {
-		if strings.HasPrefix(flag, prefix) {
+func flagMatches(flag string, referenceFlags []string) bool {
+	for _, referenceFlag := range referenceFlags {
+		var (
+			longFlag    = strings.HasPrefix(referenceFlag, "--")
+			exactMatch  = flag == referenceFlag
+			prefixMatch = strings.HasPrefix(flag, referenceFlag)
+		)
+
+		if (longFlag && exactMatch) || (!longFlag && prefixMatch) {
 			return true
 		}
 	}

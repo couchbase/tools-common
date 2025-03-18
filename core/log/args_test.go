@@ -85,11 +85,20 @@ func TestMaskArguments(t *testing.T) {
 			arguments: []string{"--password", "pass", "-u", "user", "-p", "p1"},
 			expected:  []string{"--password", "*****", "-u", "user", "-p", "*****"},
 		},
+		{
+			name: "doNotMaskStartingWithP",
+			arguments: []string{
+				"--password", "pass", "-u", "user", "-p", "p1", "--p", "aaa", "--period", "123", "-P", "123",
+			},
+			expected: []string{
+				"--password", "*****", "-u", "user", "-p", "*****", "--p", "*****", "--period", "123", "-P", "123",
+			},
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, MaskArguments(tc.arguments, []string{"-p", "--password"}))
+			require.Equal(t, tc.expected, MaskArguments(tc.arguments, []string{"-p", "--password", "--p"}))
 		})
 	}
 }
