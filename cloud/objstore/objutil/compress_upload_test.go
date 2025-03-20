@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"io"
@@ -102,7 +103,8 @@ func TestStripPrefix(t *testing.T) {
 
 func TestCompressUploadOptionsDefaults(t *testing.T) {
 	opts := CompressObjectsOptions{
-		Client:            objcli.NewTestClient(t, objval.ProviderAWS),
+		SourceClient:      objcli.NewTestClient(t, objval.ProviderAWS),
+		DestinationClient: objcli.NewTestClient(t, objval.ProviderGCP),
 		SourceBucket:      "bucket",
 		DestinationBucket: "bucket",
 		Prefix:            "prefix",
@@ -121,7 +123,8 @@ func TestCompressUploadOptionsDefaults(t *testing.T) {
 		Prefix:            "prefix",
 		Destination:       "dest",
 		PartUploadWorkers: 4,
-		Client:            opts.Client,
+		SourceClient:      opts.SourceClient,
+		DestinationClient: opts.DestinationClient,
 		Logger:            slog.Default(),
 	}
 
@@ -137,25 +140,31 @@ func TestCompressUploadOptionsMissing(t *testing.T) {
 // when iterate returns an error (MB-55967)
 func TestCompressUploadIterateError(t *testing.T) {
 	cli := objcli.NewTestClient(t, objval.ProviderAWS)
+
 	_, err := CompressObjects(CompressObjectsOptions{
-		Client:            cli,
+		SourceClient:      cli,
+		DestinationClient: cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",
 		Destination:       "export.zip",
 		// Include and Exclude both being non-nil means iterate will return an error
-		Include: []*regexp.Regexp{{}},
-		Exclude: []*regexp.Regexp{{}},
+		Include:  []*regexp.Regexp{{}},
+		Exclude:  []*regexp.Regexp{{}},
+		Checksum: md5.New(),
 	})
 
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "include/exclude are mutually exclusive")
 }
 
 func TestCompressUpload(t *testing.T) {
 	cli := setupTestClient(t)
+
 	_, err := CompressObjects(CompressObjectsOptions{
 		Options:           Options{PartSize: partSize},
-		Client:            cli,
+		SourceClient:      cli,
+		DestinationClient: cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",
@@ -190,9 +199,11 @@ func TestCompressUpload(t *testing.T) {
 
 func TestCompressUploadNoPrefix(t *testing.T) {
 	cli := setupTestClient(t)
+
 	_, err := CompressObjects(CompressObjectsOptions{
 		Options:           Options{PartSize: partSize},
-		Client:            cli,
+		SourceClient:      cli,
+		DestinationClient: cli,
 		SourceBucket:      "bucket",
 		DestinationBucket: "bucket",
 		Destination:       "export.zip",
@@ -234,7 +245,8 @@ func TestCompressUploadProgressReporting(t *testing.T) {
 
 	_, err := CompressObjects(CompressObjectsOptions{
 		Options:                Options{PartSize: partSize},
-		Client:                 cli,
+		SourceClient:           cli,
+		DestinationClient:      cli,
 		SourceBucket:           "bucket",
 		Prefix:                 "prefix",
 		DestinationBucket:      "bucket",
@@ -330,7 +342,8 @@ func TestCompressUploadUploadError(t *testing.T) {
 
 	_, err := CompressObjects(CompressObjectsOptions{
 		Options:           Options{PartSize: 1024},
-		Client:            &cli,
+		SourceClient:      &cli,
+		DestinationClient: &cli,
 		SourceBucket:      "bucket",
 		Prefix:            "prefix",
 		DestinationBucket: "bucket",
@@ -344,9 +357,11 @@ func TestCompressUploadUploadError(t *testing.T) {
 
 func TestUploadFromReader(t *testing.T) {
 	client := setupTestClient(t)
+
 	options := CompressObjectsOptions{
 		Options:           Options{PartSize: partSize},
-		Client:            client,
+		SourceClient:      client,
+		DestinationClient: client,
 		Prefix:            "avocados.png",
 		SourceBucket:      "bucket-source",
 		DestinationBucket: "bucket-destination",
@@ -359,6 +374,37 @@ func TestUploadFromReader(t *testing.T) {
 
 	data := client.Buckets["bucket-destination"]["avocados.zip"].Body
 	require.NotNil(t, data)
+
+	hasher := sha256.New()
+	_, err = hasher.Write(data)
+	require.NoError(t, err)
+
+	require.Equal(t, checksum, hasher.Sum(nil), "checksums mismatch")
+}
+
+func TestUploadToAnotherClient(t *testing.T) {
+	var (
+		src = setupTestClient(t)
+		dst = setupTestClient(t)
+	)
+
+	options := CompressObjectsOptions{
+		Options:           Options{PartSize: partSize},
+		SourceClient:      src,
+		DestinationClient: dst,
+		Prefix:            "avocados.png",
+		SourceBucket:      "bucket-source",
+		DestinationBucket: "bucket-destination",
+		Destination:       "avocados.zip",
+		Checksum:          sha256.New(),
+	}
+
+	checksum, err := CompressObjects(options)
+	require.NoError(t, err)
+
+	data := dst.Buckets["bucket-destination"]["avocados.zip"].Body
+	require.NotNil(t, data)
+	require.NotContains(t, src.Buckets["bucket-source"], "avocados.zip")
 
 	hasher := sha256.New()
 	_, err = hasher.Write(data)

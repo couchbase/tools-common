@@ -38,10 +38,15 @@ type downloadCompleteFunc func(size int64)
 type CompressObjectsOptions struct {
 	Options
 
-	// Client is the objcli.Client to use to download and upload.
+	// SourceClient is the objcli.SourceClient to use to download.
 	//
 	// NOTE: required
-	Client objcli.Client
+	SourceClient objcli.Client
+
+	// DestinationClient is the objcli.SourceClient to use to upload.
+	//
+	// NOTE: required
+	DestinationClient objcli.Client
 
 	// PartUploadWorkers is the number of parts to upload at once.
 	PartUploadWorkers int
@@ -158,7 +163,7 @@ func download(
 		return fmt.Errorf("could not create file in zip: %w", err)
 	}
 
-	obj, err := opts.Client.GetObject(ctx, objcli.GetObjectOptions{
+	obj, err := opts.SourceClient.GetObject(ctx, objcli.GetObjectOptions{
 		Bucket: opts.SourceBucket,
 		Key:    key,
 	})
@@ -207,7 +212,7 @@ func iterate(ctx context.Context, opts CompressObjectsOptions, zipWriter *zip.Wr
 		return nil
 	}
 
-	err := opts.Client.IterateObjects(ctx, objcli.IterateObjectsOptions{
+	err := opts.SourceClient.IterateObjects(ctx, objcli.IterateObjectsOptions{
 		Bucket:    opts.SourceBucket,
 		Prefix:    opts.Prefix,
 		Delimiter: opts.Delimiter,
@@ -261,7 +266,7 @@ func uploadFromReader(
 	}
 
 	mp, err := NewMPUploader(MPUploaderOptions{
-		Client:         opts.Client,
+		Client:         opts.DestinationClient,
 		Bucket:         opts.DestinationBucket,
 		Key:            opts.Destination,
 		OnPartComplete: onComplete,
@@ -314,7 +319,7 @@ func uploadFromReader(
 func calculateSize(opts CompressObjectsOptions) (int64, error) {
 	var total int64
 
-	err := opts.Client.IterateObjects(opts.Context, objcli.IterateObjectsOptions{
+	err := opts.SourceClient.IterateObjects(opts.Context, objcli.IterateObjectsOptions{
 		Bucket:    opts.SourceBucket,
 		Prefix:    opts.Prefix,
 		Delimiter: opts.Delimiter,
@@ -333,7 +338,11 @@ func calculateSize(opts CompressObjectsOptions) (int64, error) {
 // and upload every object with the given prefix there. Each object will be streamed from cloud storage, through a
 // ZipWriter and back to cloud storage.
 func CompressObjects(opts CompressObjectsOptions) ([]byte, error) {
-	if opts.Client == nil || opts.SourceBucket == "" || opts.DestinationBucket == "" || opts.Destination == "" ||
+	if opts.SourceClient == nil ||
+		opts.DestinationClient == nil ||
+		opts.SourceBucket == "" ||
+		opts.DestinationBucket == "" ||
+		opts.Destination == "" ||
 		opts.Checksum == nil {
 		return nil, fmt.Errorf("missing required parameters")
 	}

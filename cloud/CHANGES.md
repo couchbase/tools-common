@@ -1,6 +1,11 @@
 # Changes
 
+## v7.0.0
+
+- BREAKING: Added the ability to use `CompressObjects` using a source/dest client, allow uploads to another account/provider.
+
 ## v6.1.2
+
 - Ensured GCP IterateObjects returns a handled error when the bucket does not exist.
 
 ## v6.1.1
