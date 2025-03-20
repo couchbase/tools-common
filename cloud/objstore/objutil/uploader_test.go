@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

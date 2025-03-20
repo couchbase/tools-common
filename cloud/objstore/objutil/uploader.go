@@ -9,9 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli/objaws"
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 )
 

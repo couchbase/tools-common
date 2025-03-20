@@ -17,9 +17,9 @@ import (
 	"golang.org/x/exp/slices"
 	"google.golang.org/api/iterator"
 
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/utils/v3/system"

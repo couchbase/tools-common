@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	ioiface "github.com/couchbase/tools-common/types/v2/iface"

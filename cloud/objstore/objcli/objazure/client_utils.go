@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
-	"github.com/couchbase/tools-common/cloud/v6/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
 )
 
 const (
