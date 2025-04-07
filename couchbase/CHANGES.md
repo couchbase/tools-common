@@ -1,5 +1,9 @@
 # Changes
 
+## v3.3.5
+
+- Cancel client context if we fail to update the cluster config after too many retries
+
 ## v3.3.4
 
 - Fix incorrectly constructed IPv6 address in cbrest

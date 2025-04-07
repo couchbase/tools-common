@@ -2099,7 +2099,7 @@ func TestClientWaitUntilUpdated(t *testing.T) {
 
 			rev := client.authProvider.manager.config.Revision
 
-			client.waitUntilUpdated(context.Background())
+			require.NoError(t, client.waitUntilUpdated(context.Background()))
 
 			if connectionMode == ConnectionModeThisNodeOnly || connectionMode == ConnectionModeLoopback {
 				require.Equal(t, rev, client.authProvider.manager.config.Revision)
@@ -2108,4 +2108,23 @@ func TestClientWaitUntilUpdated(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientWaitUntilUpdatedTimeout(t *testing.T) {
+	cluster := NewTestCluster(t, TestClusterOptions{})
+	defer cluster.Close()
+
+	client, err := NewClient(ClientOptions{
+		ConnectionString: cluster.URL(),
+		Provider:         provider,
+	})
+	require.NoError(t, err)
+
+	// Setting the nodes to an empty list will cause the client to never be able to update the cluster config
+	client.authProvider.manager.config.Nodes = Nodes{}
+	client.authProvider.manager.maxAge = 50 * time.Millisecond
+
+	var pollingErr *ClusterConfigPollingError
+
+	require.ErrorAs(t, client.waitUntilUpdated(client.ctx), &pollingErr)
 }

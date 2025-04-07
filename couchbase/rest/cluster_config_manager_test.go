@@ -111,7 +111,7 @@ func TestClusterConfigManagerWaitUntilUpdated(t *testing.T) {
 	)
 
 	go func() {
-		manager.WaitUntilUpdated(context.Background())
+		require.NoError(t, manager.WaitUntilUpdated(context.Background()))
 
 		woken = true
 	}()
@@ -134,7 +134,7 @@ func TestClusterConfigManagerWaitUntilUpdatedContextCancel(t *testing.T) {
 	)
 
 	go func() {
-		manager.WaitUntilUpdated(ctx)
+		require.ErrorIs(t, manager.WaitUntilUpdated(ctx), context.Canceled)
 
 		woken = true
 	}()
@@ -156,7 +156,7 @@ func TestClusterConfigManagerWaitUntilUpdatedSmokeTest(t *testing.T) {
 
 	for i := 0; i < 1024; i++ {
 		go func(i int) {
-			manager.WaitUntilUpdated(context.Background())
+			require.NoError(t, manager.WaitUntilUpdated(context.Background()))
 
 			woken[i] = true
 		}(i)

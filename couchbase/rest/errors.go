@@ -236,3 +236,16 @@ type OldClusterConfigError struct {
 func (e *OldClusterConfigError) Error() string {
 	return fmt.Sprintf("cluster config revision %d is older than the current revision %d", e.old, e.curr)
 }
+
+// ClusterConfigPollingError is returned when the client fails to update the cluster config after too many retries.
+type ClusterConfigPollingError struct {
+	inner error
+}
+
+func (e *ClusterConfigPollingError) Error() string {
+	return fmt.Sprintf("background config polling fatally failed: %s", e.inner)
+}
+
+func (e *ClusterConfigPollingError) Unwrap() error {
+	return e.inner
+}

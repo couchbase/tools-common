@@ -21,6 +21,7 @@ import (
 	envvar "github.com/couchbase/tools-common/environment/variable"
 	errutil "github.com/couchbase/tools-common/errors/util"
 	netutil "github.com/couchbase/tools-common/http/util"
+	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/utils/v3/retry"
 
 	"golang.org/x/exp/slices"
@@ -92,7 +93,7 @@ type Client struct {
 
 	wg         sync.WaitGroup
 	ctx        context.Context
-	cancelFunc context.CancelFunc
+	cancelFunc context.CancelCauseFunc
 
 	logger *slog.Logger
 }
@@ -269,7 +270,7 @@ func (c *Client) beginCCP() {
 	c.wg.Add(1)
 
 	// Allow the proper cleanup of the goroutine when the user calls 'Close'
-	c.ctx, c.cancelFunc = context.WithCancel(context.Background())
+	c.ctx, c.cancelFunc = context.WithCancelCause(context.Background())
 
 	// Spin up a goroutine which will periodically update the clients cluster config the client allowing it to
 	// correctly handle dynamic changes to the target cluster; this includes proper handling/detection of
@@ -282,6 +283,8 @@ func (c *Client) beginCCP() {
 func (c *Client) pollCC() {
 	defer c.wg.Done()
 
+	var failedUpdates int
+
 	for {
 		c.authProvider.manager.WaitUntilExpired(c.ctx)
 
@@ -289,9 +292,28 @@ func (c *Client) pollCC() {
 			return
 		}
 
-		if err := c.updateCC(); err != nil {
-			c.logger.Warn("failed to update cluster config, will retry", "error", err)
+		err := c.updateCC()
+
+		// If we've failed to update the cluster config too many times, give up and close the client
+		if err != nil && failedUpdates >= c.requestRetries-1 {
+			c.logger.Error("failed to update cluster config too many times, giving up", "maxRetries", c.requestRetries,
+				"error", err)
+			c.cancelFunc(&ClusterConfigPollingError{inner: err})
+
+			return
 		}
+
+		if err != nil {
+			failedUpdates++
+			c.logger.Warn("failed attempt to update cluster config, will retry", "attempt", failedUpdates, "error", err)
+
+			// Update the last update time to the current time to delay the next update
+			c.authProvider.manager.last = ptr.To(time.Now())
+
+			continue
+		}
+
+		failedUpdates = 0
 	}
 }
 
@@ -524,7 +546,11 @@ func (c *Client) AltAddr() bool {
 // Execute the given request to completion reading the entire response body whilst honoring request level
 // retries/timeout.
 func (c *Client) Execute(request *Request) (*Response, error) {
-	return c.ExecuteWithContext(context.Background(), request)
+	if c.ctx == nil {
+		return c.ExecuteWithContext(context.Background(), request)
+	}
+
+	return c.ExecuteWithContext(c.ctx, request)
 }
 
 // ExecuteWithContext the given request to completion, using the provided context, reading the entire response body
@@ -556,7 +582,11 @@ func (c *Client) ExecuteWithContext(ctx context.Context, request *Request) (*Res
 // NOTE: The returned channel will be close when the remote connection closes the socket, in this case no error will be
 // returned.
 func (c *Client) ExecuteStream(request *Request) (<-chan StreamingResponse, error) {
-	return c.ExecuteStreamWithContext(context.Background(), request)
+	if c.ctx == nil {
+		return c.ExecuteStreamWithContext(context.Background(), request)
+	}
+
+	return c.ExecuteStreamWithContext(c.ctx, request)
 }
 
 // ExecuteStreamWithContext executes the given request using the provided context, returning a read only channel which
@@ -762,7 +792,11 @@ func (c *Client) shouldRetryWithError(ctx *retry.Context, request *Request, err 
 	// We always update the cluster config after a failed request, since some connection failures may be due to an
 	// attempt to address a node which is no longer a member of the cluster or even running Couchbase Server. For
 	// example, the 'connection refused' error.
-	c.waitUntilUpdated(ctx)
+	err = c.waitUntilUpdated(ctx)
+	if err != nil {
+		c.logger.Warn("failed to wait for cluster config update, will not retry", "error", err)
+		return false
+	}
 
 	return true
 }
@@ -803,7 +837,11 @@ func (c *Client) shouldRetryWithResponse(ctx *retry.Context, request *Request, r
 	}
 
 	if updateCC {
-		c.waitUntilUpdated(ctx)
+		err := c.waitUntilUpdated(ctx)
+		if err != nil {
+			c.logger.Warn("failed to wait for cluster config update, will not retry", "error", err)
+			return false
+		}
 	}
 
 	waitForRetryAfter(resp)
@@ -812,20 +850,19 @@ func (c *Client) shouldRetryWithResponse(ctx *retry.Context, request *Request, r
 }
 
 // waitUntilUpdated blocks the calling goroutine until the cluster config has been updated.
-func (c *Client) waitUntilUpdated(ctx context.Context) {
+func (c *Client) waitUntilUpdated(ctx context.Context) error {
 	// We don't update the cluster config when we're only communicating with the bootstrap node since it's unlikely that
 	// a refresh will resolve any issues. For example, we normally refresh to detect when a node has been added/removed
 	// from the cluster.
 	if c.connectionMode.ThisNodeOnly() {
-		return
+		return nil
 	}
 
 	// If we've got a CCP poller running, we can just wake it up and wait for the update to complete; this is more
 	// efficient because we can have multiple requests waiting for the CCP goroutine to update the cluster config
 	// at once.
 	if !(c.ctx == nil || c.cancelFunc == nil) {
-		c.authProvider.manager.WaitUntilUpdated(ctx)
-		return
+		return c.authProvider.manager.WaitUntilUpdated(ctx)
 	}
 
 	// Otherwise we're going to have to manually update the config; this isn't ideal because it means more than one
@@ -835,6 +872,8 @@ func (c *Client) waitUntilUpdated(ctx context.Context) {
 	if err != nil {
 		c.logger.Warn("failed to update cluster config, will retry", "error", err)
 	}
+
+	return nil
 }
 
 // do is a convenience which prepares then performs the provided request.
@@ -1011,7 +1050,7 @@ func (c *Client) Close() {
 		return
 	}
 
-	c.cancelFunc()
+	c.cancelFunc(nil)
 	c.wg.Wait()
 
 	c.ctx = nil

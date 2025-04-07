@@ -103,13 +103,15 @@ func (c *ClusterConfigManager) Update(config *ClusterConfig) error {
 }
 
 // WaitUntilUpdated triggers a config update and then blocks the calling goroutine until the update is complete.
-func (c *ClusterConfigManager) WaitUntilUpdated(ctx context.Context) {
+func (c *ClusterConfigManager) WaitUntilUpdated(ctx context.Context) error {
 	signal := make(chan struct{})
 	go c.closeWhenUpdated(signal)
 
 	select {
 	case <-ctx.Done():
+		return context.Cause(ctx)
 	case <-signal:
+		return nil
 	}
 }
 
