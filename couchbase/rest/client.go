@@ -824,7 +824,14 @@ func (c *Client) waitUntilUpdated(ctx context.Context) {
 	// efficient because we can have multiple requests waiting for the CCP goroutine to update the cluster config
 	// at once.
 	if !(c.ctx == nil || c.cancelFunc == nil) {
-		c.authProvider.manager.WaitUntilUpdated(ctx)
+		timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		c.authProvider.manager.WaitUntilUpdated(timeoutCtx)
+
+		if timeoutCtx.Err() == context.DeadlineExceeded {
+			c.logger.Warn("config update timed out")
+		}
 		return
 	}
 

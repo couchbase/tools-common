@@ -1,5 +1,9 @@
 # Changes
 
+## v3.3.5
+
+- Add timeout to `WaitUntilUpdated`
+
 ## v3.3.4
 
 - Fix incorrectly constructed IPv6 address in cbrest
