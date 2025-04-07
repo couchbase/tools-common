@@ -30,6 +30,9 @@ modes = ["major", "minor", "patch"]
 if mode not in modes:
     sys.exit(f"Error: Expected <mode> to be one of {', '.join(modes)}")
 
+# Get latest tags
+subprocess.run("git fetch --tags", shell=True, check=True)
+
 # Find the last tag
 last = subprocess.check_output(f"git tag | grep {module} | tr -d {module}/v | sort | tail -1",
                                stderr=subprocess.STDOUT,
