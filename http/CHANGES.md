@@ -1,8 +1,11 @@
 # Changes
 
+## v1.0.8
+
+- Add `ReplaceLocalhost`
+
 ## v1.0.7
 
-- Add `ReplaceLocalhost'
 - Upgraded dependencies
 
 ## v1.0.6
