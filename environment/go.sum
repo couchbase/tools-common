@@ -1,5 +1,7 @@
 github.com/couchbase/tools-common/http v1.0.7 h1:Cs73GNlUEr/hUx+w3beJHj2k+PyerFJZMo3MhW9kBj8=
 github.com/couchbase/tools-common/http v1.0.7/go.mod h1:DjwXbyc9PvnIY34MKxG6lF6ucs8c8fbml2oleBbEdZQ=
+github.com/couchbase/tools-common/http v1.0.8 h1:kKkpuNdbIN3xQLuUwt+7R4gC2zk/Ka7rOM61jklSXcI=
+github.com/couchbase/tools-common/http v1.0.8/go.mod h1:DjwXbyc9PvnIY34MKxG6lF6ucs8c8fbml2oleBbEdZQ=
 github.com/couchbase/tools-common/strings v1.0.0 h1:GSP3nA/dDkoLbBPt4Zezfl0KJxLiPyw61PoWrNBsK5g=
 github.com/couchbase/tools-common/strings v1.0.0/go.mod h1:946T46RH9TQ9BwDag7oJsKCJrPguvYFeLlfMir7DFAY=
 github.com/couchbase/tools-common/types/v2 v2.0.1 h1:Ous2huHQK8kzM+W71dqHS9wVMjcHJLKNk/aNBt2Rqac=
