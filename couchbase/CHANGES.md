@@ -1,6 +1,10 @@
 # Changes
 
-## v3.3.5
+## v3.3.6
+
+- Retracted 3.3.5 due to incorrect commit being tagged
+
+## v3.3.5 (Retracted)
 
 - Cancel client context if we fail to update the cluster config after too many retries
 

@@ -37,3 +37,6 @@ require (
 // Retracted in MB-63328 as the release contained an API that we weren't
 // committed to supporting.
 retract v3.1.0
+
+// Retracted due to incorrect commit being tagged
+retract v3.3.5
