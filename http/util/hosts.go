@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
 )
 
@@ -22,6 +23,8 @@ func HostsToConnectionString(hosts []string) string {
 
 // ReplaceLocalhost uses 'replacement' if the URL 'host' uses localhost as its hostname, retaining host's scheme, port,
 // path and query.
+//
+// NOTE: If 'replacement' is an IPv6 address it is correctly wrapped in square brackets.
 func ReplaceLocalhost(host, replacement string) (string, error) {
 	parsed, err := url.Parse(host)
 	if err != nil {
@@ -30,6 +33,15 @@ func ReplaceLocalhost(host, replacement string) (string, error) {
 
 	if parsed.Hostname() != "localhost" {
 		return host, nil
+	}
+
+	var replaceString string
+
+	replace, err := netip.ParseAddr(replacement)
+	if err != nil || replace.Is4() {
+		replaceString = replacement
+	} else {
+		replaceString = fmt.Sprintf("[%s]", replacement)
 	}
 
 	port := parsed.Port()
@@ -42,5 +54,5 @@ func ReplaceLocalhost(host, replacement string) (string, error) {
 		query = "?" + parsed.RawQuery
 	}
 
-	return fmt.Sprintf("%s://%s%s%s%s", parsed.Scheme, replacement, port, parsed.Path, query), nil
+	return fmt.Sprintf("%s://%s%s%s%s", parsed.Scheme, replaceString, port, parsed.Path, query), nil
 }

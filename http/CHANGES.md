@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.9
+
+- `ReplaceLocalhost` now wraps IPv6 addresses correctly
+
 ## v1.0.8
 
 - Add `ReplaceLocalhost`
