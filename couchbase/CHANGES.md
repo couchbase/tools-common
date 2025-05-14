@@ -1,5 +1,10 @@
 # Changes
 
+## v3.3.7
+
+- Add Enterprise Analytics mappings to versions
+- Updated Columnar mappings to reflect correct server versions
+
 ## v3.3.6
 
 - Retracted 3.3.5 due to incorrect commit being tagged
