@@ -1,5 +1,10 @@
 # Changes
 
+## v3.3.8
+
+- Correct version parsing for Enterprise Analytics
+- Correct defaulting to latest versions on unknown Columnar and Enterprise Analytics versions
+
 ## v3.3.7
 
 - Add Enterprise Analytics mappings to versions

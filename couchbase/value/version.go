@@ -19,6 +19,9 @@ type ClusterVersion struct {
 type Version string
 
 const (
+	SuffixColumnar            = "-columnar"
+	SuffixEnterpriseAnalytics = "-enterprise-analytics"
+
 	// VersionUnknown indicates the cluster is running an unknown version of Couchbase Server; this is usually a
 	// development build and therefore is treated as being the latest version during comparisons.
 	VersionUnknown = Version("0.0.0")
@@ -71,38 +74,46 @@ const (
 	// VersionLatest represents the latest known version of Couchbase server, this may be an unreleased version.
 	VersionLatest = Version8_0_0
 
-	// VersionColumnarUnknown indicates the cluster is running an unknown version of Couchbase Columnar; this is
-	// usually a development build and therefore is treated as being the latest version during comparisons.
-	VersionColumnarUnknown = Version("0.0.0-columnar")
-
 	// VersionColumnar1_0_0 represents the 1.0.0 release of Couchbase Columnar (Goldfish).
-	VersionColumnar1_0_0 = Version("1.0.0-columnar")
+	VersionColumnar1_0_0 = Version("1.0.0" + SuffixColumnar)
 
 	// VersionColumnar1_0_1 represents the 1.0.1 release of Couchbase Columnar (Goldfish).
-	VersionColumnar1_0_1 = Version("1.0.1-columnar")
+	VersionColumnar1_0_1 = Version("1.0.1" + SuffixColumnar)
 
 	// VersionColumnar1_0_2 represents the 1.0.2 release of Couchbase Columnar (Goldfish).
-	VersionColumnar1_0_2 = Version("1.0.2-columnar")
+	VersionColumnar1_0_2 = Version("1.0.2" + SuffixColumnar)
 
 	// VersionColumnar1_0_3 represents the 1.0.3 release of Couchbase Columnar (Goldfish).
-	VersionColumnar1_0_3 = Version("1.0.3-columnar")
+	VersionColumnar1_0_3 = Version("1.0.3" + SuffixColumnar)
 
 	// VersionColumnar1_0_5 represents the 1.0.5 release of Couchbase Columnar (Goldfish).
-	VersionColumnar1_0_5 = Version("1.0.5-columnar")
+	VersionColumnar1_0_5 = Version("1.0.5" + SuffixColumnar)
 
 	// VersionColumnar1_1_0 represents the 1.1.0 release of Couchbase Columnar (Ionic).
-	VersionColumnar1_1_0 = Version("1.1.0-columnar")
+	VersionColumnar1_1_0 = Version("1.1.0" + SuffixColumnar)
 
 	// VersionColumnarLatest represents the latest known version of Couchbase Columnar, this may be an unreleased version.
 	VersionColumnarLatest = VersionColumnar1_1_0
 
 	// VersionEnterpriseAnalytics2_0_0 represents the 2.0.0 release of Enterprise Analytics (Phoenix).
-	VersionEnterpriseAnalytics2_0_0 = Version("2.0.0-enterprise-analytics")
+	VersionEnterpriseAnalytics2_0_0 = Version("2.0.0" + SuffixEnterpriseAnalytics)
 
 	// VersionEnterpriseAnalyticsLatest represents the latest known version of Enterprise Analytics, this may be an
 	// unreleased version.
 	VersionEnterpriseAnalyticsLatest = VersionEnterpriseAnalytics2_0_0
 )
+
+// serverVersions is a map of Couchbase Columnar and Enterprise Analytics versions to their equivalent Couchbase Server
+// versions. This is used to resolve the server version when comparing versions.
+var serverVersions = map[Version]Version{
+	VersionColumnar1_0_0:            Version7_6_1,
+	VersionColumnar1_0_1:            Version7_6_1,
+	VersionColumnar1_0_2:            Version7_6_3,
+	VersionColumnar1_0_3:            Version7_6_4,
+	VersionColumnar1_0_5:            Version7_6_4,
+	VersionColumnar1_1_0:            Version7_6_4,
+	VersionEnterpriseAnalytics2_0_0: Version8_0_0,
+}
 
 // Older returns a boolean indicating whether the current version is older than the provided version.
 //
@@ -131,17 +142,6 @@ func (v Version) compare(other Version) int {
 	return semver.Compare("v"+string(v.ServerVersion()), "v"+string(other.ServerVersion()))
 }
 
-func (v Version) fixupMissingUnknown() Version {
-	// note- this always returns the server (not columnar) latest in the event of missing version
-	if v == "" || v == VersionUnknown {
-		return VersionLatest
-	} else if v == VersionColumnarUnknown {
-		return VersionColumnarLatest
-	}
-
-	return v
-}
-
 // Equal returns a boolean indicating whether the current version is equal to the provided version.
 func (v Version) Equal(other Version) bool {
 	// semver.Compare() returns 0 if both versions are invalid
@@ -151,38 +151,48 @@ func (v Version) Equal(other Version) bool {
 // ServerVersion returns the Couchbase server version that this version equates to, after resolving unknown & missing
 // versions.
 func (v Version) ServerVersion() Version {
-	v = v.fixupMissingUnknown()
-	if !v.IsColumnar() {
-		return v
+	if v == "" || v == VersionUnknown {
+		return VersionLatest
 	}
 
-	switch v {
-	case VersionColumnar1_0_0, VersionColumnar1_0_1:
-		return Version7_6_1
-	case VersionColumnar1_0_2:
-		return Version7_6_3
-	case VersionColumnar1_0_3, VersionColumnar1_0_5, VersionColumnar1_1_0:
-		return Version7_6_4
-	case VersionEnterpriseAnalytics2_0_0:
-		return Version8_0_0
-	default:
-		return VersionUnknown
+	if v.IsColumnar() {
+		if v, found := serverVersions[v]; found {
+			return v
+		}
+
+		return serverVersions[VersionColumnarLatest]
 	}
+
+	if v.IsEnterpriseAnalytics() {
+		if v, found := serverVersions[v]; found {
+			return v
+		}
+
+		return serverVersions[VersionEnterpriseAnalyticsLatest]
+	}
+
+	return v
 }
 
 // IsColumnar returns a boolean indicating whether this version represents a Couchbase Columnar product version.
 func (v Version) IsColumnar() bool {
-	return strings.HasSuffix(string(v), "-columnar") ||
-		strings.HasSuffix(string(v), "-enterprise-analytics")
+	return strings.HasSuffix(string(v), SuffixColumnar)
+}
+
+// IsEnterpriseAnalytics returns a boolean indicating whether this version represents an Enterprise Analytics product
+// version.
+func (v Version) IsEnterpriseAnalytics() bool {
+	return strings.HasSuffix(string(v), SuffixEnterpriseAnalytics)
 }
 
 // ParseVersion parses the supplied product version string into a Version.
 func ParseVersion(version string) Version {
 	versionSplits := strings.Split(version, "-")
-	suffix := versionSplits[len(versionSplits)-1]
 
-	if suffix == "columnar" {
-		return Version(versionSplits[0] + "-" + suffix)
+	if strings.HasSuffix(version, SuffixColumnar) {
+		return Version(versionSplits[0] + SuffixColumnar)
+	} else if strings.HasSuffix(version, SuffixEnterpriseAnalytics) {
+		return Version(versionSplits[0] + SuffixEnterpriseAnalytics)
 	}
 
 	return Version(versionSplits[0])

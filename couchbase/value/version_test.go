@@ -275,11 +275,67 @@ func TestVersionEqual(t *testing.T) {
 			second:   Version8_0_0,
 			expected: true,
 		},
+		{
+			name:     "EnterpriseAnalytics99.0.0To8.0.0",
+			first:    Version("99.0.0-enterprise-analytics"),
+			second:   Version8_0_0,
+			expected: true,
+		},
+		{
+			name:     "Columnar99.0.0To8.0.0",
+			first:    Version("99.0.0-columnar"),
+			second:   Version7_6_4,
+			expected: true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require.Equal(t, test.expected, test.first.Equal(test.second))
+		})
+	}
+}
+
+func TestVersionParse(t *testing.T) {
+	type test struct {
+		input    string
+		expected Version
+	}
+
+	tests := []*test{
+		{
+			input:    "7.6.4-1234-enterprise",
+			expected: Version7_6_4,
+		},
+		{
+			input:    "7.6.4-1234-community",
+			expected: Version7_6_4,
+		},
+		{
+			input:    "7.6.4-1234-wombat",
+			expected: Version7_6_4,
+		},
+		{
+			input:    "1.1.0-1234-columnar",
+			expected: VersionColumnar1_1_0,
+		},
+		{
+			input:    "1.1.0-1234-wombat-columnar",
+			expected: VersionColumnar1_1_0,
+		},
+		{
+			input:    "2.0.0-1234-enterprise-analytics",
+			expected: VersionEnterpriseAnalytics2_0_0,
+		},
+		{
+			input:    "2.0.0-1234-enterprise-analytics-wombat",
+			expected: Version("2.0.0"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			require.Equal(t, test.expected, ParseVersion(test.input))
 		})
 	}
 }
