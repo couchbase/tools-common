@@ -1,5 +1,10 @@
 # Changes
 
+## v1.1.0
+
+* Adds options to put a cap on the output error message when calling Error() on multierror
+* Fixes overflow when multierror adds itself by blocking add if error is equal to itself
+
 ## v1.0.0
 
 No functional changes since v0.1.0, bumping all 'tools-common' sub-modules to

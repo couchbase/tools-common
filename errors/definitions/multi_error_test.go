@@ -56,11 +56,17 @@ func TestMultiErrorStrings(t *testing.T) {
 			separator: "-",
 			expected:  "oh no! A-B-C",
 		},
+		{
+			name:     "Out of memory",
+			errs:     []error{fmt.Errorf("A"), fmt.Errorf("B"), fmt.Errorf("C"), fmt.Errorf("testing out of memory")},
+			expected: "A; B; C; error message output cap hit - not all errors are shown",
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			me := MultiError{
+				OutputCap: 15,
 				Prefix:    tc.prefix,
 				Separator: tc.separator,
 			}
@@ -80,4 +86,13 @@ func TestMultiErrorErrOrNil(t *testing.T) {
 
 	me.Add(fmt.Errorf("oh no"))
 	require.Error(t, me.ErrOrNil(), "didn't get error when expected")
+}
+
+func TestOverflowLoop(t *testing.T) {
+	var multiErr MultiError
+
+	multiErr.Add(fmt.Errorf("oh no"))
+	multiErr.Add(multiErr.ErrOrNil())
+
+	require.Equal(t, multiErr.Error(), "oh no")
 }
