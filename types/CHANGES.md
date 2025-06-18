@@ -1,5 +1,9 @@
 # Changes
 
+## v2.1.0
+
+- Add a `timeprovider` package containing a `TimeProvider` abstraction used to replace `time.Now()`.
+
 ## v2.0.1
 
 - Upgraded dependencies
