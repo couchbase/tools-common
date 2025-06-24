@@ -20,7 +20,7 @@ require (
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/couchbase/tools-common/sync/v2 v2.0.1
 	github.com/couchbase/tools-common/testing v1.0.2
-	github.com/couchbase/tools-common/types/v2 v2.0.1
+	github.com/couchbase/tools-common/types/v2 v2.1.0
 	github.com/couchbase/tools-common/utils/v3 v3.0.2
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
@@ -87,11 +87,13 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.32.0 // indirect
 	go.opentelemetry.io/otel/trace v1.32.0 // indirect
 	golang.org/x/crypto v0.30.0 // indirect
+	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.32.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/tools v0.28.0 // indirect
 	google.golang.org/genproto v0.0.0-20241206012308-a4fef0638583 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241206012308-a4fef0638583 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241206012308-a4fef0638583 // indirect

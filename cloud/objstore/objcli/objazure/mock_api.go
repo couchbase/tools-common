@@ -78,47 +78,62 @@ func (m *MockcontainerAPI) EXPECT() *MockcontainerAPIMockRecorder {
 	return m.recorder
 }
 
-// NewBlobClient mocks base method.
-func (m *MockcontainerAPI) NewBlobClient(blobName string) blobAPI {
+// GetProperties mocks base method.
+func (m *MockcontainerAPI) GetProperties(ctx context.Context, o *container.GetPropertiesOptions) (container.GetPropertiesResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewBlobClient", blobName)
+	ret := m.ctrl.Call(m, "GetProperties", ctx, o)
+	ret0, _ := ret[0].(container.GetPropertiesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProperties indicates an expected call of GetProperties.
+func (mr *MockcontainerAPIMockRecorder) GetProperties(ctx, o interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProperties", reflect.TypeOf((*MockcontainerAPI)(nil).GetProperties), ctx, o)
+}
+
+// NewBlobClient mocks base method.
+func (m *MockcontainerAPI) NewBlobClient(name string) blobAPI {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewBlobClient", name)
 	ret0, _ := ret[0].(blobAPI)
 	return ret0
 }
 
 // NewBlobClient indicates an expected call of NewBlobClient.
-func (mr *MockcontainerAPIMockRecorder) NewBlobClient(blobName interface{}) *gomock.Call {
+func (mr *MockcontainerAPIMockRecorder) NewBlobClient(name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlobClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlobClient), blobName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlobClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlobClient), name)
 }
 
 // NewBlockBlobClient mocks base method.
-func (m *MockcontainerAPI) NewBlockBlobClient(blobName string) blockBlobAPI {
+func (m *MockcontainerAPI) NewBlockBlobClient(name string) blockBlobAPI {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewBlockBlobClient", blobName)
+	ret := m.ctrl.Call(m, "NewBlockBlobClient", name)
 	ret0, _ := ret[0].(blockBlobAPI)
 	return ret0
 }
 
 // NewBlockBlobClient indicates an expected call of NewBlockBlobClient.
-func (mr *MockcontainerAPIMockRecorder) NewBlockBlobClient(blobName interface{}) *gomock.Call {
+func (mr *MockcontainerAPIMockRecorder) NewBlockBlobClient(name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlockBlobClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlockBlobClient), blobName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlockBlobClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlockBlobClient), name)
 }
 
 // NewBlockBlobVersionClient mocks base method.
-func (m *MockcontainerAPI) NewBlockBlobVersionClient(blobName, versionID string) (blockBlobAPI, error) {
+func (m *MockcontainerAPI) NewBlockBlobVersionClient(name, version string) (blockBlobAPI, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewBlockBlobVersionClient", blobName, versionID)
+	ret := m.ctrl.Call(m, "NewBlockBlobVersionClient", name, version)
 	ret0, _ := ret[0].(blockBlobAPI)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewBlockBlobVersionClient indicates an expected call of NewBlockBlobVersionClient.
-func (mr *MockcontainerAPIMockRecorder) NewBlockBlobVersionClient(blobName, versionID interface{}) *gomock.Call {
+func (mr *MockcontainerAPIMockRecorder) NewBlockBlobVersionClient(name, version interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlockBlobVersionClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlockBlobVersionClient), blobName, versionID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlockBlobVersionClient", reflect.TypeOf((*MockcontainerAPI)(nil).NewBlockBlobVersionClient), name, version)
 }
 
 // NewListBlobsFlatPager mocks base method.
@@ -200,6 +215,36 @@ func (m *MockblobAPI) GetSASURL(permissions sas.BlobPermissions, expiry time.Tim
 func (mr *MockblobAPIMockRecorder) GetSASURL(permissions, expiry, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSASURL", reflect.TypeOf((*MockblobAPI)(nil).GetSASURL), permissions, expiry, options)
+}
+
+// SetImmutabilityPolicy mocks base method.
+func (m *MockblobAPI) SetImmutabilityPolicy(ctx context.Context, expiryTime time.Time, options *blob.SetImmutabilityPolicyOptions) (blob.SetImmutabilityPolicyResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetImmutabilityPolicy", ctx, expiryTime, options)
+	ret0, _ := ret[0].(blob.SetImmutabilityPolicyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetImmutabilityPolicy indicates an expected call of SetImmutabilityPolicy.
+func (mr *MockblobAPIMockRecorder) SetImmutabilityPolicy(ctx, expiryTime, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetImmutabilityPolicy", reflect.TypeOf((*MockblobAPI)(nil).SetImmutabilityPolicy), ctx, expiryTime, options)
+}
+
+// WithVersionID mocks base method.
+func (m *MockblobAPI) WithVersionID(versionID string) (*blob.Client, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithVersionID", versionID)
+	ret0, _ := ret[0].(*blob.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WithVersionID indicates an expected call of WithVersionID.
+func (mr *MockblobAPIMockRecorder) WithVersionID(versionID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithVersionID", reflect.TypeOf((*MockblobAPI)(nil).WithVersionID), versionID)
 }
 
 // MockflatBlobsPager is a mock of flatBlobsPager interface.

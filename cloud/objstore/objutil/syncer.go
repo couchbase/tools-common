@@ -117,6 +117,8 @@ func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFil
 		Key:          destination.Path,
 		Body:         reader,
 		MPUThreshold: s.opts.MPUThreshold,
+		Precondition: s.opts.Precondition,
+		Lock:         s.opts.Lock,
 	}
 
 	return Upload(opts)

@@ -10,7 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"regexp"
-	"time"
+	"strconv"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -22,19 +22,25 @@ import (
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
+	"github.com/couchbase/tools-common/types/v2/timeprovider"
 	"github.com/couchbase/tools-common/utils/v3/system"
 )
 
-// attrs wraps object attributes with internal attributes (e.g. version).
-type attrs struct {
-	objval.ObjectAttrs
-	Version *int64
+type composeOptions struct {
+	bucket       string
+	key          string
+	parts        []string
+	precondition objcli.OperationPrecondition
+	lock         *objcli.ObjectLock
 }
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in Google Storage.
 type Client struct {
 	serviceAPI serviceAPI
 	logger     *slog.Logger
+
+	// timeProvider is an abstraction which provides the current time. We need this for testing.
+	timeProvider timeprovider.TimeProvider
 }
 
 var _ objcli.Client = (*Client)(nil)
@@ -48,6 +54,9 @@ type ClientOptions struct {
 
 	// Logger is the passed logger which implements a custom Log method
 	Logger *slog.Logger
+
+	// timeProvider is an abstraction which provides the current time. We need this for testing.
+	timeProvider timeprovider.TimeProvider
 }
 
 // defaults fills any missing attributes to a sane default.
@@ -64,8 +73,13 @@ func NewClient(options ClientOptions) *Client {
 	options.defaults()
 
 	client := Client{
-		serviceAPI: serviceClient{options.Client},
-		logger:     options.Logger,
+		serviceAPI:   serviceClient{options.Client},
+		logger:       options.Logger,
+		timeProvider: options.timeProvider,
+	}
+
+	if client.timeProvider == nil {
+		client.timeProvider = timeprovider.CurrentTimeProvider{}
 	}
 
 	return &client
@@ -85,7 +99,22 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		offset, length = opts.ByteRange.ToOffsetLength(length)
 	}
 
-	reader, err := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).NewRangeReader(ctx, offset, length)
+	object := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key)
+
+	if opts.VersionID != "" {
+		gen, err := strconv.ParseUint(opts.VersionID, 10, 64)
+		if err != nil {
+			return nil, handleError(
+				opts.Bucket,
+				opts.Key,
+				fmt.Errorf("failed to parse VersionID into GCP generation: %w", err),
+			)
+		}
+
+		object = object.Generation(int64(gen))
+	}
+
+	reader, err := object.NewRangeReader(ctx, offset, length)
 	if err != nil {
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
@@ -98,16 +127,35 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		LastModified: ptr.To(remote.LastModified),
 	}
 
-	object := &objval.Object{
+	if remote.Generation != 0 {
+		attrs.VersionID = strconv.FormatInt(remote.Generation, 10)
+	}
+
+	objectRes := &objval.Object{
 		ObjectAttrs: attrs,
 		Body:        reader,
 	}
 
-	return object, nil
+	return objectRes, nil
 }
 
 func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsOptions) (*objval.ObjectAttrs, error) {
-	remote, err := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).Attrs(ctx)
+	object := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key)
+
+	if opts.VersionID != "" {
+		gen, err := strconv.ParseUint(opts.VersionID, 10, 64)
+		if err != nil {
+			return nil, handleError(
+				opts.Bucket,
+				opts.Key,
+				fmt.Errorf("failed to parse VersionID into GCP generation: %w", err),
+			)
+		}
+
+		object = object.Generation(int64(gen))
+	}
+
+	remote, err := object.Attrs(ctx)
 	if err != nil {
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
@@ -117,6 +165,15 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		ETag:         ptr.To(remote.Etag),
 		Size:         ptr.To(remote.Size),
 		LastModified: &remote.Updated,
+	}
+
+	if remote.Retention != nil {
+		attrs.LockExpiration = &remote.Retention.RetainUntil
+		attrs.LockType = getLockType(remote.Retention.Mode)
+	}
+
+	if remote.Generation != 0 {
+		attrs.VersionID = strconv.FormatInt(remote.Generation, 10)
 	}
 
 	return attrs, nil
@@ -133,8 +190,22 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		// the assumption) that we have exclusive access to a given path prefix in GCP so we don't need to worry about
 		// potentially overwriting objects.
 		object = c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).Retryer(storage.WithPolicy(storage.RetryAlways))
-		writer = object.NewWriter(ctx)
 	)
+
+	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
+		object = object.If(storage.Conditions{
+			DoesNotExist: true,
+		})
+	}
+
+	writer := object.NewWriter(ctx)
+
+	if opts.Lock != nil {
+		err := writer.SetLock(opts.Lock)
+		if err != nil {
+			return fmt.Errorf("failed to set object lock: %w", err)
+		}
+	}
 
 	_, err := objcli.CopyReadSeeker(io.MultiWriter(md5sum, crc32c), opts.Body)
 	if err != nil {
@@ -154,13 +225,13 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 
 func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
 	var (
-		srcHdle = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
-		dstHdle = c.serviceAPI.Bucket(opts.DestinationBucket).Object(opts.DestinationKey)
+		srcHandle = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
+		dstHandle = c.serviceAPI.Bucket(opts.DestinationBucket).Object(opts.DestinationKey)
 	)
 
 	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 	// destination object, always retry.
-	_, err := dstHdle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHdle).Run(ctx)
+	_, err := dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
 
 	return handleError("", "", err)
 }
@@ -173,7 +244,13 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
 	if objerr.IsNotFoundError(err) || ptr.From(attrs.Size) == 0 {
-		return c.PutObject(ctx, objcli.PutObjectOptions(opts))
+		putOpts := objcli.PutObjectOptions{
+			Bucket: opts.Bucket,
+			Key:    opts.Key,
+			Body:   opts.Body,
+		}
+
+		return c.PutObject(ctx, putOpts)
 	}
 
 	if err != nil {
@@ -219,29 +296,51 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 }
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
-	objects := make([]attrs, 0, len(opts.Keys))
+	objects := make([]objval.ObjectAttrs, 0, len(opts.Keys))
 
 	for _, key := range opts.Keys {
-		objects = append(objects, attrs{ObjectAttrs: objval.ObjectAttrs{Key: key}})
+		objects = append(objects, objval.ObjectAttrs{Key: key})
 	}
 
 	return c.deleteObjects(ctx, opts.Bucket, objects...)
 }
 
+func (c *Client) DeleteObjectVersions(ctx context.Context, opts objcli.DeleteObjectVersionsOptions) error {
+	versions := make([]objval.ObjectAttrs, 0)
+
+	for _, version := range opts.Versions {
+		versions = append(versions, objval.ObjectAttrs{
+			Key:       version.Key,
+			VersionID: version.VersionID,
+		})
+	}
+
+	return c.deleteObjects(ctx, opts.Bucket, versions...)
+}
+
 // deleteObjects uses a worker pool to delete the given objects.
-func (c *Client) deleteObjects(ctx context.Context, bucket string, objects ...attrs) error {
+func (c *Client) deleteObjects(ctx context.Context, bucket string, objects ...objval.ObjectAttrs) error {
 	pool := hofp.NewPool(hofp.Options{
 		Context: ctx,
 		Size:    system.NumWorkers(len(objects)),
 	})
 
-	del := func(ctx context.Context, object attrs) error {
+	del := func(ctx context.Context, object objval.ObjectAttrs) error {
 		// We correctly handle the case where the object doesn't exist and should have exclusive access to the path
 		// prefix in GCP, always retry.
 		handle := c.serviceAPI.Bucket(bucket).Object(object.Key).Retryer(storage.WithPolicy(storage.RetryAlways))
 
-		if object.Version != nil {
-			handle = handle.Generation(*object.Version)
+		if object.VersionID != "" {
+			gen, err := strconv.ParseUint(object.VersionID, 10, 64)
+			if err != nil {
+				return handleError(
+					bucket,
+					object.Key,
+					fmt.Errorf("failed to parse VersionID into GCP generation: %w", err),
+				)
+			}
+
+			handle = handle.Generation(int64(gen))
 		}
 
 		err := handle.Delete(ctx)
@@ -253,7 +352,7 @@ func (c *Client) deleteObjects(ctx context.Context, bucket string, objects ...at
 		return nil
 	}
 
-	queue := func(object attrs) error {
+	queue := func(object objval.ObjectAttrs) error {
 		return pool.Queue(func(ctx context.Context) error { return del(ctx, object) })
 	}
 
@@ -270,10 +369,14 @@ func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirector
 	var (
 		// size matches the batch deletion size in AWS/Azure.
 		size  = 1000
-		batch = make([]attrs, 0, size)
+		batch = make([]objval.ObjectAttrs, 0, size)
 	)
 
-	fn := func(obj attrs) error {
+	fn := func(obj objval.ObjectAttrs) error {
+		if obj.LockExpiration != nil && obj.LockExpiration.After(c.timeProvider.Now()) {
+			return objerr.ErrDeleteDirectoryRemainingItems{Bucket: opts.Bucket, Key: obj.Key}
+		}
+
 		batch = append(batch, obj)
 
 		if len(batch) < size {
@@ -315,11 +418,11 @@ func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirector
 }
 
 func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
-	fn := func(attrs attrs) error {
-		return opts.Func(&attrs.ObjectAttrs)
+	fn := func(attrs objval.ObjectAttrs) error {
+		return opts.Func(&attrs)
 	}
 
-	return c.iterateObjects(ctx, opts.Bucket, opts.Prefix, opts.Delimiter, false, opts.Include, opts.Exclude, fn)
+	return c.iterateObjects(ctx, opts.Bucket, opts.Prefix, opts.Delimiter, opts.Versions, opts.Include, opts.Exclude, fn)
 }
 
 // iterateObjects iterates through the objects in the remote storage allowing enabling listing object versions.
@@ -331,7 +434,7 @@ func (c *Client) iterateObjects(
 	versions bool,
 	include []*regexp.Regexp,
 	exclude []*regexp.Regexp,
-	fn func(attrs) error,
+	fn func(objval.ObjectAttrs) error,
 ) error {
 	if include != nil && exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
@@ -344,12 +447,19 @@ func (c *Client) iterateObjects(
 		Versions:   versions,
 	}
 
-	err := query.SetAttrSelection([]string{
+	attrsToList := []string{
 		"Name",
 		"Etag",
 		"Size",
 		"Updated",
-	})
+		"Retention",
+	}
+
+	if versions {
+		attrsToList = append(attrsToList, "Generation")
+	}
+
+	err := query.SetAttrSelection(attrsToList)
 	if err != nil {
 		return fmt.Errorf("failed to set attribute selection: %w", err)
 	}
@@ -371,38 +481,33 @@ func (c *Client) iterateObjects(
 			continue
 		}
 
-		var (
-			key     = remote.Prefix
-			size    *int64
-			updated *time.Time
-			version int64
-		)
+		var attrs *objval.ObjectAttrs
 
-		// If "key" is empty this isn't a directory stub, treat it as a normal object
-		if key == "" {
-			key = remote.Name
-			size = ptr.To(remote.Size)
-			updated = &remote.Updated
-			version = remote.Generation
-		}
+		// If Prefix is empty this isn't a directory stub, treat it as a normal object
+		if remote.Prefix == "" {
+			attrs = &objval.ObjectAttrs{
+				Key:          remote.Name,
+				Size:         ptr.To(remote.Size),
+				LastModified: &remote.Updated,
+			}
 
-		oa := objval.ObjectAttrs{
-			Key:          key,
-			Size:         size,
-			LastModified: updated,
-		}
+			if remote.Retention != nil {
+				attrs.LockExpiration = &remote.Retention.RetainUntil
+				attrs.LockType = getLockType(remote.Retention.Mode)
+			}
 
-		attrs := attrs{
-			ObjectAttrs: oa,
-		}
-
-		// If versions are enabled, populate the attribute
-		if versions {
-			attrs.Version = ptr.To(version)
+			// If versions are enabled, populate the attribute
+			if versions && remote.Generation != 0 {
+				attrs.VersionID = strconv.FormatInt(remote.Generation, 10)
+			}
+		} else {
+			attrs = &objval.ObjectAttrs{
+				Key: remote.Prefix,
+			}
 		}
 
 		// If the caller has returned an error, stop iteration, and return control to them
-		if err = fn(attrs); err != nil {
+		if err = fn(*attrs); err != nil {
 			return err
 		}
 	}
@@ -451,9 +556,11 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 	intermediate := partKey(opts.UploadID, opts.Key)
 
 	err = c.PutObject(ctx, objcli.PutObjectOptions{
-		Bucket: opts.Bucket,
-		Key:    intermediate,
-		Body:   opts.Body,
+		Bucket:       opts.Bucket,
+		Key:          intermediate,
+		Body:         opts.Body,
+		Precondition: opts.Precondition,
+		Lock:         opts.Lock,
 	})
 	if err != nil {
 		return objval.Part{}, err // Purposefully not wrapped
@@ -484,13 +591,13 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 
 	var (
 		intermediate = partKey(opts.UploadID, opts.DestinationKey)
-		srcHdle      = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
-		dstHdle      = c.serviceAPI.Bucket(opts.DestinationBucket).Object(intermediate)
+		srcHandle    = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
+		dstHandle    = c.serviceAPI.Bucket(opts.DestinationBucket).Object(intermediate)
 	)
 
 	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 	// destination object, always retry.
-	_, err = dstHdle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHdle).Run(ctx)
+	_, err = dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
 	if err != nil {
 		return objval.Part{}, handleError(opts.DestinationBucket, intermediate, err)
 	}
@@ -505,7 +612,15 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 		converted = append(converted, part.ID)
 	}
 
-	err := c.complete(ctx, opts.Bucket, opts.Key, converted...)
+	completeOpts := &composeOptions{
+		bucket:       opts.Bucket,
+		key:          opts.Key,
+		parts:        converted,
+		precondition: opts.Precondition,
+		lock:         opts.Lock,
+	}
+
+	err := c.complete(ctx, completeOpts)
 	if err != nil {
 		return err
 	}
@@ -525,38 +640,69 @@ func (c *Client) Close() error {
 }
 
 // complete recursively composes the object in chunks of 32 eventually resulting in a single complete object.
-func (c *Client) complete(ctx context.Context, bucket, key string, parts ...string) error {
-	if len(parts) <= MaxComposable {
-		return c.compose(ctx, bucket, key, parts...)
+func (c *Client) complete(ctx context.Context, opts *composeOptions) error {
+	if len(opts.parts) <= MaxComposable {
+		return c.compose(ctx, opts)
 	}
 
-	intermediate := partKey(uuid.NewString(), key)
-	defer c.cleanup(ctx, bucket, intermediate)
+	intermediate := partKey(uuid.NewString(), opts.key)
 
-	err := c.compose(ctx, bucket, intermediate, parts[:MaxComposable]...)
+	defer c.cleanup(ctx, opts.bucket, intermediate)
+
+	intermediateOpts := &composeOptions{
+		bucket:       opts.bucket,
+		key:          intermediate,
+		parts:        opts.parts[:MaxComposable],
+		precondition: opts.precondition,
+		lock:         opts.lock,
+	}
+
+	err := c.compose(ctx, intermediateOpts)
 	if err != nil {
 		return err
 	}
 
-	return c.complete(ctx, bucket, key, append([]string{intermediate}, parts[MaxComposable:]...)...)
+	finalOpts := &composeOptions{
+		bucket:       opts.bucket,
+		key:          opts.key,
+		parts:        append([]string{intermediate}, opts.parts[MaxComposable:]...),
+		precondition: opts.precondition,
+		lock:         opts.lock,
+	}
+
+	return c.complete(ctx, finalOpts)
 }
 
 // compose the given parts into a single object.
-func (c *Client) compose(ctx context.Context, bucket, key string, parts ...string) error {
-	handles := make([]objectAPI, 0, len(parts))
+func (c *Client) compose(ctx context.Context, opts *composeOptions) error {
+	handles := make([]objectAPI, 0, len(opts.parts))
 
-	for _, part := range parts {
-		handles = append(handles, c.serviceAPI.Bucket(bucket).Object(part))
+	for _, part := range opts.parts {
+		handles = append(handles, c.serviceAPI.Bucket(opts.bucket).Object(part))
 	}
 
-	var (
-		// Object composition is non-destructive from the source perspective and we don't mind potentially "overwriting"
-		// the destination object, always retry.
-		dst    = c.serviceAPI.Bucket(bucket).Object(key).Retryer(storage.WithPolicy(storage.RetryAlways))
-		_, err = dst.ComposerFrom(handles...).Run(ctx)
-	)
+	// Object composition is non-destructive from the source perspective and we don't mind potentially "overwriting"
+	// the destination object, always retry.
+	dst := c.serviceAPI.Bucket(opts.bucket).Object(opts.key).Retryer(storage.WithPolicy(storage.RetryAlways))
 
-	return handleError(bucket, key, err)
+	if opts.precondition == objcli.OperationPreconditionOnlyIfAbsent {
+		dst = dst.If(storage.Conditions{
+			DoesNotExist: true,
+		})
+	}
+
+	composer := dst.ComposerFrom(handles...)
+
+	if opts.lock != nil {
+		err := composer.SetLock(opts.lock)
+		if err != nil {
+			return fmt.Errorf("failed to set object lock: %w", err)
+		}
+	}
+
+	_, err := composer.Run(ctx)
+
+	return handleError(opts.bucket, opts.key, err)
 }
 
 // cleanup attempts to remove the given keys, logging them if we receive an error.
@@ -579,4 +725,70 @@ func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMult
 	})
 
 	return err
+}
+
+func (c *Client) GetBucketLockingStatus(
+	ctx context.Context,
+	opts objcli.GetBucketLockingStatusOptions,
+) (*objval.BucketLockingStatus, error) {
+	bucket := c.serviceAPI.Bucket(opts.Bucket)
+
+	attrs, err := bucket.Attrs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &objval.BucketLockingStatus{
+		Enabled: attrs.ObjectRetentionMode != "",
+	}
+
+	return res, nil
+}
+
+func (c *Client) SetObjectLock(ctx context.Context, opts objcli.SetObjectLockOptions) error {
+	if opts.Lock == nil {
+		return errors.New("object lock is nil")
+	}
+
+	object := c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key)
+
+	if opts.VersionID != "" {
+		gen, err := strconv.ParseUint(opts.VersionID, 10, 64)
+		if err != nil {
+			return handleError(
+				opts.Bucket,
+				opts.Key,
+				fmt.Errorf("failed to parse VersionID into GCP generation: %w", err),
+			)
+		}
+
+		object = object.Generation(int64(gen))
+	}
+
+	switch opts.Lock.Type {
+	case objval.LockTypeCompliance:
+		_, err := object.Update(ctx, storage.ObjectAttrsToUpdate{
+			Retention: &storage.ObjectRetention{
+				Mode:        "Locked",
+				RetainUntil: opts.Lock.Expiration,
+			},
+		})
+		if err != nil {
+			return handleError(opts.Bucket, opts.Key, err)
+		}
+	default:
+		return errors.New("unsupported lock type")
+	}
+
+	return nil
+}
+
+// getLockType converts GCP's retention mode to 'objval.LockType'.
+func getLockType(gcpLockMode string) objval.LockType {
+	switch gcpLockMode {
+	case "Locked":
+		return objval.LockTypeCompliance
+	default:
+		return objval.LockTypeUndefined
+	}
 }

@@ -47,11 +47,23 @@ func TestUploadDirectory(t *testing.T) {
 		dstTrailing = dst + "/"
 	)
 
-	tests := []struct{ src, dst, subdir string }{
+	tests := []struct {
+		src, dst, subdir string
+		lock             *objcli.ObjectLock
+		precondition     objcli.OperationPrecondition
+	}{
 		{src: src, dst: dst, subdir: "bar"},
 		{src: srcTrailing, dst: dst},
 		{src: srcTrailing, dst: dstTrailing},
 		{src: src, dst: dstTrailing, subdir: "bar"},
+		{src: src, dst: dst, subdir: "bar", lock: objcli.NewComplianceLock(time.Now().AddDate(0, 0, 1))},
+		{src: srcTrailing, dst: dst, lock: objcli.NewComplianceLock(time.Now().AddDate(0, 0, 2))},
+		{src: srcTrailing, dst: dstTrailing, lock: objcli.NewComplianceLock(time.Now().AddDate(0, 0, 3))},
+		{src: src, dst: dstTrailing, subdir: "bar", lock: objcli.NewComplianceLock(time.Now().AddDate(0, 0, 4))},
+		{src: src, dst: dst, subdir: "bar", precondition: objcli.OperationPreconditionOnlyIfAbsent},
+		{src: srcTrailing, dst: dst, precondition: objcli.OperationPreconditionOnlyIfAbsent},
+		{src: srcTrailing, dst: dstTrailing, precondition: objcli.OperationPreconditionOnlyIfAbsent},
+		{src: src, dst: dstTrailing, subdir: "bar", precondition: objcli.OperationPreconditionOnlyIfAbsent},
 	}
 
 	for _, test := range tests {
@@ -59,9 +71,11 @@ func TestUploadDirectory(t *testing.T) {
 			client := objcli.NewTestClient(t, objval.ProviderAWS)
 
 			require.NoError(t, Sync(SyncOptions{
-				Client:      client,
-				Source:      test.src,
-				Destination: test.dst,
+				Client:       client,
+				Source:       test.src,
+				Destination:  test.dst,
+				Lock:         test.lock,
+				Precondition: test.precondition,
 			}))
 
 			require.Len(t, client.Buckets, 1)
@@ -69,9 +83,50 @@ func TestUploadDirectory(t *testing.T) {
 
 			for _, file := range files {
 				key := filepath.Join("foo", test.subdir, file.path)
-				require.Contains(t, client.Buckets["bucket"], key)
-				require.Equal(t, []byte(file.contents), client.Buckets["bucket"][key].Body)
+
+				require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: key})
+				require.Equal(
+					t,
+					[]byte(file.contents),
+					client.Buckets["bucket"][objval.TestObjectIdentifier{Key: key}].Body,
+				)
+
+				if test.lock != nil {
+					require.Equal(
+						t,
+						objval.LockTypeCompliance,
+						client.Buckets["bucket"][objval.TestObjectIdentifier{Key: key}].LockType,
+					)
+					require.Equal(
+						t,
+						test.lock.Expiration,
+						*client.Buckets["bucket"][objval.TestObjectIdentifier{Key: key}].LockExpiration,
+					)
+
+					continue
+				}
+
+				require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: key}].LockType)
 			}
+
+			if test.precondition != "" {
+				require.Error(t, Sync(SyncOptions{
+					Client:       client,
+					Source:       test.src,
+					Destination:  test.dst,
+					Lock:         test.lock,
+					Precondition: test.precondition,
+				}))
+
+				return
+			}
+
+			require.NoError(t, Sync(SyncOptions{
+				Client:      client,
+				Source:      test.src,
+				Destination: test.dst,
+				Lock:        test.lock,
+			}))
 		})
 	}
 }

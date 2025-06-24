@@ -19,9 +19,11 @@ import (
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/v2/ptr"
+	"github.com/couchbase/tools-common/types/v2/timeprovider"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -33,7 +35,14 @@ func TestNewClient(t *testing.T) {
 		logger = slog.Default()
 	)
 
-	require.Equal(t, &Client{serviceAPI: api, logger: logger}, NewClient(ClientOptions{ServiceAPI: api}))
+	require.Equal(t,
+		&Client{
+			serviceAPI:   api,
+			logger:       logger,
+			timeProvider: timeprovider.CurrentTimeProvider{},
+		},
+		NewClient(ClientOptions{ServiceAPI: api}),
+	)
 }
 
 func TestClientProvider(t *testing.T) {
@@ -76,6 +85,153 @@ func TestClientGetObject(t *testing.T) {
 			Key:          "key",
 			Size:         ptr.To(int64(len("value"))),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		},
+	}
+
+	require.Equal(t, expected, object)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "GetObject", 1)
+}
+
+func TestClientGetObjectVersionID(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.GetObjectInput) bool {
+		var (
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			key     = input.Key != nil && *input.Key == "key"
+			version = input.VersionId != nil && *input.VersionId == "version1"
+		)
+
+		return bucket && key && version
+	}
+
+	output := &s3.GetObjectOutput{
+		Body:          io.NopCloser(strings.NewReader("value")),
+		ContentLength: ptr.To(int64(len("value"))),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
+		VersionId:     ptr.To("version1"),
+	}
+
+	api.On("GetObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		VersionID: "version1",
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("value"), testutil.ReadAll(t, object.Body))
+	object.Body = nil
+
+	expected := &objval.Object{
+		ObjectAttrs: objval.ObjectAttrs{
+			Key:          "key",
+			Size:         ptr.To(int64(len("value"))),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			VersionID:    "version1",
+		},
+	}
+
+	require.Equal(t, expected, object)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "GetObject", 1)
+}
+
+func TestClientGetObjectLockData(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.GetObjectInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return bucket && key
+	}
+
+	output := &s3.GetObjectOutput{
+		Body:                      io.NopCloser(strings.NewReader("value")),
+		ContentLength:             ptr.To(int64(len("value"))),
+		LastModified:              ptr.To((time.Time{}).Add(24 * time.Hour)),
+		ObjectLockRetainUntilDate: ptr.To(time.Now()),
+		ObjectLockMode:            types.ObjectLockModeCompliance,
+	}
+
+	api.On("GetObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("value"), testutil.ReadAll(t, object.Body))
+	object.Body = nil
+
+	expected := &objval.Object{
+		ObjectAttrs: objval.ObjectAttrs{
+			Key:            "key",
+			Size:           ptr.To(int64(len("value"))),
+			LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
+			LockExpiration: output.ObjectLockRetainUntilDate,
+			LockType:       objval.LockTypeCompliance,
+		},
+	}
+
+	require.Equal(t, expected, object)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "GetObject", 1)
+}
+
+func TestClientGetObjectLockDataNonCompliance(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.GetObjectInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return bucket && key
+	}
+
+	output := &s3.GetObjectOutput{
+		Body:                      io.NopCloser(strings.NewReader("value")),
+		ContentLength:             ptr.To(int64(len("value"))),
+		LastModified:              ptr.To((time.Time{}).Add(24 * time.Hour)),
+		ObjectLockRetainUntilDate: ptr.To(time.Now()),
+		ObjectLockMode:            types.ObjectLockModeGovernance,
+	}
+
+	api.On("GetObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("value"), testutil.ReadAll(t, object.Body))
+	object.Body = nil
+
+	expected := &objval.Object{
+		ObjectAttrs: objval.ObjectAttrs{
+			Key:            "key",
+			Size:           ptr.To(int64(len("value"))),
+			LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
+			LockExpiration: output.ObjectLockRetainUntilDate,
+			LockType:       objval.LockTypeUndefined,
 		},
 	}
 
@@ -168,6 +324,96 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	api.AssertNumberOfCalls(t, "HeadObject", 1)
 }
 
+func TestClientGetObjectAttrsVersionId(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.HeadObjectInput) bool {
+		var (
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			key     = input.Key != nil && *input.Key == "key"
+			version = input.VersionId != nil && *input.VersionId == "version1"
+		)
+
+		return bucket && key && version
+	}
+
+	output := &s3.HeadObjectOutput{
+		ETag:          ptr.To("etag"),
+		ContentLength: ptr.To[int64](5),
+		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
+		VersionId:     ptr.To("version1"),
+	}
+
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		VersionID: "version1",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.ObjectAttrs{
+		Key:          "key",
+		ETag:         ptr.To("etag"),
+		Size:         ptr.To[int64](5),
+		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		VersionID:    "version1",
+	}
+
+	require.Equal(t, expected, attrs)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
+}
+
+func TestClientGetObjectAttrsLockData(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.HeadObjectInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+		)
+
+		return bucket && key
+	}
+
+	output := &s3.HeadObjectOutput{
+		ETag:                      ptr.To("etag"),
+		ContentLength:             ptr.To[int64](5),
+		LastModified:              ptr.To((time.Time{}).Add(24 * time.Hour)),
+		ObjectLockRetainUntilDate: ptr.To(time.Now()),
+		ObjectLockMode:            types.ObjectLockModeCompliance,
+	}
+
+	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.ObjectAttrs{
+		Key:            "key",
+		ETag:           ptr.To("etag"),
+		Size:           ptr.To[int64](5),
+		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
+		LockExpiration: output.ObjectLockRetainUntilDate,
+		LockType:       objval.LockTypeCompliance,
+	}
+
+	require.Equal(t, expected, attrs)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "HeadObject", 1)
+}
+
 func TestClientPutObject(t *testing.T) {
 	api := &mockServiceAPI{}
 
@@ -189,6 +435,70 @@ func TestClientPutObject(t *testing.T) {
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("value"),
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
+}
+
+func TestClientPutObjectIfAbsent(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.PutObjectInput) bool {
+		var (
+			body        = input.Body != nil && bytes.Equal(testutil.ReadAll(t, input.Body), []byte("value"))
+			bucket      = input.Bucket != nil && *input.Bucket == "bucket"
+			key         = input.Key != nil && *input.Key == "key"
+			ifNoneMatch = input.IfNoneMatch != nil && *input.IfNoneMatch == "*"
+		)
+
+		return body && bucket && key && ifNoneMatch
+	}
+
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket:       "bucket",
+		Key:          "key",
+		Body:         strings.NewReader("value"),
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
+}
+
+func TestClientPutObjectLockPeriod(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	now := time.Now()
+	expirationTIme := now.AddDate(0, 0, int(5))
+
+	fn := func(input *s3.PutObjectInput) bool {
+		var (
+			body       = input.Body != nil && bytes.Equal(testutil.ReadAll(t, input.Body), []byte("value"))
+			bucket     = input.Bucket != nil && *input.Bucket == "bucket"
+			key        = input.Key != nil && *input.Key == "key"
+			lockMode   = input.ObjectLockMode == types.ObjectLockModeCompliance
+			lockPeriod = input.ObjectLockRetainUntilDate != nil && *input.ObjectLockRetainUntilDate == expirationTIme
+		)
+
+		return body && bucket && key && lockMode && lockPeriod
+	}
+
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("value"),
+		Lock:   objcli.NewComplianceLock(expirationTIme),
 	})
 	require.NoError(t, err)
 
@@ -617,6 +927,129 @@ func TestClientDeleteObjectsIgnoreNotFoundError(t *testing.T) {
 	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
 		Bucket: "bucket",
 		Keys:   []string{"key"},
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
+}
+
+func TestClientDeleteObjectVersionsNoKeys(t *testing.T) {
+	api := &mockServiceAPI{}
+	client := &Client{serviceAPI: api}
+
+	require.Equal(t, nil, client.deleteObjectVersions(context.Background(), "bucket"))
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 0)
+}
+
+func TestClientDeleteObjectVersionsSinglePage(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.DeleteObjectsInput) bool {
+		var (
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
+			objects = input.Delete != nil && reflect.DeepEqual(input.Delete.Objects, []types.ObjectIdentifier{
+				{Key: ptr.To("key1"), VersionId: ptr.To("v1")},
+				{Key: ptr.To("key1"), VersionId: ptr.To("v2")},
+				{Key: ptr.To("key2"), VersionId: ptr.To("v1")},
+				{Key: ptr.To("key2"), VersionId: ptr.To("v2")},
+				{Key: ptr.To("key3"), VersionId: ptr.To("v1")},
+				{Key: ptr.To("key3"), VersionId: ptr.To("v2")},
+			})
+		)
+
+		return bucket && quiet && objects
+	}
+
+	api.On("DeleteObjects", matchers.Context, mock.MatchedBy(fn)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.DeleteObjectVersions(context.Background(), objcli.DeleteObjectVersionsOptions{
+		Bucket: "bucket",
+		Versions: []objval.ObjectVersion{
+			{Key: "key1", VersionID: "v1"},
+			{Key: "key1", VersionID: "v2"},
+			{Key: "key2", VersionID: "v1"},
+			{Key: "key2", VersionID: "v2"},
+			{Key: "key3", VersionID: "v1"},
+			{Key: "key3", VersionID: "v2"},
+		},
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 1)
+}
+
+func TestClientDeleteObjectVersionsMultiplePages(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn1 := func(input *s3.DeleteObjectsInput) bool {
+		var (
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
+			objects = input.Delete != nil && len(input.Delete.Objects) == PageSize
+		)
+
+		return bucket && quiet && objects
+	}
+
+	api.On("DeleteObjects", matchers.Context, mock.MatchedBy(fn1)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
+
+	fn2 := func(input *s3.DeleteObjectsInput) bool {
+		var (
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			quiet   = input.Delete != nil && input.Delete.Quiet != nil && *input.Delete.Quiet
+			objects = input.Delete != nil && len(input.Delete.Objects) == 42
+		)
+
+		return bucket && quiet && objects
+	}
+
+	api.On("DeleteObjects", matchers.Context, mock.MatchedBy(fn2)).
+		Return(&s3.DeleteObjectsOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	versions := make([]objval.ObjectVersion, 0, PageSize+42)
+
+	const items = PageSize + 42
+
+	for i := 0; i < items; i += 2 {
+		versions = append(versions, objval.ObjectVersion{Key: fmt.Sprintf("key%d", i), VersionID: "v1"})
+		versions = append(versions, objval.ObjectVersion{Key: fmt.Sprintf("key%d", i), VersionID: "v2"})
+	}
+
+	err := client.DeleteObjectVersions(context.Background(), objcli.DeleteObjectVersionsOptions{
+		Bucket:   "bucket",
+		Versions: versions,
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "DeleteObjects", 2)
+}
+
+func TestClientDeleteObjectVersionsIgnoreNotFoundError(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	output := &s3.DeleteObjectsOutput{
+		Errors: []types.Error{{Code: ptr.To("NoSuchKey"), Message: ptr.To("")}},
+	}
+
+	api.On("DeleteObjects", matchers.Context, mock.Anything).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.DeleteObjectVersions(context.Background(), objcli.DeleteObjectVersionsOptions{
+		Bucket:   "bucket",
+		Versions: []objval.ObjectVersion{{Key: "k1", VersionID: "v1"}},
 	})
 	require.NoError(t, err)
 
@@ -1102,16 +1535,128 @@ func TestClientIterateObjectsWithIncludeExclude(t *testing.T) {
 	}
 }
 
+func TestClientIterateObjectsVersions(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.ListObjectVersionsInput) bool {
+		var (
+			bucket    = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix    = input.Prefix != nil && *input.Prefix == "prefix"
+			delimiter = input.Delimiter != nil && *input.Delimiter == "delimiter"
+		)
+
+		return bucket && prefix && delimiter
+	}
+
+	api.On("ListObjectVersions", matchers.Context, mock.MatchedBy(fn), mock.Anything).
+		Return(&s3.ListObjectVersionsOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+		Versions:  true,
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectVersions", 1)
+}
+
+func TestClientIterateObjectsVersionsOutput(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.ListObjectVersionsInput) bool {
+		var (
+			bucket    = input.Bucket != nil && *input.Bucket == "bucket"
+			prefix    = input.Prefix != nil && *input.Prefix == "prefix"
+			delimiter = input.Delimiter != nil && *input.Delimiter == "delimiter"
+		)
+
+		return bucket && prefix && delimiter
+	}
+
+	now := time.Now()
+
+	api.On("ListObjectVersions", matchers.Context, mock.MatchedBy(fn), mock.Anything).
+		Return(&s3.ListObjectVersionsOutput{
+			Versions: []types.ObjectVersion{
+				{
+					Key:          ptr.To("k1"),
+					Size:         ptr.To(int64(1)),
+					VersionId:    ptr.To("v1"),
+					LastModified: ptr.To(now),
+					IsLatest:     ptr.To(true),
+				},
+				{Key: ptr.To("k2"), Size: ptr.To(int64(2)), VersionId: ptr.To("v2"), LastModified: ptr.To(now)},
+			},
+			DeleteMarkers: []types.DeleteMarkerEntry{
+				{Key: ptr.To("k1"), VersionId: ptr.To("v2"), LastModified: ptr.To(now)},
+				{Key: ptr.To("k2"), VersionId: ptr.To("v3"), LastModified: ptr.To(now), IsLatest: ptr.To(true)},
+			},
+		}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	var all []*objval.ObjectAttrs
+
+	fn2 := func(attrs *objval.ObjectAttrs) error { all = append(all, attrs); return nil }
+
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+		Versions:  true,
+		Func:      fn2,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []*objval.ObjectAttrs{
+		ptr.To(objval.ObjectAttrs{
+			Key:              "k1",
+			Size:             ptr.To(int64(1)),
+			VersionID:        "v1",
+			LastModified:     ptr.To(now),
+			IsCurrentVersion: true,
+		}),
+		ptr.To(objval.ObjectAttrs{
+			Key:          "k2",
+			Size:         ptr.To(int64(2)),
+			VersionID:    "v2",
+			LastModified: ptr.To(now),
+		}),
+		ptr.To(objval.ObjectAttrs{
+			Key:            "k1",
+			VersionID:      "v2",
+			LastModified:   ptr.To(now),
+			IsDeleteMarker: true,
+		}),
+		ptr.To(objval.ObjectAttrs{
+			Key:              "k2",
+			VersionID:        "v3",
+			LastModified:     ptr.To(now),
+			IsCurrentVersion: true,
+			IsDeleteMarker:   true,
+		}),
+	}, all)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "ListObjectVersions", 1)
+}
+
 func TestClientCreateMultipartUpload(t *testing.T) {
 	api := &mockServiceAPI{}
 
 	fn := func(input *s3.CreateMultipartUploadInput) bool {
 		var (
-			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			key    = input.Key != nil && *input.Key == "key"
+			bucket      = input.Bucket != nil && *input.Bucket == "bucket"
+			key         = input.Key != nil && *input.Key == "key"
+			lockMode    = input.ObjectLockMode == ""
+			retainUntil = input.ObjectLockRetainUntilDate == nil
 		)
 
-		return bucket && key
+		return bucket && key && lockMode && retainUntil
 	}
 
 	output := &s3.CreateMultipartUploadOutput{
@@ -1126,6 +1671,44 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 	id, err := client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
 		Bucket: "bucket",
 		Key:    "key",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "id", id)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "CreateMultipartUpload", 1)
+}
+
+func TestClientCreateMultipartUploadLockPeriod(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	now := time.Now()
+	expirationTime := now.AddDate(0, 0, int(5))
+
+	fn := func(input *s3.CreateMultipartUploadInput) bool {
+		var (
+			bucket      = input.Bucket != nil && *input.Bucket == "bucket"
+			key         = input.Key != nil && *input.Key == "key"
+			lockMode    = input.ObjectLockMode == types.ObjectLockModeCompliance
+			retainUntil = input.ObjectLockRetainUntilDate != nil && *input.ObjectLockRetainUntilDate == expirationTime
+		)
+
+		return bucket && key && lockMode && retainUntil
+	}
+
+	output := &s3.CreateMultipartUploadOutput{
+		UploadId: ptr.To("id"),
+	}
+
+	api.On("CreateMultipartUpload", matchers.Context, mock.MatchedBy(fn), mock.Anything).
+		Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	id, err := client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Lock:   objcli.NewComplianceLock(expirationTime),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "id", id)
@@ -1334,6 +1917,41 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
 }
 
+func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.CompleteMultipartUploadInput) bool {
+		var (
+			bucket = input.Bucket != nil && *input.Bucket == "bucket"
+			key    = input.Key != nil && *input.Key == "key"
+			id     = input.UploadId != nil && *input.UploadId == "id"
+			parts  = reflect.DeepEqual(input.MultipartUpload.Parts, []types.CompletedPart{
+				{ETag: ptr.To("etag1"), PartNumber: ptr.To[int32](1)},
+				{ETag: ptr.To("etag2"), PartNumber: ptr.To[int32](2)},
+			})
+			ifNoneMatch = input.IfNoneMatch != nil && *input.IfNoneMatch == "*"
+		)
+
+		return bucket && key && id && parts && ifNoneMatch
+	}
+
+	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:       "bucket",
+		UploadID:     "id",
+		Key:          "key",
+		Parts:        []objval.Part{{ID: "etag1", Number: 1}, {ID: "etag2", Number: 2}},
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
+}
+
 func TestClientAbortMultipartUpload(t *testing.T) {
 	api := &mockServiceAPI{}
 
@@ -1389,4 +2007,98 @@ func TestClientAbortMultipartUploadNoSuchUpload(t *testing.T) {
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "AbortMultipartUpload", 1)
+}
+
+func TestClientGetGetBucketLockingStatus(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.GetObjectLockConfigurationInput) bool {
+		return input.Bucket != nil && *input.Bucket == "bucket"
+	}
+
+	output := &s3.GetObjectLockConfigurationOutput{
+		ObjectLockConfiguration: &types.ObjectLockConfiguration{
+			ObjectLockEnabled: types.ObjectLockEnabledEnabled,
+		},
+	}
+
+	api.On("GetObjectLockConfiguration", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	lockStatus, err := client.GetBucketLockingStatus(context.Background(), objcli.GetBucketLockingStatusOptions{
+		Bucket: "bucket",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.BucketLockingStatus{
+		Enabled: true,
+	}
+
+	require.Equal(t, expected, lockStatus)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "GetObjectLockConfiguration", 1)
+}
+
+func TestClientGetGetBucketLockingStatusIgnoreNotFoundErr(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.GetObjectLockConfigurationInput) bool {
+		return input.Bucket != nil && *input.Bucket == "bucket"
+	}
+
+	api.On("GetObjectLockConfiguration", matchers.Context, mock.MatchedBy(fn)).
+		Return(nil, &smithy.GenericAPIError{Code: "ObjectLockConfigurationNotFoundError"})
+
+	client := &Client{serviceAPI: api}
+
+	lockStatus, err := client.GetBucketLockingStatus(context.Background(), objcli.GetBucketLockingStatusOptions{
+		Bucket: "bucket",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.BucketLockingStatus{
+		Enabled: false,
+	}
+
+	require.Equal(t, expected, lockStatus)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "GetObjectLockConfiguration", 1)
+}
+
+func TestClientSetObjectLock(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	now := time.Now()
+	expirationTIme := now.AddDate(0, 0, int(5))
+
+	fn := func(input *s3.PutObjectRetentionInput) bool {
+		var (
+			bucket        = input.Bucket != nil && *input.Bucket == "bucket"
+			key           = input.Key != nil && *input.Key == "key"
+			versionID     = input.VersionId != nil && *input.VersionId == "version1"
+			retentionMode = input.Retention != nil && input.Retention.Mode == types.ObjectLockRetentionModeCompliance
+			retainUntil   = input.Retention != nil && input.Retention.RetainUntilDate != nil &&
+				*input.Retention.RetainUntilDate == expirationTIme
+		)
+
+		return bucket && key && versionID && retentionMode && retainUntil
+	}
+
+	api.On("PutObjectRetention", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectRetentionOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.SetObjectLock(context.Background(), objcli.SetObjectLockOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		VersionID: "version1",
+		Lock:      objcli.NewComplianceLock(expirationTIme),
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "PutObjectRetention", 1)
 }

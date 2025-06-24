@@ -3,6 +3,7 @@ package objcli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/v2/ptr"
+	"github.com/couchbase/tools-common/types/v2/timeprovider"
 )
 
 // TestClient implementation of the 'Client' interface which stores state in memory, and can be used to avoid having to
@@ -33,6 +34,8 @@ type TestClient struct {
 	// not safe/recommended to access this attribute whilst a test is running; it should only be used to inspect state
 	// (to perform assertions) once testing is complete.
 	Buckets objval.TestBuckets
+
+	TimeProvider timeprovider.TimeProvider
 }
 
 var _ Client = (*TestClient)(nil)
@@ -40,9 +43,10 @@ var _ Client = (*TestClient)(nil)
 // NewTestClient returns a new test client, which has no buckets/objects.
 func NewTestClient(t *testing.T, provider objval.Provider) *TestClient {
 	return &TestClient{
-		t:        t,
-		provider: provider,
-		Buckets:  make(objval.TestBuckets),
+		t:            t,
+		provider:     provider,
+		Buckets:      make(objval.TestBuckets),
+		TimeProvider: timeprovider.CurrentTimeProvider{},
 	}
 }
 
@@ -86,7 +90,19 @@ func (t *TestClient) PutObject(_ context.Context, opts PutObjectOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	_ = t.putObjectLocked(opts.Bucket, opts.Key, opts.Body)
+	if opts.Precondition == OperationPreconditionOnlyIfAbsent {
+		b := t.getBucketLocked(opts.Bucket)
+		for objID := range b {
+			if objID.Key == opts.Key {
+				return errors.New("object already exists")
+			}
+		}
+	}
+
+	_, err := t.putObjectLocked(opts)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -100,7 +116,14 @@ func (t *TestClient) CopyObject(_ context.Context, opts CopyObjectOptions) error
 		return err
 	}
 
-	_ = t.putObjectLocked(opts.DestinationBucket, opts.DestinationKey, bytes.NewReader(src.Body))
+	_, err = t.putObjectLocked(PutObjectOptions{
+		Bucket: opts.DestinationBucket,
+		Key:    opts.DestinationKey,
+		Body:   bytes.NewReader(src.Body),
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -109,11 +132,18 @@ func (t *TestClient) AppendToObject(_ context.Context, opts AppendToObjectOption
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, ok := t.getBucketLocked(opts.Bucket)[opts.Key]
+	object, ok := t.getBucketLocked(opts.Bucket)[objval.TestObjectIdentifier{Key: opts.Key}]
 	if ok {
 		object.Body = append(object.Body, testutil.ReadAll(t.t, opts.Body)...)
 	} else {
-		_ = t.putObjectLocked(opts.Bucket, opts.Key, opts.Body)
+		_, err := t.putObjectLocked(PutObjectOptions{
+			Bucket: opts.Bucket,
+			Key:    opts.Key,
+			Body:   opts.Body,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -126,7 +156,38 @@ func (t *TestClient) DeleteObjects(_ context.Context, opts DeleteObjectsOptions)
 	b := t.getBucketLocked(opts.Bucket)
 
 	for _, key := range opts.Keys {
-		delete(b, key)
+		obj, err := t.getObjectRLocked(opts.Bucket, key)
+		if err != nil {
+			continue
+		}
+
+		if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
+			return errors.New("cannot delete locked object")
+		}
+
+		delete(b, objval.TestObjectIdentifier{Key: key})
+	}
+
+	return nil
+}
+
+func (t *TestClient) DeleteObjectVersions(_ context.Context, opts DeleteObjectVersionsOptions) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	b := t.getBucketLocked(opts.Bucket)
+
+	for _, objVersion := range opts.Versions {
+		obj, err := t.getObjectVersion(opts.Bucket, objVersion.Key, objVersion.VersionID)
+		if err != nil {
+			return err
+		}
+
+		if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
+			return errors.New("cannot delete locked object")
+		}
+
+		delete(b, objval.TestObjectIdentifier(objVersion))
 	}
 
 	return nil
@@ -138,12 +199,25 @@ func (t *TestClient) DeleteDirectory(_ context.Context, opts DeleteDirectoryOpti
 
 	b := t.getBucketLocked(opts.Bucket)
 
-	for key := range b {
-		if !strings.HasPrefix(key, opts.Prefix) {
+	for objID := range b {
+		if !opts.Versions && objID.VersionID != "" {
 			continue
 		}
 
-		delete(b, key)
+		if !strings.HasPrefix(objID.Key, opts.Prefix) {
+			continue
+		}
+
+		obj, err := t.getObjectVersion(opts.Bucket, objID.Key, objID.VersionID)
+		if err != nil {
+			return err
+		}
+
+		if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
+			return errors.New("cannot delete locked object")
+		}
+
+		delete(b, objID)
 	}
 
 	return nil
@@ -170,21 +244,25 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 
 	seen := make(map[string]struct{})
 
-	for key, object := range cpy {
-		if !strings.HasPrefix(key, opts.Prefix) || ShouldIgnore(key, opts.Include, opts.Exclude) {
+	for objID, object := range cpy {
+		if !opts.Versions && objID.VersionID != "" {
+			continue
+		}
+
+		if !strings.HasPrefix(objID.Key, opts.Prefix) || ShouldIgnore(objID.Key, opts.Include, opts.Exclude) {
 			continue
 		}
 
 		var (
 			attrs   = object.ObjectAttrs
-			trimmed = strings.TrimPrefix(key, opts.Prefix)
+			trimmed = strings.TrimPrefix(objID.Key, opts.Prefix)
 		)
 
 		// If this is a nested key, convert it into a directory stub. AWS allows a filesystem style API when you pass a
 		// delimiter - if your prefix has a "directory" in it we get a stub, rather than the actual object which could
 		// be nested.
 		if opts.Delimiter != "" && strings.Count(trimmed, opts.Delimiter) > 1 {
-			attrs.Key = parentDirectory(key)
+			attrs.Key = parentDirectory(objID.Key)
 			attrs.ETag = nil
 			attrs.Size = nil
 			attrs.LastModified = nil
@@ -247,8 +325,19 @@ func (t *TestClient) UploadPart(_ context.Context, opts UploadPartOptions) (objv
 	size, err := SeekerLength(opts.Body)
 	require.NoError(t.t, err)
 
+	id, err := t.putObjectLocked(PutObjectOptions{
+		Bucket:       opts.Bucket,
+		Key:          partKey(opts.UploadID, opts.Key),
+		Body:         opts.Body,
+		Precondition: opts.Precondition,
+		Lock:         opts.Lock,
+	})
+	if err != nil {
+		return objval.Part{}, err
+	}
+
 	part := objval.Part{
-		ID:     t.putObjectLocked(opts.Bucket, partKey(opts.UploadID, opts.Key), opts.Body),
+		ID:     id,
 		Number: opts.Number,
 		Size:   size,
 	}
@@ -268,11 +357,14 @@ func (t *TestClient) UploadPartCopy(_ context.Context, opts UploadPartCopyOption
 	body := make([]byte, opts.ByteRange.End-opts.ByteRange.Start+1)
 	copy(body, object.Body)
 
-	id := t.putObjectLocked(
-		opts.DestinationBucket,
-		partKey(opts.UploadID, opts.DestinationKey),
-		bytes.NewReader(body),
-	)
+	id, err := t.putObjectLocked(PutObjectOptions{
+		Bucket: opts.DestinationBucket,
+		Key:    partKey(opts.UploadID, opts.DestinationKey),
+		Body:   bytes.NewReader(body),
+	})
+	if err != nil {
+		return objval.Part{}, err
+	}
 
 	part := objval.Part{
 		ID:     id,
@@ -298,9 +390,18 @@ func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMul
 		buffer.Write(object.Body)
 	}
 
-	_ = t.putObjectLocked(opts.Bucket, opts.Key, bytes.NewReader(buffer.Bytes()))
+	_, err := t.putObjectLocked(PutObjectOptions{
+		Bucket:       opts.Bucket,
+		Key:          opts.Key,
+		Body:         bytes.NewReader(buffer.Bytes()),
+		Precondition: opts.Precondition,
+		Lock:         opts.Lock,
+	})
+	if err != nil {
+		return err
+	}
 
-	t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	_ = t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
 
 	return nil
 }
@@ -309,7 +410,34 @@ func (t *TestClient) AbortMultipartUpload(_ context.Context, opts AbortMultipart
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	err := t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *TestClient) GetBucketLockingStatus(
+	_ context.Context,
+	_ GetBucketLockingStatusOptions,
+) (*objval.BucketLockingStatus, error) {
+	return &objval.BucketLockingStatus{Enabled: true}, nil
+}
+
+func (t *TestClient) SetObjectLock(_ context.Context, opts SetObjectLockOptions) error {
+	b, ok := t.Buckets[opts.Bucket]
+	if !ok {
+		return &objerr.NotFoundError{Type: "object", Name: opts.Key}
+	}
+
+	o, ok := b[objval.TestObjectIdentifier{Key: opts.Key, VersionID: opts.VersionID}]
+	if !ok {
+		return &objerr.NotFoundError{Type: "object", Name: opts.Key}
+	}
+
+	o.LockType = opts.Lock.Type
+	o.LockExpiration = &opts.Lock.Expiration
 
 	return nil
 }
@@ -323,6 +451,20 @@ func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {
 	return t.Buckets[bucket]
 }
 
+func (t *TestClient) getObjectVersion(bucket, key, versionID string) (*objval.TestObject, error) {
+	b, ok := t.Buckets[bucket]
+	if !ok {
+		return nil, &objerr.NotFoundError{Type: "object", Name: key}
+	}
+
+	o, ok := b[objval.TestObjectIdentifier{Key: key, VersionID: versionID}]
+	if !ok {
+		return nil, &objerr.NotFoundError{Type: "object", Name: key}
+	}
+
+	return o, nil
+}
+
 // NOTE: Buckets are automatically created by the test client when they're required, so this error returns an object not
 // found error if either the bucket/object don't exist.
 func (t *TestClient) getObjectRLocked(bucket, key string) (*objval.TestObject, error) {
@@ -331,7 +473,7 @@ func (t *TestClient) getObjectRLocked(bucket, key string) (*objval.TestObject, e
 		return nil, &objerr.NotFoundError{Type: "object", Name: key}
 	}
 
-	o, ok := b[key]
+	o, ok := b[objval.TestObjectIdentifier{Key: key}]
 	if !ok {
 		return nil, &objerr.NotFoundError{Type: "object", Name: key}
 	}
@@ -339,9 +481,13 @@ func (t *TestClient) getObjectRLocked(bucket, key string) (*objval.TestObject, e
 	return o, nil
 }
 
-func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) string {
+func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
+	body := opts.Body
+	key := opts.Key
+	bucket := opts.Bucket
+
 	var (
-		now  = time.Now()
+		now  = t.TimeProvider.Now()
 		data = testutil.ReadAll(t.t, body)
 	)
 
@@ -357,22 +503,55 @@ func (t *TestClient) putObjectLocked(bucket, key string, body io.ReadSeeker) str
 		t.Buckets[bucket] = make(objval.TestBucket)
 	}
 
-	t.Buckets[bucket][key] = &objval.TestObject{
+	oldVersion, ok := t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}]
+	if ok {
+		if opts.Precondition == OperationPreconditionOnlyIfAbsent {
+			return "", errors.New("object already exists")
+		}
+
+		versionID, _ := uuid.NewRandom()
+		t.Buckets[bucket][objval.TestObjectIdentifier{Key: key, VersionID: versionID.String()}] = oldVersion
+	}
+
+	obj := &objval.TestObject{
 		ObjectAttrs: attrs,
 		Body:        data,
 	}
 
-	return attrs.Key
-}
-
-func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []*regexp.Regexp) {
-	b := t.getBucketLocked(bucket)
-
-	for key := range b {
-		if strings.HasPrefix(key, prefix) && !ShouldIgnore(key, include, exclude) {
-			delete(b, key)
+	if opts.Lock != nil {
+		switch opts.Lock.Type {
+		case objval.LockTypeCompliance:
+			obj.LockType = objval.LockTypeCompliance
+			obj.LockExpiration = &opts.Lock.Expiration
+		default:
+			return "", errors.New("unported lock type")
 		}
 	}
+
+	t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}] = obj
+
+	return attrs.Key, nil
+}
+
+func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []*regexp.Regexp) error {
+	b := t.getBucketLocked(bucket)
+
+	for objID := range b {
+		if strings.HasPrefix(objID.Key, prefix) && !ShouldIgnore(objID.Key, include, exclude) {
+			obj, err := t.getObjectRLocked(bucket, objID.Key)
+			if err != nil {
+				return err
+			}
+
+			if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
+				return errors.New("cannot delete locked object")
+			}
+
+			delete(b, objID)
+		}
+	}
+
+	return nil
 }
 
 // partKey returns a key which should be used for an in-progress multipart upload. This function should be used to

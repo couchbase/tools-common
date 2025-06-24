@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -22,32 +23,140 @@ import (
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/v2/ptr"
+	"github.com/couchbase/tools-common/types/v2/timeprovider"
 )
 
+type customMatcher struct {
+	message string
+	match   func(arg any) bool
+}
+
+func (o customMatcher) Matches(x interface{}) bool {
+	return o.match(x)
+}
+
+func (o customMatcher) String() string {
+	return o.message
+}
+
+func immutabilityModeMatcher(mode blob.ImmutabilityPolicySetting) customMatcher {
+	return customMatcher{
+		message: fmt.Sprintf("Immutability policy mode should be %q", mode),
+		match: func(arg interface{}) bool {
+			var immutabilityPolicyMode *blob.ImmutabilityPolicySetting
+
+			switch inputOpts := arg.(type) {
+			case *blob.SetImmutabilityPolicyOptions:
+				immutabilityPolicyMode = inputOpts.Mode
+			default:
+				return false
+			}
+
+			return immutabilityPolicyMode != nil && *immutabilityPolicyMode == mode
+		},
+	}
+}
+
+func immutabilityPolicyMatcher(mode blob.ImmutabilityPolicySetting, expiryTime time.Time) customMatcher {
+	return customMatcher{
+		message: fmt.Sprintf("Immutability policy mode should be %q and expiry time should be %q", mode, expiryTime),
+		match: func(arg interface{}) bool {
+			var immutabilityPolicyMode *blob.ImmutabilityPolicySetting
+			var immutabilityPolicyExpiryTime *time.Time
+
+			switch inputOpts := arg.(type) {
+			case *blockblob.UploadOptions:
+				immutabilityPolicyMode = inputOpts.ImmutabilityPolicyMode
+				immutabilityPolicyExpiryTime = inputOpts.ImmutabilityPolicyExpiryTime
+			case *blockblob.CommitBlockListOptions:
+				immutabilityPolicyMode = inputOpts.ImmutabilityPolicyMode
+				immutabilityPolicyExpiryTime = inputOpts.ImmutabilityPolicyExpiryTime
+			default:
+				return false
+			}
+
+			modeMatch := immutabilityPolicyMode != nil && *immutabilityPolicyMode == mode
+			expiryMatch := immutabilityPolicyExpiryTime != nil && *immutabilityPolicyExpiryTime == expiryTime
+
+			return modeMatch && expiryMatch
+		},
+	}
+}
+
+func ifAbsentMatcher() customMatcher {
+	return customMatcher{
+		message: fmt.Sprintf("ifNoneMatch should be %q ", azcore.ETagAny),
+		match: func(arg interface{}) bool {
+			var accessConditions *blob.AccessConditions
+
+			switch inputOpts := arg.(type) {
+			case *blockblob.UploadOptions:
+				accessConditions = inputOpts.AccessConditions
+			case *blockblob.CommitBlockListOptions:
+				accessConditions = inputOpts.AccessConditions
+			default:
+				return false
+			}
+
+			if accessConditions == nil || accessConditions.ModifiedAccessConditions == nil {
+				return false
+			}
+
+			ifNoneMatch := accessConditions.ModifiedAccessConditions.IfNoneMatch
+
+			return ifNoneMatch != nil && *ifNoneMatch == azcore.ETagAny
+		},
+	}
+}
+
 func TestNewClient(t *testing.T) {
-	require.Equal(t, &Client{serviceAPI: &serviceClient{}}, NewClient(ClientOptions{}))
+	require.Equal(
+		t,
+		&Client{serviceAPI: &serviceClient{}, timeProvider: timeprovider.CurrentTimeProvider{}},
+		NewClient(ClientOptions{}),
+	)
 }
 
 func TestClientProvider(t *testing.T) {
 	require.Equal(t, objval.ProviderAzure, (&Client{}).Provider())
 }
 
-func newTestClient(t *testing.T) (*Client, *MockcontainerAPI, *MockblockBlobAPI) {
+type testEnvironment struct {
+	ctrl         *gomock.Controller
+	client       *Client
+	serviceAPI   *MockserviceAPI
+	containerAPI *MockcontainerAPI
+	blobAPI      *MockblobAPI
+	blockBlobAPI *MockblockBlobAPI
+}
+
+func newTestEnvironment(t *testing.T) testEnvironment {
 	var (
-		ctrl = gomock.NewController(t)
-		sAPI = NewMockserviceAPI(ctrl)
-		cAPI = NewMockcontainerAPI(ctrl)
-		bAPI = NewMockblockBlobAPI(ctrl)
+		ctrl  = gomock.NewController(t)
+		sAPI  = NewMockserviceAPI(ctrl)
+		cAPI  = NewMockcontainerAPI(ctrl)
+		bAPI  = NewMockblobAPI(ctrl)
+		bbAPI = NewMockblockBlobAPI(ctrl)
 	)
 
-	sAPI.EXPECT().NewContainerClient("container").Return(cAPI).AnyTimes()
-	cAPI.EXPECT().NewBlockBlobClient("blob").Return(bAPI).AnyTimes()
+	sAPI.EXPECT().NewContainerClient(gomock.Any()).Return(cAPI).AnyTimes()
+	cAPI.EXPECT().NewBlockBlobClient(gomock.Any()).Return(bbAPI).AnyTimes()
+	cAPI.EXPECT().NewBlobClient(gomock.Any()).Return(bAPI).AnyTimes()
 
-	return &Client{serviceAPI: sAPI}, cAPI, bAPI
+	return testEnvironment{
+		ctrl:         ctrl,
+		client:       &Client{serviceAPI: sAPI, timeProvider: timeprovider.CurrentTimeProvider{}},
+		serviceAPI:   sAPI,
+		containerAPI: cAPI,
+		blobAPI:      bAPI,
+		blockBlobAPI: bbAPI,
+	}
 }
 
 func TestClientGetObject(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	output := blob.DownloadStreamResponse{}
 
@@ -84,7 +193,9 @@ func TestClientGetObject(t *testing.T) {
 }
 
 func TestClientGetObjectWithByteRange(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	output := blob.DownloadStreamResponse{}
 
@@ -135,8 +246,100 @@ func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	require.ErrorAs(t, err, &invalidByteRange)
 }
 
+func TestClientGetObjectVersionID(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	cAPI := testEnvironment.containerAPI
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	output := blob.DownloadStreamResponse{}
+
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.ContentLength = ptr.To[int64](42)
+	output.Body = io.NopCloser(strings.NewReader("value"))
+	output.VersionID = ptr.To("version1")
+
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob", "version1").Return(bAPI, nil)
+
+	bAPI.
+		EXPECT().
+		DownloadStream(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error) {
+			require.Equal(t, int64(0), opts.Range.Count)
+			require.Equal(t, int64(0), opts.Range.Offset)
+
+			return output, nil
+		})
+
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "container",
+		Key:       "blob",
+		VersionID: "version1",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.Object{
+		ObjectAttrs: objval.ObjectAttrs{
+			Key:          "blob",
+			Size:         ptr.To[int64](42),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			VersionID:    "version1",
+		},
+		Body: io.NopCloser(strings.NewReader("value")),
+	}
+
+	require.Equal(t, expected, object)
+}
+
+func TestClientGetObjectLockData(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	now := time.Now()
+
+	output := blob.DownloadStreamResponse{}
+
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.ContentLength = ptr.To[int64](42)
+	output.Body = io.NopCloser(strings.NewReader("value"))
+	output.ImmutabilityPolicyExpiresOn = &now
+	output.ImmutabilityPolicyMode = ptr.To(blob.ImmutabilityPolicyModeLocked)
+
+	bAPI.
+		EXPECT().
+		DownloadStream(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts *blob.DownloadStreamOptions) (blob.DownloadStreamResponse, error) {
+			require.Equal(t, int64(0), opts.Range.Count)
+			require.Equal(t, int64(0), opts.Range.Offset)
+
+			return output, nil
+		})
+
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket: "container",
+		Key:    "blob",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.Object{
+		ObjectAttrs: objval.ObjectAttrs{
+			Key:            "blob",
+			Size:           ptr.To[int64](42),
+			LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
+			LockExpiration: &now,
+			LockType:       objval.LockTypeCompliance,
+		},
+		Body: io.NopCloser(strings.NewReader("value")),
+	}
+
+	require.Equal(t, expected, object)
+}
+
 func TestClientGetObjectAttrs(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	output := blob.GetPropertiesResponse{}
 
@@ -162,8 +365,80 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	require.Equal(t, expected, attrs)
 }
 
+func TestClientGetObjectAttrsVersionID(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	cAPI := testEnvironment.containerAPI
+	bAPI := testEnvironment.blockBlobAPI
+
+	output := blob.GetPropertiesResponse{}
+
+	output.ContentLength = ptr.To[int64](42)
+	output.ETag = ptr.To(azcore.ETag("etag"))
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.VersionID = ptr.To("version1")
+
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob", "version1").Return(bAPI, nil)
+
+	bAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
+
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket:    "container",
+		Key:       "blob",
+		VersionID: "version1",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.ObjectAttrs{
+		Key:          "blob",
+		ETag:         ptr.To("etag"),
+		Size:         ptr.To[int64](42),
+		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		VersionID:    "version1",
+	}
+
+	require.Equal(t, expected, attrs)
+}
+
+func TestClientGetObjectAttrsLockData(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	now := time.Now()
+
+	output := blob.GetPropertiesResponse{}
+
+	output.ContentLength = ptr.To[int64](42)
+	output.ETag = ptr.To(azcore.ETag("etag"))
+	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.ImmutabilityPolicyExpiresOn = &now
+	output.ImmutabilityPolicyMode = ptr.To(blob.ImmutabilityPolicyModeLocked)
+
+	bAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
+
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket: "container",
+		Key:    "blob",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.ObjectAttrs{
+		Key:            "blob",
+		ETag:           ptr.To("etag"),
+		Size:           ptr.To[int64](42),
+		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
+		LockType:       objval.LockTypeCompliance,
+		LockExpiration: &now,
+	}
+
+	require.Equal(t, expected, attrs)
+}
+
 func TestClientPutObject(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	output := blockblob.UploadResponse{}
 
@@ -189,8 +464,74 @@ func TestClientPutObject(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestClientPutObjectLockData(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	now := time.Now()
+	expirationTime := now.AddDate(0, 0, 5)
+
+	fn := func(
+		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
+	) (blockblob.UploadResponse, error) {
+		b := md5.Sum([]byte("value"))
+		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
+
+		return blockblob.UploadResponse{}, nil
+	}
+
+	bAPI.
+		EXPECT().
+		Upload(
+			gomock.Any(),
+			gomock.Any(),
+			immutabilityPolicyMatcher(blob.ImmutabilityPolicySettingLocked, expirationTime),
+		).DoAndReturn(fn)
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "container",
+		Key:    "blob",
+		Body:   strings.NewReader("value"),
+		Lock:   objcli.NewComplianceLock(expirationTime),
+	})
+	require.NoError(t, err)
+}
+
+func TestClientPutObjectIfAbsent(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	output := blockblob.UploadResponse{}
+
+	fn := func(
+		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
+	) (blockblob.UploadResponse, error) {
+		b := md5.Sum([]byte("value"))
+		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
+
+		return output, nil
+	}
+
+	bAPI.
+		EXPECT().
+		Upload(gomock.Any(), gomock.Any(), ifAbsentMatcher()).
+		DoAndReturn(fn)
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket:       "container",
+		Key:          "blob",
+		Body:         strings.NewReader("value"),
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+}
+
 func TestClientAppendToObjectNotExists(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	bAPI.
 		EXPECT().
@@ -238,7 +579,7 @@ func TestClientCopyObject(t *testing.T) {
 
 	dbAPI.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("example.com", nil)
 
-	client := &Client{serviceAPI: sAPI}
+	client := &Client{serviceAPI: sAPI, timeProvider: timeprovider.CurrentTimeProvider{}}
 
 	fn := func(
 		_ context.Context,
@@ -263,7 +604,10 @@ func TestClientCopyObject(t *testing.T) {
 }
 
 func TestClientAppendToObject(t *testing.T) {
-	client, cAPI, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+	blobClient := testEnvironment.blobAPI
 
 	output := blob.GetPropertiesResponse{}
 
@@ -271,8 +615,6 @@ func TestClientAppendToObject(t *testing.T) {
 	output.ETag = ptr.To(azcore.ETag("etag"))
 	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
 
-	blobClient := NewMockblobAPI(cAPI.ctrl)
-	cAPI.EXPECT().NewBlobClient(gomock.Any()).Return(blobClient)
 	blobClient.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("example.com", nil)
 
 	bAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
@@ -336,7 +678,9 @@ func TestClientDeleteObjects(t *testing.T) {
 }
 
 func TestClientDeleteObjectsKeyNotFound(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	bAPI.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(
 		blob.DeleteResponse{},
@@ -346,6 +690,56 @@ func TestClientDeleteObjectsKeyNotFound(t *testing.T) {
 	err := client.DeleteObjects(context.Background(), objcli.DeleteObjectsOptions{
 		Bucket: "container",
 		Keys:   []string{"blob"},
+	})
+	require.NoError(t, err)
+}
+
+func TestClientDeleteObjectVersions(t *testing.T) {
+	var (
+		ctrl = gomock.NewController(t)
+		sAPI = NewMockserviceAPI(ctrl)
+		cAPI = NewMockcontainerAPI(ctrl)
+		bAPI = NewMockblockBlobAPI(ctrl)
+	)
+
+	sAPI.EXPECT().NewContainerClient("container").Return(cAPI).Times(4)
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob1", "v1").Return(bAPI, nil)
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob2", "v1").Return(bAPI, nil)
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob1", "v2").Return(bAPI, nil)
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob2", "v2").Return(bAPI, nil)
+
+	client := &Client{serviceAPI: sAPI}
+
+	bAPI.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(blob.DeleteResponse{}, nil).Times(4)
+
+	err := client.DeleteObjectVersions(context.Background(), objcli.DeleteObjectVersionsOptions{
+		Bucket: "container",
+		Versions: []objval.ObjectVersion{
+			{Key: "blob1", VersionID: "v1"},
+			{Key: "blob2", VersionID: "v1"},
+			{Key: "blob1", VersionID: "v2"},
+			{Key: "blob2", VersionID: "v2"},
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestClientDeleteObjectVersionsKeyNotFound(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	cAPI := testEnvironment.containerAPI
+	bAPI := testEnvironment.blockBlobAPI
+
+	cAPI.EXPECT().NewBlockBlobVersionClient("blob1", "v1").Return(bAPI, nil)
+
+	bAPI.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(
+		blob.DeleteResponse{},
+		&azcore.ResponseError{ErrorCode: string(bloberror.BlobNotFound)},
+	)
+
+	err := client.DeleteObjectVersions(context.Background(), objcli.DeleteObjectVersionsOptions{
+		Bucket:   "container",
+		Versions: []objval.ObjectVersion{{Key: "blob1", VersionID: "v1"}},
 	})
 	require.NoError(t, err)
 }
@@ -374,7 +768,9 @@ func TestClientUploadPartWithUploadID(t *testing.T) {
 }
 
 func TestClientListParts(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	output := blockblob.GetBlockListResponse{}
 	output.BlockList = blockblob.BlockList{
@@ -415,7 +811,9 @@ func TestClientListPartsWithUploadID(t *testing.T) {
 }
 
 func TestClientUploadPart(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	bAPI.
 		EXPECT().
@@ -483,7 +881,7 @@ func TestClientUploadPartCopyWithSASToken(t *testing.T) {
 			cAPI.EXPECT().NewBlobClient("src").Return(srcAPI)
 			cAPI.EXPECT().NewBlockBlobClient("dst").Return(dstAPI)
 
-			client := Client{serviceAPI: sAPI}
+			client := Client{serviceAPI: sAPI, timeProvider: timeprovider.CurrentTimeProvider{}}
 
 			srcAPI.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("example.com", nil)
 
@@ -540,7 +938,7 @@ func TestClientUploadPartCopy(t *testing.T) {
 	srcBlobAPI.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New(sasErrString))
 	srcBlockBlobAPI.EXPECT().URL().Return("example.com")
 
-	client := Client{serviceAPI: sAPI}
+	client := Client{serviceAPI: sAPI, timeProvider: timeprovider.CurrentTimeProvider{}}
 
 	dstBlockBlobAPI.
 		EXPECT().
@@ -615,7 +1013,9 @@ func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 }
 
 func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
-	client, _, bAPI := newTestClient(t)
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
 
 	bAPI.
 		EXPECT().
@@ -643,6 +1043,76 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	bAPI.
+		EXPECT().
+		CommitBlockList(gomock.Any(), gomock.Any(), ifAbsentMatcher()).
+		DoAndReturn(func(
+			_ context.Context, base64BlockIDs []string, _ *blockblob.CommitBlockListOptions,
+		) (blockblob.CommitBlockListResponse, error) {
+			require.Equal(t, []string{"blob1", "blob2", "blob3"}, base64BlockIDs)
+
+			return blockblob.CommitBlockListResponse{}, nil
+		})
+
+	parts := make([]objval.Part, 0)
+
+	for i := 1; i <= 3; i++ {
+		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
+	}
+
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:       "container",
+		UploadID:     objcli.NoUploadID,
+		Key:          "blob",
+		Parts:        parts,
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+}
+
+func TestClientCompleteMultipartUploadLockPeriod(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	now := time.Now()
+	expirationTime := now.AddDate(0, 0, 5)
+
+	bAPI.
+		EXPECT().
+		CommitBlockList(
+			gomock.Any(),
+			gomock.Any(),
+			immutabilityPolicyMatcher(blob.ImmutabilityPolicySettingLocked, expirationTime),
+		).DoAndReturn(
+		func(_ context.Context, base64BlockIDs []string, _ *blockblob.CommitBlockListOptions,
+		) (blockblob.CommitBlockListResponse, error) {
+			require.Equal(t, []string{"blob1", "blob2", "blob3"}, base64BlockIDs)
+
+			return blockblob.CommitBlockListResponse{}, nil
+		})
+
+	parts := make([]objval.Part, 0)
+
+	for i := 1; i <= 3; i++ {
+		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
+	}
+
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:   "container",
+		UploadID: objcli.NoUploadID,
+		Key:      "blob",
+		Parts:    parts,
+		Lock:     objcli.NewComplianceLock(expirationTime),
+	})
+	require.NoError(t, err)
+}
+
 func TestClientAbortMultipartUpload(t *testing.T) {
 	client := &Client{}
 
@@ -663,4 +1133,51 @@ func TestClientAbortMultipartUploadWithUploadID(t *testing.T) {
 		Key:      "blob",
 	})
 	require.ErrorIs(t, err, objcli.ErrExpectedNoUploadID)
+}
+
+func TestClientGetBucketLockingStatus(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	cAPI := testEnvironment.containerAPI
+
+	output := container.GetPropertiesResponse{}
+
+	output.IsImmutableStorageWithVersioningEnabled = ptr.To(true)
+
+	cAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
+
+	object, err := client.GetBucketLockingStatus(context.Background(), objcli.GetBucketLockingStatusOptions{
+		Bucket: "container",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.BucketLockingStatus{
+		Enabled: true,
+	}
+
+	require.Equal(t, expected, object)
+}
+
+func TestClientSetObjectLock(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blobAPI
+
+	now := time.Now()
+	expirationTime := now.AddDate(0, 0, 5)
+
+	bAPI.
+		EXPECT().
+		SetImmutabilityPolicy(
+			gomock.Any(),
+			expirationTime,
+			immutabilityModeMatcher(blob.ImmutabilityPolicySettingLocked),
+		).Return(blob.SetImmutabilityPolicyResponse{}, nil)
+
+	err := client.SetObjectLock(context.Background(), objcli.SetObjectLockOptions{
+		Bucket: "container",
+		Key:    "blob",
+		Lock:   objcli.NewComplianceLock(expirationTime),
+	})
+	require.NoError(t, err)
 }

@@ -48,6 +48,16 @@ type UploadOptions struct {
 
 	// MPUThreshold is a threshold at which point objects which broken down into multipart uploads.
 	MPUThreshold int64
+
+	// Precondition is used to perform a conditional operation. If the precondition is not satisfied the operation will
+	// fail.
+	Precondition objcli.OperationPrecondition
+
+	// Lock is the object lock which determines the period during which the object will be immutable. If set to nil the
+	// object will be mutable.
+	//
+	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
+	Lock *objcli.ObjectLock
 }
 
 // defaults populates the options with sensible defaults.
@@ -73,9 +83,11 @@ func Upload(opts UploadOptions) error {
 	}
 
 	err = opts.Client.PutObject(opts.Context, objcli.PutObjectOptions{
-		Bucket: opts.Bucket,
-		Key:    opts.Key,
-		Body:   opts.Body,
+		Bucket:       opts.Bucket,
+		Key:          opts.Key,
+		Body:         opts.Body,
+		Precondition: opts.Precondition,
+		Lock:         opts.Lock,
 	})
 
 	return err
@@ -84,10 +96,12 @@ func Upload(opts UploadOptions) error {
 // upload an object to a remote cloud by breaking it down into individual chunks and uploading them concurrently.
 func upload(opts UploadOptions) error {
 	mpu, err := NewMPUploader(MPUploaderOptions{
-		Client:  opts.Client,
-		Bucket:  opts.Bucket,
-		Key:     opts.Key,
-		Options: opts.Options,
+		Client:       opts.Client,
+		Bucket:       opts.Bucket,
+		Key:          opts.Key,
+		Options:      opts.Options,
+		Precondition: opts.Precondition,
+		Lock:         opts.Lock,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create uploader: %w", err)

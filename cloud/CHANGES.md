@@ -1,5 +1,45 @@
 # Changes
 
+## v7.1.0
+
+- Add the ability to lock an object for a specified period of time in compliance mode through a new `Lock`
+parameter. If it is not set it will be ignored. The following function options now accept the new `Lock` parameter:
+  - `PutObjectOptions` - We can set the lock as we are uploading a new object
+  - `SetObjectLockOptions` - Sets a lock for an existing object
+  - `CreateMultipartUploadOptions` - For AWS the lock needs to be specified when creating a multipart upload.
+  This has no effect on Azure and GCP.
+  - `UploadPartOptions` - For GCP we can specify a lock when uploading each part. On AWS and Azure parts are
+  automatically immutable.
+  - `CompleteMultipartUploadOptions`- For Azure and GCP it must be set when completing the multipart upload. This has
+  no effect on AWS.
+  - `SyncOptions` - We can lock all newly uploaded objects with the specified lock.
+  - `UploadOptions` - The lock will be passed down to the corresponding client methods.
+  - `MPUploaderOptions` - We can set the lock when creating a new `MPUploader`
+- Add a new `GetBucketLockingStatus` function to check whether the necessary conditions to lock an object in compliance
+mode (versioning/locking to be enabled) are met for the specified bucket.
+- Add a new `SetObjectLock` function to set a lock for an existing object. Can be used to extend the length of the
+lock period.
+- Add a new `DeleteObjectVersions` function which deletes specific object versions. Accepts a list of
+key-versionID pairs.
+- The `IterateObjects` function can list iterate object versions if the `Versions` parameter is set to `true`.
+- Add the ability to verify that an object with the provided key does not already exist before overwriting it. This
+can be done using the new `OnlyIfAbsent` parameter which is accepted through the following function options:
+`PutObject`, `CompleteMultipartUpload`, `UploadPartOptions` (only for GCP), `SyncOptions`, `UploadOptions`,
+`MPUploaderOptions`.
+- `objval.ObjectAttrs` now contains the the following additional attributes:
+  - `VersionID` - Used to identify a specific version when object versioning is enabled.
+  - `LockExpiration` - The time the object lock will expire. Will be populated only when an object lock has been set.
+  - `LockType` - The type of the object lock. Can be either `LockTypeCompliance` or `LockTypeUndefined`
+  - `IsCurrentVersion` - Used to determine whether the specific version is the current (live) one when listing object
+  versions.
+  - `IsDeleteMarker` - Used to determine whether the specific object version is a delete marker. Only used for AWS.
+- The lock data (expiration date and type) can be read through the following functions:
+  - `GetObject` - only for AWS and Azure.
+  - `GetObjectAttrs`
+  - `IterateObjects` - only for Azure and GCP.
+- Fix a `DeleteDirectory` bug on Azure. Previously it would fail to delete object versions due attempting
+to delete the current (live) versions as if they are noncurrent.
+
 ## v7.0.0
 
 - BREAKING: Added the ability to use `CompressObjects` using a source/dest client, allow uploads to another account/provider.

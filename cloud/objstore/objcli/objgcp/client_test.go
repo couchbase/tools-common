@@ -24,6 +24,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	"github.com/couchbase/tools-common/types/v2/ptr"
+	"github.com/couchbase/tools-common/types/v2/timeprovider"
 )
 
 func TestNewClient(t *testing.T) {
@@ -31,8 +32,12 @@ func TestNewClient(t *testing.T) {
 
 	require.Equal(
 		t,
-		&Client{serviceAPI: serviceClient{c: &storage.Client{}}, logger: logger},
-		NewClient(ClientOptions{&storage.Client{}, logger}),
+		&Client{
+			serviceAPI:   serviceClient{c: &storage.Client{}},
+			logger:       logger,
+			timeProvider: timeprovider.CurrentTimeProvider{},
+		},
+		NewClient(ClientOptions{&storage.Client{}, logger, nil}),
 	)
 }
 
@@ -171,6 +176,70 @@ func TestClientGetObjectWithInvalidByteRange(t *testing.T) {
 	require.ErrorAs(t, err, &invalidByteRange)
 }
 
+func TestClientGetObjectVersionID(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mrAPI = &mockReaderAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	moAPI.On("Generation", mock.MatchedBy(func(gen int64) bool { return gen == 1234 })).Return(moAPI)
+
+	moAPI.On(
+		"NewRangeReader",
+		mock.Anything,
+		mock.MatchedBy(func(offset int64) bool { return offset == 0 }),
+		mock.MatchedBy(func(length int64) bool { return length == -1 }),
+	).Return(mrAPI, nil)
+
+	output := storage.ReaderObjectAttrs{
+		Size:         42,
+		LastModified: (time.Time{}).Add(24 * time.Hour),
+		Generation:   1234,
+	}
+
+	mrAPI.On("Attrs", mock.Anything).Return(output, nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	object, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		VersionID: "1234",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.Object{
+		ObjectAttrs: objval.ObjectAttrs{
+			Key:          "key",
+			Size:         ptr.To[int64](42),
+			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			VersionID:    "1234",
+		},
+		Body: mrAPI,
+	}
+
+	require.Equal(t, expected, object)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Generation", 1)
+	moAPI.AssertNumberOfCalls(t, "NewRangeReader", 1)
+
+	mrAPI.AssertExpectations(t)
+	mrAPI.AssertNumberOfCalls(t, "Attrs", 1)
+}
+
 func TestClientGetObjectAttrs(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}
@@ -204,6 +273,114 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		ETag:         ptr.To("etag"),
 		Size:         ptr.To[int64](5),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+	}
+
+	require.Equal(t, expected, attrs)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Attrs", 1)
+}
+
+func TestClientGetObjectAttrsVersionID(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	moAPI.On("Generation", mock.MatchedBy(func(gen int64) bool { return gen == 1234 })).Return(moAPI)
+
+	output := &storage.ObjectAttrs{
+		Name:       "key",
+		Etag:       "etag",
+		Size:       5,
+		Updated:    (time.Time{}).Add(24 * time.Hour),
+		Generation: 1234,
+	}
+
+	moAPI.On("Attrs", mock.Anything).Return(output, nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		VersionID: "1234",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.ObjectAttrs{
+		Key:          "key",
+		ETag:         ptr.To("etag"),
+		Size:         ptr.To[int64](5),
+		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		VersionID:    "1234",
+	}
+
+	require.Equal(t, expected, attrs)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Generation", 1)
+	moAPI.AssertNumberOfCalls(t, "Attrs", 1)
+}
+
+func TestClientGetObjectAttrsLockData(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	now := time.Now()
+
+	output := &storage.ObjectAttrs{
+		Name:    "key",
+		Etag:    "etag",
+		Size:    5,
+		Updated: (time.Time{}).Add(24 * time.Hour),
+		Retention: &storage.ObjectRetention{
+			RetainUntil: now,
+			Mode:        "Locked",
+		},
+	}
+
+	moAPI.On("Attrs", mock.Anything).Return(output, nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	attrs, err := client.GetObjectAttrs(context.Background(), objcli.GetObjectAttrsOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.ObjectAttrs{
+		Key:            "key",
+		ETag:           ptr.To("etag"),
+		Size:           ptr.To[int64](5),
+		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
+		LockType:       objval.LockTypeCompliance,
+		LockExpiration: &now,
 	}
 
 	require.Equal(t, expected, attrs)
@@ -281,6 +458,154 @@ func TestClientPutObject(t *testing.T) {
 	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
 
 	mwAPI.AssertExpectations(t)
+	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
+	mwAPI.AssertNumberOfCalls(t, "Close", 1)
+}
+
+func TestClientPutObjectIfAbsent(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mwAPI = &mockWriterAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("If", mock.MatchedBy(func(conds storage.Conditions) bool { return conds.DoesNotExist })).Return(moAPI)
+
+	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
+
+	fn1 := func(sum []byte) bool {
+		expected := md5.Sum([]byte("value"))
+
+		return bytes.Equal(sum, expected[:])
+	}
+
+	mwAPI.On("SendMD5", mock.MatchedBy(fn1))
+
+	fn2 := func(sum uint32) bool {
+		hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+		hasher.Write([]byte("value"))
+
+		return sum == hasher.Sum32()
+	}
+
+	mwAPI.On("SendCRC", mock.MatchedBy(fn2))
+
+	fn3 := func(data []byte) bool {
+		return bytes.Equal(data, []byte("value"))
+	}
+
+	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
+
+	mwAPI.On("Close").Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket:       "bucket",
+		Key:          "key",
+		Body:         strings.NewReader("value"),
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
+	moAPI.AssertNumberOfCalls(t, "If", 1)
+	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
+
+	mwAPI.AssertExpectations(t)
+	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
+	mwAPI.AssertNumberOfCalls(t, "Close", 1)
+}
+
+func TestClientPutObjectWithLockPeriod(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mwAPI = &mockWriterAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
+
+	expectedLock := objcli.NewComplianceLock(time.Now().AddDate(0, 0, 5))
+
+	mwAPI.On("SetLock", mock.MatchedBy(func(l *objcli.ObjectLock) bool { return l == expectedLock })).Return(nil)
+
+	fn1 := func(sum []byte) bool {
+		expected := md5.Sum([]byte("value"))
+
+		return bytes.Equal(sum, expected[:])
+	}
+
+	mwAPI.On("SendMD5", mock.MatchedBy(fn1))
+
+	fn2 := func(sum uint32) bool {
+		hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+		hasher.Write([]byte("value"))
+
+		return sum == hasher.Sum32()
+	}
+
+	mwAPI.On("SendCRC", mock.MatchedBy(fn2))
+
+	fn3 := func(data []byte) bool {
+		return bytes.Equal(data, []byte("value"))
+	}
+
+	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
+
+	mwAPI.On("Close").Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("value"),
+		Lock:   expectedLock,
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
+	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
+
+	mwAPI.AssertExpectations(t)
+	mwAPI.AssertNumberOfCalls(t, "SetLock", 1)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
@@ -473,6 +798,52 @@ func TestClientDeleteObjects(t *testing.T) {
 	moAPI.AssertNumberOfCalls(t, "Delete", 3)
 }
 
+func TestClientDeleteObjectVersions(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	moAPI.On("Generation", mock.MatchedBy(func(gen int64) bool { return gen == 1 || gen == 2 })).Return(moAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return strings.HasPrefix(key, "key") })).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("Delete", mock.Anything).Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.DeleteObjectVersions(context.Background(), objcli.DeleteObjectVersionsOptions{
+		Bucket: "bucket",
+		Versions: []objval.ObjectVersion{
+			{Key: "key1", VersionID: "1"},
+			{Key: "key1", VersionID: "2"},
+			{Key: "key2", VersionID: "1"},
+			{Key: "key2", VersionID: "2"},
+			{Key: "key3", VersionID: "1"},
+			{Key: "key3", VersionID: "2"},
+		},
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 6)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 6)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Generation", 6)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 6)
+	moAPI.AssertNumberOfCalls(t, "Delete", 6)
+}
+
 func TestClientDeleteDirectory(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}
@@ -641,6 +1012,46 @@ func TestClientIterateObjects(t *testing.T) {
 		Bucket:    "bucket",
 		Prefix:    "prefix",
 		Delimiter: "delimiter",
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
+
+	miAPI.AssertExpectations(t)
+	miAPI.AssertNumberOfCalls(t, "Next", 1)
+}
+
+func TestClientIterateObjectsVersions(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" &&
+			query.Delimiter == "delimiter" &&
+			query.Projection == storage.ProjectionNoACL &&
+			query.Versions
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+		Versions:  true,
 	})
 	require.NoError(t, err)
 
@@ -1105,6 +1516,89 @@ func TestClientUploadPart(t *testing.T) {
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
 }
 
+func TestClientUploadPartIfAbsentAndLocked(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mwAPI = &mockWriterAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return strings.HasPrefix(key, "key-") })).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("If", mock.MatchedBy(func(conds storage.Conditions) bool { return conds.DoesNotExist })).Return(moAPI)
+
+	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
+
+	expectedLock := objcli.NewComplianceLock(time.Now().AddDate(0, 0, 5))
+
+	mwAPI.On("SetLock", mock.MatchedBy(func(l *objcli.ObjectLock) bool { return l == expectedLock })).Return(nil)
+
+	fn1 := func(sum []byte) bool {
+		expected := md5.Sum([]byte("value"))
+
+		return bytes.Equal(sum, expected[:])
+	}
+
+	mwAPI.On("SendMD5", mock.MatchedBy(fn1))
+
+	fn2 := func(sum uint32) bool {
+		hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+		hasher.Write([]byte("value"))
+
+		return sum == hasher.Sum32()
+	}
+
+	mwAPI.On("SendCRC", mock.MatchedBy(fn2))
+
+	fn3 := func(data []byte) bool {
+		return bytes.Equal(data, []byte("value"))
+	}
+
+	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
+
+	mwAPI.On("Close").Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	part, err := client.UploadPart(context.Background(), objcli.UploadPartOptions{
+		Bucket:       "bucket",
+		UploadID:     "id",
+		Key:          "key",
+		Number:       42,
+		Body:         strings.NewReader("value"),
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+		Lock:         expectedLock,
+	})
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(part.ID, "key-"))
+	require.Equal(t, 42, part.Number)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
+	moAPI.AssertNumberOfCalls(t, "If", 1)
+	moAPI.AssertNumberOfCalls(t, "NewWriter", 1)
+
+	mwAPI.AssertExpectations(t)
+	mwAPI.AssertNumberOfCalls(t, "SetLock", 1)
+	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
+	mwAPI.AssertNumberOfCalls(t, "Close", 1)
+}
+
 func TestClientUploadPartCopy(t *testing.T) {
 	type test struct {
 		name    string
@@ -1254,6 +1748,118 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	mcAPI.AssertExpectations(t)
 }
 
+func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mcAPI = &mockComposeAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(
+		func(key string) bool { return key == "key" || strings.HasPrefix(key, "key-") },
+	)).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("If", mock.MatchedBy(func(conds storage.Conditions) bool { return conds.DoesNotExist })).Return(moAPI)
+
+	expected := make([]any, 0, MaxComposable)
+
+	for i := 0; i < MaxComposable; i++ {
+		expected = append(expected, mock.Anything)
+	}
+
+	moAPI.On("ComposerFrom", expected...).Return(mcAPI)
+
+	mcAPI.On("Run", mock.Anything).Return(nil, nil)
+
+	moAPI.On("Delete", mock.Anything).Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	parts := make([]objval.Part, 0)
+
+	for i := 1; i < MaxComposable*2+42; i++ {
+		parts = append(parts, objval.Part{ID: fmt.Sprintf("key-%d", i), Number: i})
+	}
+
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:       "bucket",
+		UploadID:     "id",
+		Key:          "key",
+		Parts:        parts,
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	mbAPI.AssertExpectations(t)
+	moAPI.AssertExpectations(t)
+	mcAPI.AssertExpectations(t)
+}
+
+func TestClientCompleteMultipartUploadLocked(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mcAPI = &mockComposeAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(
+		func(key string) bool { return key == "key" || strings.HasPrefix(key, "key-") },
+	)).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	expected := make([]any, 0, MaxComposable)
+
+	for i := 0; i < MaxComposable; i++ {
+		expected = append(expected, mock.Anything)
+	}
+
+	expectedLock := objcli.NewComplianceLock(time.Now().AddDate(0, 0, 5))
+
+	moAPI.On("ComposerFrom", expected...).Return(mcAPI)
+
+	mcAPI.On("SetLock", mock.MatchedBy(func(l *objcli.ObjectLock) bool { return l == expectedLock })).Return(nil)
+
+	mcAPI.On("Run", mock.Anything).Return(nil, nil)
+
+	moAPI.On("Delete", mock.Anything).Return(nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	parts := make([]objval.Part, 0)
+
+	for i := 1; i < MaxComposable*2+42; i++ {
+		parts = append(parts, objval.Part{ID: fmt.Sprintf("key-%d", i), Number: i})
+	}
+
+	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+		Parts:    parts,
+		Lock:     expectedLock,
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	mbAPI.AssertExpectations(t)
+	moAPI.AssertExpectations(t)
+	mcAPI.AssertExpectations(t)
+}
+
 func TestClientAbortMultipartUpload(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}
@@ -1304,4 +1910,88 @@ func TestClientAbortMultipartUpload(t *testing.T) {
 	moAPI.AssertExpectations(t)
 	moAPI.AssertNumberOfCalls(t, "Retryer", 1)
 	moAPI.AssertNumberOfCalls(t, "Delete", 1)
+}
+
+func TestClientGetBucketLockingStatus(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	output := &storage.BucketAttrs{
+		ObjectRetentionMode: "Enabled",
+	}
+
+	mbAPI.On("Attrs", mock.Anything).Return(output, nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	res, err := client.GetBucketLockingStatus(context.Background(), objcli.GetBucketLockingStatusOptions{
+		Bucket: "bucket",
+	})
+	require.NoError(t, err)
+
+	expected := &objval.BucketLockingStatus{
+		Enabled: true,
+	}
+
+	require.Equal(t, expected, res)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Attrs", 1)
+}
+
+func TestClientSetObjectLock(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	moAPI.On("Generation", mock.MatchedBy(func(gen int64) bool { return gen == 1234 })).Return(moAPI)
+
+	now := time.Now()
+	expirationTime := now.AddDate(0, 0, 5)
+
+	moAPI.On("Update", mock.Anything, mock.MatchedBy(
+		func(attrs storage.ObjectAttrsToUpdate) bool {
+			if attrs.Retention == nil {
+				return false
+			}
+
+			modeMatch := attrs.Retention.Mode == "Locked"
+			periodMatch := attrs.Retention.RetainUntil == expirationTime
+
+			return modeMatch && periodMatch
+		},
+	)).Return(nil, nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	err := client.SetObjectLock(context.Background(), objcli.SetObjectLockOptions{
+		Bucket:    "bucket",
+		Key:       "key",
+		VersionID: "1234",
+		Lock:      objcli.NewComplianceLock(expirationTime),
+	})
+	require.NoError(t, err)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Object", 1)
+
+	moAPI.AssertExpectations(t)
+	moAPI.AssertNumberOfCalls(t, "Generation", 1)
+	moAPI.AssertNumberOfCalls(t, "Update", 1)
 }

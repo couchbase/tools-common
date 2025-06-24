@@ -34,6 +34,7 @@ type containerAPI interface {
 	NewBlockBlobVersionClient(name, version string) (blockBlobAPI, error)
 	NewListBlobsFlatPager(o *container.ListBlobsFlatOptions) flatBlobsPager
 	NewListBlobsHierarchyPager(delimiter string, o *container.ListBlobsHierarchyOptions) hierarchyBlobsPager
+	GetProperties(ctx context.Context, o *container.GetPropertiesOptions) (container.GetPropertiesResponse, error)
 }
 
 type containerClient struct {
@@ -62,9 +63,22 @@ func (c containerClient) NewListBlobsHierarchyPager(
 	return c.client.NewListBlobsHierarchyPager(delimiter, o)
 }
 
+func (c containerClient) GetProperties(
+	ctx context.Context,
+	o *container.GetPropertiesOptions,
+) (container.GetPropertiesResponse, error) {
+	return c.client.GetProperties(ctx, o)
+}
+
 type blobAPI interface {
 	CopyFromURL(ctx context.Context, copySource string, o *blob.CopyFromURLOptions) (blob.CopyFromURLResponse, error)
 	GetSASURL(permissions sas.BlobPermissions, expiry time.Time, options *blob.GetSASURLOptions) (string, error)
+	SetImmutabilityPolicy(
+		ctx context.Context,
+		expiryTime time.Time,
+		options *blob.SetImmutabilityPolicyOptions,
+	) (blob.SetImmutabilityPolicyResponse, error)
+	WithVersionID(versionID string) (*blob.Client, error)
 }
 
 var _ blobAPI = (*blob.Client)(nil)

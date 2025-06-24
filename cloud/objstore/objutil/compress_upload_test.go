@@ -28,7 +28,7 @@ import (
 const partSize = 1024
 
 // paths is a list of objects to create. This ensures we test a few different cases: objects the size of partSize, an
-// odd size (i.e. not divisable or a factor of partSize), a multiple of partSize and +/- 1.
+// odd size (i.e. not devisable or a factor of partSize), a multiple of partSize and +/- 1.
 var paths = []struct {
 	path string
 	size int64
@@ -174,9 +174,9 @@ func TestCompressUpload(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.Contains(t, cli.Buckets["bucket"], "export.zip")
+	require.Contains(t, cli.Buckets["bucket"], objval.TestObjectIdentifier{Key: "export.zip"})
 
-	data := cli.Buckets["bucket"]["export.zip"].Body
+	data := cli.Buckets["bucket"][objval.TestObjectIdentifier{Key: "export.zip"}].Body
 
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestCompressUpload(t *testing.T) {
 
 		buf, err := io.ReadAll(file)
 		require.NoError(t, err)
-		require.Equal(t, cli.Buckets["bucket"][path.path].Body, buf)
+		require.Equal(t, cli.Buckets["bucket"][objval.TestObjectIdentifier{Key: path.path}].Body, buf)
 	}
 }
 
@@ -212,9 +212,9 @@ func TestCompressUploadNoPrefix(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.Contains(t, cli.Buckets["bucket"], "export.zip")
+	require.Contains(t, cli.Buckets["bucket"], objval.TestObjectIdentifier{Key: "export.zip"})
 
-	data := cli.Buckets["bucket"]["export.zip"].Body
+	data := cli.Buckets["bucket"][objval.TestObjectIdentifier{Key: "export.zip"}].Body
 
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	require.NoError(t, err)
@@ -231,7 +231,7 @@ func TestCompressUploadNoPrefix(t *testing.T) {
 
 		buf, err := io.ReadAll(file)
 		require.NoError(t, err)
-		require.Equal(t, cli.Buckets["bucket"][path.path].Body, buf)
+		require.Equal(t, cli.Buckets["bucket"][objval.TestObjectIdentifier{Key: path.path}].Body, buf)
 	}
 }
 
@@ -372,7 +372,7 @@ func TestUploadFromReader(t *testing.T) {
 	checksum, err := CompressObjects(options)
 	require.NoError(t, err)
 
-	data := client.Buckets["bucket-destination"]["avocados.zip"].Body
+	data := client.Buckets["bucket-destination"][objval.TestObjectIdentifier{Key: "avocados.zip"}].Body
 	require.NotNil(t, data)
 
 	hasher := sha256.New()
@@ -402,9 +402,9 @@ func TestUploadToAnotherClient(t *testing.T) {
 	checksum, err := CompressObjects(options)
 	require.NoError(t, err)
 
-	data := dst.Buckets["bucket-destination"]["avocados.zip"].Body
+	data := dst.Buckets["bucket-destination"][objval.TestObjectIdentifier{Key: "avocados.zip"}].Body
 	require.NotNil(t, data)
-	require.NotContains(t, src.Buckets["bucket-source"], "avocados.zip")
+	require.NotContains(t, src.Buckets["bucket-source"], objval.TestObjectIdentifier{Key: "avocados.zip"})
 
 	hasher := sha256.New()
 	_, err = hasher.Write(data)

@@ -39,8 +39,18 @@ type SyncOptions struct {
 	// NOTE: Only used for upload.
 	MPUThreshold int64
 
-	// Logger is the passed Logger struct that impletments the Log method for logger the user wants to use.
+	// Logger is the passed Logger struct that implements the Log method for logger the user wants to use.
 	Logger *slog.Logger
+
+	// Precondition is used to perform a conditional operation. If the precondition is not satisfied the operation will
+	// fail.
+	Precondition objcli.OperationPrecondition
+
+	// Lock is the object lock which determines the period during which the object will be immutable. If set to nil the
+	// object will be mutable.
+	//
+	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
+	Lock *objcli.ObjectLock
 }
 
 // defaults fills any missing attributes to a sane default.

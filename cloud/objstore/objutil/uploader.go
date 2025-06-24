@@ -69,6 +69,16 @@ type MPUploaderOptions struct {
 	//
 	// This callback may be used to track parts and persist them to disk to allow robust multipart uploads.
 	OnPartComplete OnPartCompleteFunc
+
+	// Precondition is used to perform a conditional operation. If the precondition is not satisfied the operation will
+	// fail.
+	Precondition objcli.OperationPrecondition
+
+	// Lock is the object lock which determines the period during which the object will be immutable. If set to nil the
+	// object will be mutable.
+	//
+	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
+	Lock *objcli.ObjectLock
 }
 
 // defaults populates the options with sensible defaults.
@@ -129,6 +139,7 @@ func (m *MPUploader) createMPU() error {
 	m.opts.ID, err = m.opts.Client.CreateMultipartUpload(m.opts.Context, objcli.CreateMultipartUploadOptions{
 		Bucket: m.opts.Bucket,
 		Key:    m.opts.Key,
+		Lock:   m.opts.Lock,
 	})
 
 	return err
@@ -149,7 +160,7 @@ func (m *MPUploader) Upload(body io.ReadSeeker) error {
 }
 
 // UploadWithMeta uploads the given body as a part for the multipart upload. The provided metadata will be returned
-// unmodified via the 'OnPartComplete' callback and may be used to pass metdata that may be persisted to disk at the
+// unmodified via the 'OnPartComplete' callback and may be used to pass metadata that may be persisted to disk at the
 // same time as the completed part.
 //
 // NOTE: This function is not thread safe.
@@ -170,11 +181,13 @@ func (m *MPUploader) UploadWithMeta(metadata any, body io.ReadSeeker) error {
 // upload a new part with the given number/body.
 func (m *MPUploader) upload(ctx context.Context, number int, metadata any, body io.ReadSeeker) error {
 	part, err := m.opts.Client.UploadPart(ctx, objcli.UploadPartOptions{
-		Bucket:   m.opts.Bucket,
-		UploadID: m.opts.ID,
-		Key:      m.opts.Key,
-		Number:   number,
-		Body:     body,
+		Bucket:       m.opts.Bucket,
+		UploadID:     m.opts.ID,
+		Key:          m.opts.Key,
+		Number:       number,
+		Body:         body,
+		Precondition: m.opts.Precondition,
+		Lock:         m.opts.Lock,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to upload part: %w", err)
@@ -237,10 +250,12 @@ func (m *MPUploader) Commit() error {
 	)
 
 	err = m.opts.Client.CompleteMultipartUpload(m.opts.Context, objcli.CompleteMultipartUploadOptions{
-		Bucket:   m.opts.Bucket,
-		UploadID: m.opts.ID,
-		Key:      m.opts.Key,
-		Parts:    m.opts.Parts,
+		Bucket:       m.opts.Bucket,
+		UploadID:     m.opts.ID,
+		Key:          m.opts.Key,
+		Parts:        m.opts.Parts,
+		Precondition: m.opts.Precondition,
+		Lock:         m.opts.Lock,
 	})
 
 	return err

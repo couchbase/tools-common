@@ -2,9 +2,13 @@ package objgcp
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"cloud.google.com/go/storage"
+
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 )
 
 //go:generate mockery --all --case underscore --inpackage
@@ -32,6 +36,7 @@ func (s serviceClient) Close() error {
 type bucketAPI interface {
 	Object(key string) objectAPI
 	Objects(ctx context.Context, query *storage.Query) objectIteratorAPI
+	Attrs(ctx context.Context) (attrs *storage.BucketAttrs, err error)
 }
 
 // bucketHandle implements the 'bucketAPI' interface and encapsulates the Google Storage SDK into a unit testable
@@ -48,6 +53,10 @@ func (b bucketHandle) Objects(ctx context.Context, query *storage.Query) objectI
 	return b.h.Objects(ctx, query)
 }
 
+func (b bucketHandle) Attrs(ctx context.Context) (attrs *storage.BucketAttrs, err error) {
+	return b.h.Attrs(ctx)
+}
+
 // objectAPI is an object level API which allows interactions with an object stored in a Google cloud bucket.
 type objectAPI interface {
 	Attrs(ctx context.Context) (*storage.ObjectAttrs, error)
@@ -58,6 +67,8 @@ type objectAPI interface {
 	CopierFrom(src objectAPI) copierAPI
 	Retryer(opts ...storage.RetryOption) objectAPI
 	Generation(gen int64) objectAPI
+	If(conds storage.Conditions) objectAPI
+	Update(ctx context.Context, uattrs storage.ObjectAttrsToUpdate) (oa *storage.ObjectAttrs, err error)
 }
 
 // objectHandle implements the 'objectAPI' interface and encapsulates the Google Storage SDK into a unit testable
@@ -126,6 +137,17 @@ func (o objectHandle) Generation(gen int64) objectAPI {
 	return objectHandle{h: o.h.Generation(gen)}
 }
 
+func (o objectHandle) If(conds storage.Conditions) objectAPI {
+	return objectHandle{h: o.h.If(conds)}
+}
+
+func (o objectHandle) Update(
+	ctx context.Context,
+	uattrs storage.ObjectAttrsToUpdate,
+) (oa *storage.ObjectAttrs, err error) {
+	return o.h.Update(ctx, uattrs)
+}
+
 // readerAPI is a range aware reader API which is used to stream object data from Google Storage.
 type readerAPI interface {
 	io.ReadCloser
@@ -154,6 +176,7 @@ type writerAPI interface {
 	io.WriteCloser
 	SendMD5(md5 []byte)
 	SendCRC(crc uint32)
+	SetLock(lock *objcli.ObjectLock) error
 }
 
 // writer implements the 'writerAPI' and encapsulates the Google Storage SDK into a unit testable interface.
@@ -178,6 +201,24 @@ func (w writer) SendCRC(crc uint32) {
 	w.w.ObjectAttrs.CRC32C = crc
 }
 
+func (w writer) SetLock(lock *objcli.ObjectLock) error {
+	if lock == nil {
+		return nil
+	}
+
+	switch lock.Type {
+	case objval.LockTypeCompliance:
+		w.w.Retention = &storage.ObjectRetention{
+			Mode:        "Locked",
+			RetainUntil: lock.Expiration,
+		}
+	default:
+		return errors.New("unsupported lock type")
+	}
+
+	return nil
+}
+
 // objectIteratorAPI is an object level iterator API which can be used to list objects in Google Storage.
 type objectIteratorAPI interface {
 	Next() (*storage.ObjectAttrs, error)
@@ -191,6 +232,7 @@ type objectIteratorAPI interface {
 // allow resuming after a process has died (required for resume).
 type composeAPI interface {
 	Run(ctx context.Context) (*storage.ObjectAttrs, error)
+	SetLock(lock *objcli.ObjectLock) error
 }
 
 // composer implements the 'composeAPI' interface and encapsulates the Google Storage SDK in a unit testable interface.
@@ -200,6 +242,24 @@ type composer struct {
 
 func (c composer) Run(ctx context.Context) (*storage.ObjectAttrs, error) {
 	return c.c.Run(ctx)
+}
+
+func (c composer) SetLock(lock *objcli.ObjectLock) error {
+	if lock == nil {
+		return nil
+	}
+
+	switch lock.Type {
+	case objval.LockTypeCompliance:
+		c.c.Retention = &storage.ObjectRetention{
+			Mode:        "Locked",
+			RetainUntil: lock.Expiration,
+		}
+	default:
+		return errors.New("unsupported lock type")
+	}
+
+	return nil
 }
 
 type copierAPI interface {

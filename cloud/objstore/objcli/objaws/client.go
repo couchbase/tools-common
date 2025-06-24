@@ -4,6 +4,7 @@ package objaws
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,8 +17,10 @@ import (
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
+	"github.com/couchbase/tools-common/types/v2/timeprovider"
 	"github.com/couchbase/tools-common/utils/v3/system"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -25,8 +28,9 @@ import (
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in AWS S3.
 type Client struct {
-	serviceAPI serviceAPI
-	logger     *slog.Logger
+	serviceAPI   serviceAPI
+	logger       *slog.Logger
+	timeProvider timeprovider.TimeProvider
 }
 
 var _ objcli.Client = (*Client)(nil)
@@ -41,6 +45,9 @@ type ClientOptions struct {
 
 	// Logger is the passed logger which implements a custom Log method
 	Logger *slog.Logger
+
+	// timeProvider is an abstraction which provides the current time. We need this for testing.
+	timeProvider timeprovider.TimeProvider
 }
 
 // defaults fills any missing attributes to a sane default.
@@ -57,8 +64,13 @@ func NewClient(options ClientOptions) *Client {
 	options.defaults()
 
 	client := Client{
-		serviceAPI: options.ServiceAPI,
-		logger:     options.Logger,
+		serviceAPI:   options.ServiceAPI,
+		logger:       options.Logger,
+		timeProvider: options.timeProvider,
+	}
+
+	if options.timeProvider == nil {
+		client.timeProvider = timeprovider.CurrentTimeProvider{}
 	}
 
 	return &client
@@ -78,6 +90,10 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		Key:    ptr.To(opts.Key),
 	}
 
+	if opts.VersionID != "" {
+		input.VersionId = ptr.To(opts.VersionID)
+	}
+
 	if opts.ByteRange != nil {
 		input.Range = ptr.To(opts.ByteRange.ToRangeHeader())
 	}
@@ -88,9 +104,15 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 	}
 
 	attrs := objval.ObjectAttrs{
-		Key:          opts.Key,
-		Size:         resp.ContentLength,
-		LastModified: resp.LastModified,
+		Key:            opts.Key,
+		Size:           resp.ContentLength,
+		LastModified:   resp.LastModified,
+		LockExpiration: resp.ObjectLockRetainUntilDate,
+		LockType:       getLockType(resp.ObjectLockMode),
+	}
+
+	if resp.VersionId != nil {
+		attrs.VersionID = *resp.VersionId
 	}
 
 	object := &objval.Object{
@@ -107,16 +129,26 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		Key:    ptr.To(opts.Key),
 	}
 
+	if opts.VersionID != "" {
+		input.VersionId = ptr.To(opts.VersionID)
+	}
+
 	resp, err := c.serviceAPI.HeadObject(ctx, input)
 	if err != nil {
 		return nil, handleError(input.Bucket, input.Key, err)
 	}
 
 	attrs := &objval.ObjectAttrs{
-		Key:          opts.Key,
-		ETag:         resp.ETag,
-		Size:         resp.ContentLength,
-		LastModified: resp.LastModified,
+		Key:            opts.Key,
+		ETag:           resp.ETag,
+		Size:           resp.ContentLength,
+		LastModified:   resp.LastModified,
+		LockExpiration: resp.ObjectLockRetainUntilDate,
+		LockType:       getLockType(resp.ObjectLockMode),
+	}
+
+	if resp.VersionId != nil {
+		attrs.VersionID = *resp.VersionId
 	}
 
 	return attrs, nil
@@ -128,6 +160,20 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		Bucket:            ptr.To(opts.Bucket),
 		Key:               ptr.To(opts.Key),
 		ChecksumAlgorithm: types.ChecksumAlgorithmCrc32,
+	}
+
+	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
+		input.IfNoneMatch = ptr.To("*")
+	}
+
+	if opts.Lock != nil {
+		switch opts.Lock.Type {
+		case objval.LockTypeCompliance:
+			input.ObjectLockMode = types.ObjectLockModeCompliance
+			input.ObjectLockRetainUntilDate = aws.Time(opts.Lock.Expiration)
+		default:
+			return errors.New("unsupported lock type")
+		}
 	}
 
 	_, err := c.serviceAPI.PutObject(ctx, input)
@@ -158,7 +204,18 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
 	if objerr.IsNotFoundError(err) {
-		return c.PutObject(ctx, objcli.PutObjectOptions(opts))
+		putOpts := objcli.PutObjectOptions{
+			Bucket: opts.Bucket,
+			Key:    opts.Key,
+			Body:   opts.Body,
+		}
+
+		err := c.PutObject(ctx, putOpts)
+		if err != nil {
+			return fmt.Errorf("failed to put object: %w", err)
+		}
+
+		return nil
 	}
 
 	if err != nil {
@@ -224,7 +281,7 @@ func (c *Client) createMPUThenCopyAndAppend(
 		return nil
 	}
 
-	aopts := objcli.AbortMultipartUploadOptions{
+	aOpts := objcli.AbortMultipartUploadOptions{
 		Bucket:   bucket,
 		UploadID: id,
 		Key:      attrs.Key,
@@ -232,7 +289,7 @@ func (c *Client) createMPUThenCopyAndAppend(
 
 	// NOTE: We've failed for some reason, we should try to cleanup after ourselves; the AWS client does not use the
 	// given 'parts' argument, so we can omit it here
-	if err := c.AbortMultipartUpload(ctx, aopts); err != nil {
+	if err := c.AbortMultipartUpload(ctx, aOpts); err != nil {
 		c.logger.Error("failed to abort multipart upload, it should be aborted manually", "id", id, "key", attrs.Key)
 	}
 
@@ -300,6 +357,38 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 	}
 
 	for start, end := 0, PageSize; start < len(opts.Keys); start, end = start+PageSize, end+PageSize {
+		if queue(start, end) != nil {
+			break
+		}
+	}
+
+	return pool.Stop()
+}
+
+func (c *Client) DeleteObjectVersions(ctx context.Context, opts objcli.DeleteObjectVersionsOptions) error {
+	versions := make([]types.ObjectIdentifier, 0)
+
+	for _, objVersion := range opts.Versions {
+		versions = append(versions, types.ObjectIdentifier{
+			Key:       &objVersion.Key,
+			VersionId: &objVersion.VersionID,
+		})
+	}
+
+	pool := hofp.NewPool(hofp.Options{
+		Context: ctx,
+		Size:    system.NumWorkers(len(versions)),
+	})
+
+	del := func(ctx context.Context, start, end int) error {
+		return c.deleteObjectVersions(ctx, opts.Bucket, versions[start:min(end, len(versions))]...)
+	}
+
+	queue := func(start, end int) error {
+		return pool.Queue(func(ctx context.Context) error { return del(ctx, start, end) })
+	}
+
+	for start, end := 0, PageSize; start < len(versions); start, end = start+PageSize, end+PageSize {
 		if queue(start, end) != nil {
 			break
 		}
@@ -454,7 +543,50 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
-	callback := func(page *s3.ListObjectsV2Output) error {
+	if opts.Versions {
+		err := c.iterateObjectVersions(ctx, opts)
+		if err != nil {
+			return fmt.Errorf("failed to iterate object versions: %w", err)
+		}
+
+		return nil
+	}
+
+	return c.iterateObjects(ctx, opts)
+}
+
+func (c *Client) iterateObjectVersions(ctx context.Context, opts objcli.IterateObjectsOptions) error {
+	callback := func(pageOutput *s3.ListObjectVersionsOutput) error {
+		page := listObjectsOutput{
+			commonPrefixes: pageOutput.CommonPrefixes,
+			versions:       pageOutput.Versions,
+			deleteMarkers:  pageOutput.DeleteMarkers,
+		}
+
+		return c.handlePage(page, opts.Include, opts.Exclude, opts.Func)
+	}
+
+	input := &s3.ListObjectVersionsInput{
+		Bucket:    ptr.To(opts.Bucket),
+		Prefix:    ptr.To(opts.Prefix),
+		Delimiter: ptr.To(opts.Delimiter),
+	}
+
+	err := c.listObjectVersions(ctx, input, callback)
+	if err != nil {
+		return handleError(input.Bucket, nil, err)
+	}
+
+	return nil
+}
+
+func (c *Client) iterateObjects(ctx context.Context, opts objcli.IterateObjectsOptions) error {
+	callback := func(pageOutput *s3.ListObjectsV2Output) error {
+		page := listObjectsOutput{
+			commonPrefixes: pageOutput.CommonPrefixes,
+			contents:       pageOutput.Contents,
+		}
+
 		return c.handlePage(page, opts.Include, opts.Exclude, opts.Func)
 	}
 
@@ -475,18 +607,50 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 // handlePage iterates over common prefixes/objects in the given page executing the given function for each object which
 // has not been explicitly ignored by the user.
 func (c *Client) handlePage(
-	page *s3.ListObjectsV2Output,
+	page listObjectsOutput,
 	include, exclude []*regexp.Regexp,
 	fn objcli.IterateFunc,
 ) error {
-	converted := make([]*objval.ObjectAttrs, 0, len(page.CommonPrefixes)+len(page.Contents))
+	converted := make([]*objval.ObjectAttrs, 0, len(page.commonPrefixes)+len(page.contents))
 
-	for _, cp := range page.CommonPrefixes {
+	for _, cp := range page.commonPrefixes {
 		converted = append(converted, &objval.ObjectAttrs{Key: *cp.Prefix})
 	}
 
-	for _, o := range page.Contents {
+	for _, o := range page.contents {
 		converted = append(converted, &objval.ObjectAttrs{Key: *o.Key, Size: o.Size, LastModified: o.LastModified})
+	}
+
+	for _, ov := range page.versions {
+		obj := &objval.ObjectAttrs{
+			Key:          *ov.Key,
+			Size:         ov.Size,
+			LastModified: ov.LastModified,
+		}
+
+		if ov.VersionId != nil {
+			obj.VersionID = *ov.VersionId
+		}
+
+		if ov.IsLatest != nil {
+			obj.IsCurrentVersion = *ov.IsLatest
+		}
+
+		converted = append(converted, obj)
+	}
+
+	for _, dm := range page.deleteMarkers {
+		obj := &objval.ObjectAttrs{Key: *dm.Key, IsDeleteMarker: true, LastModified: dm.LastModified}
+
+		if dm.VersionId != nil {
+			obj.VersionID = *dm.VersionId
+		}
+
+		if dm.IsLatest != nil {
+			obj.IsCurrentVersion = *dm.IsLatest
+		}
+
+		converted = append(converted, obj)
 	}
 
 	for _, attrs := range converted {
@@ -509,7 +673,7 @@ func (c *Client) listObjects(
 	input *s3.ListObjectsV2Input,
 	fn func(page *s3.ListObjectsV2Output) error,
 ) error {
-	return listObjects[*s3.ListObjectsV2Output](ctx, s3.NewListObjectsV2Paginator(c.serviceAPI, input), fn)
+	return listObjects(ctx, s3.NewListObjectsV2Paginator(c.serviceAPI, input), fn)
 }
 
 // listObjectVersions uses the SDK paginator to run the given function on pages of object versions.
@@ -518,13 +682,23 @@ func (c *Client) listObjectVersions(
 	input *s3.ListObjectVersionsInput,
 	fn func(page *s3.ListObjectVersionsOutput) error,
 ) error {
-	return listObjects[*s3.ListObjectVersionsOutput](ctx, s3.NewListObjectVersionsPaginator(c.serviceAPI, input), fn)
+	return listObjects(ctx, s3.NewListObjectVersionsPaginator(c.serviceAPI, input), fn)
 }
 
 func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMultipartUploadOptions) (string, error) {
 	input := &s3.CreateMultipartUploadInput{
 		Bucket: ptr.To(opts.Bucket),
 		Key:    ptr.To(opts.Key),
+	}
+
+	if opts.Lock != nil {
+		switch opts.Lock.Type {
+		case objval.LockTypeCompliance:
+			input.ObjectLockMode = types.ObjectLockModeCompliance
+			input.ObjectLockRetainUntilDate = aws.Time(opts.Lock.Expiration)
+		default:
+			return "", errors.New("unsupported lock type")
+		}
 	}
 
 	resp, err := c.serviceAPI.CreateMultipartUpload(ctx, input)
@@ -644,6 +818,10 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 		MultipartUpload: &types.CompletedMultipartUpload{Parts: converted},
 	}
 
+	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
+		input.IfNoneMatch = ptr.To("*")
+	}
+
 	_, err := c.serviceAPI.CompleteMultipartUpload(ctx, input)
 
 	return handleError(input.Bucket, input.Key, err)
@@ -658,6 +836,60 @@ func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMult
 
 	_, err := c.serviceAPI.AbortMultipartUpload(ctx, input)
 	if err != nil && !isNoSuchUpload(err) {
+		return handleError(input.Bucket, input.Key, err)
+	}
+
+	return nil
+}
+
+func (c *Client) GetBucketLockingStatus(
+	ctx context.Context,
+	opts objcli.GetBucketLockingStatusOptions,
+) (*objval.BucketLockingStatus, error) {
+	input := &s3.GetObjectLockConfigurationInput{
+		Bucket: ptr.To(opts.Bucket),
+	}
+
+	result := &objval.BucketLockingStatus{}
+
+	output, err := c.serviceAPI.GetObjectLockConfiguration(ctx, input)
+	if err != nil {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ObjectLockConfigurationNotFoundError" {
+			return result, nil
+		}
+
+		return nil, handleError(input.Bucket, nil, err)
+	}
+
+	result.Enabled = output.ObjectLockConfiguration.ObjectLockEnabled == types.ObjectLockEnabledEnabled
+
+	return result, nil
+}
+
+func (c *Client) SetObjectLock(ctx context.Context, opts objcli.SetObjectLockOptions) error {
+	if opts.Lock == nil {
+		return errors.New("object lock is nil")
+	}
+
+	input := &s3.PutObjectRetentionInput{
+		Bucket:    ptr.To(opts.Bucket),
+		Key:       ptr.To(opts.Key),
+		VersionId: ptr.To(opts.VersionID),
+	}
+
+	switch opts.Lock.Type {
+	case objval.LockTypeCompliance:
+		input.Retention = &types.ObjectLockRetention{
+			Mode:            types.ObjectLockRetentionModeCompliance,
+			RetainUntilDate: aws.Time(opts.Lock.Expiration),
+		}
+	default:
+		return errors.New("unsupported lock type")
+	}
+
+	_, err := c.serviceAPI.PutObjectRetention(ctx, input)
+	if err != nil {
 		return handleError(input.Bucket, input.Key, err)
 	}
 
@@ -685,4 +917,15 @@ func listObjects[O any](ctx context.Context, pgn paginator[O], fn func(O) error)
 	}
 
 	return nil
+}
+
+// getLockType converts S3's 'types.ObjectLockMode' to 'objval.LockType'.
+func getLockType(awsLockMode types.ObjectLockMode) objval.LockType {
+	switch awsLockMode {
+	case types.ObjectLockModeCompliance:
+		return objval.LockTypeCompliance
+	default:
+		// Currently, we only care if the object is in 'compliance' mode.
+		return objval.LockTypeUndefined
+	}
 }

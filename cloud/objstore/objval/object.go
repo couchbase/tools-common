@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// ObjectVersion represents a version of an object.
+type ObjectVersion struct {
+	// Key is the identifier for the object; a unique path.
+	Key string
+	// VersionID is used to identify a specific version when object versioning is enabled.
+	VersionID string
+}
+
 // ObjectAttrs represents the attributes usually attached to an object in the cloud.
 type ObjectAttrs struct {
 	// Key is the identifier for the object; a unique path.
@@ -27,6 +35,22 @@ type ObjectAttrs struct {
 	// NOTE: The semantics of this attribute may differ between cloud providers (e.g. an change of metadata might bump
 	// the last modified time).
 	LastModified *time.Time
+
+	// VersionID is used to identify a specific version when object versioning is enabled.
+	VersionID string
+
+	// LockExpiration is the time the object lock will expire.
+	LockExpiration *time.Time
+
+	// LockType is the type of the object lock.
+	LockType LockType
+
+	// IsCurrentVersion is used to determine whether this is the latest
+	// version of the object. Only available when iterating object versions on AWS and Azure.
+	IsCurrentVersion bool
+
+	// IsDeleteMarker determines whether this describes a delete marker instead of an object or a version.
+	IsDeleteMarker bool
 }
 
 // IsDir returns a boolean indicating whether these attributes represent a synthetic directory, created by the library
@@ -35,7 +59,7 @@ type ObjectAttrs struct {
 // NOTE: This does not, and will not indicate whether the remote object is itself a directory stub; a zero length object
 // created by the AWS WebUI.
 func (o *ObjectAttrs) IsDir() bool {
-	return o.Size == nil && o.ETag == nil && o.LastModified == nil
+	return o.Size == nil && o.ETag == nil && o.LastModified == nil && !o.IsDeleteMarker
 }
 
 // Object represents an object stored in the cloud, simply the attributes and it's body.
@@ -52,10 +76,19 @@ type Object struct {
 type TestBuckets map[string]TestBucket
 
 // TestBucket represents a bucket and is only used by the 'TestClient' to store objects in memory.
-type TestBucket map[string]*TestObject
+type TestBucket map[TestObjectIdentifier]*TestObject
+
+// TestObjectIdentifier identifies an object or an object version and is only used by the 'TestObject'.
+type TestObjectIdentifier struct {
+	// Key is the object key.
+	Key string
+	// VersionID identifies the specific object version. If empty the identifier refers to the current version.
+	VersionID string
+}
 
 // TestObject represents an object and is only used by the 'TestObject'.
 type TestObject struct {
 	ObjectAttrs
+	// Body is data contained in the test object.
 	Body []byte
 }

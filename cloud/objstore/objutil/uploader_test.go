@@ -85,8 +85,113 @@ func TestMPUploaderUpload(t *testing.T) {
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 1)
-	require.Contains(t, client.Buckets["bucket"], "key")
-	require.Equal(t, []byte("body"), client.Buckets["bucket"]["key"].Body)
+	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
+	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
+	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
+}
+
+func TestMPUploaderUploadLock(t *testing.T) {
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
+
+	now := time.Now()
+
+	options := MPUploaderOptions{
+		Client: client,
+		Bucket: "bucket",
+		Key:    "key",
+		Lock:   objcli.NewComplianceLock(now.AddDate(0, 0, 3)),
+	}
+
+	uploader, err := NewMPUploader(options)
+	require.NoError(t, err)
+
+	defer uploader.Abort() //nolint:errcheck
+
+	require.NoError(t, uploader.Upload(strings.NewReader("body")))
+	require.NoError(t, uploader.Commit())
+
+	require.Len(t, uploader.opts.Parts, 1)
+	require.Len(t, client.Buckets, 1)
+	require.Len(t, client.Buckets["bucket"], 2)
+	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
+	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
+	require.Equal(
+		t,
+		objval.LockTypeCompliance,
+		client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType,
+	)
+	require.Equal(
+		t,
+		options.Lock.Expiration,
+		*client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockExpiration,
+	)
+}
+
+func TestMPUploaderUploadTwoTimes(t *testing.T) {
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
+
+	options := MPUploaderOptions{
+		Client: client,
+		Bucket: "bucket",
+		Key:    "key",
+	}
+
+	uploader, err := NewMPUploader(options)
+	require.NoError(t, err)
+
+	defer uploader.Abort() //nolint:errcheck
+
+	require.NoError(t, uploader.Upload(strings.NewReader("body")))
+	require.NoError(t, uploader.Commit())
+
+	require.Len(t, uploader.opts.Parts, 1)
+	require.Len(t, client.Buckets, 1)
+	require.Len(t, client.Buckets["bucket"], 1)
+	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
+	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
+	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
+
+	uploader, err = NewMPUploader(options)
+	require.NoError(t, err)
+
+	defer uploader.Abort() //nolint:errcheck
+
+	require.NoError(t, uploader.Upload(strings.NewReader("body")))
+	require.NoError(t, uploader.Commit())
+}
+
+func TestMPUploaderUploadIfAbsent(t *testing.T) {
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
+
+	options := MPUploaderOptions{
+		Client:       client,
+		Bucket:       "bucket",
+		Key:          "key",
+		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	}
+
+	uploader, err := NewMPUploader(options)
+	require.NoError(t, err)
+
+	defer uploader.Abort() //nolint:errcheck
+
+	require.NoError(t, uploader.Upload(strings.NewReader("body")))
+	require.NoError(t, uploader.Commit())
+
+	require.Len(t, uploader.opts.Parts, 1)
+	require.Len(t, client.Buckets, 1)
+	require.Len(t, client.Buckets["bucket"], 1)
+	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
+	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
+	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
+
+	uploader, err = NewMPUploader(options)
+	require.NoError(t, err)
+
+	defer uploader.Abort() //nolint:errcheck
+
+	require.NoError(t, uploader.Upload(strings.NewReader("body")))
+	require.Error(t, uploader.Commit())
 }
 
 func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
@@ -119,8 +224,8 @@ func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 1)
-	require.Contains(t, client.Buckets["bucket"], "key")
-	require.Equal(t, []byte("body"), client.Buckets["bucket"]["key"].Body)
+	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
+	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 
 	require.Equal(t, 42, metadata)
 	require.NotZero(t, part)
@@ -283,6 +388,6 @@ func TestMPUploaderCommit(t *testing.T) {
 	require.NoError(t, uploader.Commit())
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 1)
-	require.Contains(t, client.Buckets["bucket"], "key")
-	require.Equal(t, []byte("12"), client.Buckets["bucket"]["key"].Body)
+	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
+	require.Equal(t, []byte("12"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 }
