@@ -6,10 +6,17 @@ import "time"
 
 type TimeProvider interface {
 	Now() time.Time
+	Ticker() Ticker
 }
 
 type CurrentTimeProvider struct{}
 
+var _ TimeProvider = &CurrentTimeProvider{}
+
 func (tp CurrentTimeProvider) Now() time.Time {
 	return time.Now()
+}
+
+func (tp CurrentTimeProvider) Ticker() Ticker {
+	return NewRealTicker()
 }
