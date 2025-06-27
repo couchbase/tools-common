@@ -58,7 +58,7 @@ func (t *TestClient) GetObject(_ context.Context, opts GetObjectOptions) (*objva
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	object, err := t.getObjectRLocked(opts.Bucket, opts.Key)
+	object, err := t.getObjectVersion(opts.Bucket, opts.Key, opts.VersionID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (t *TestClient) GetObjectAttrs(_ context.Context, opts GetObjectAttrsOption
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	object, err := t.getObjectRLocked(opts.Bucket, opts.Key)
+	object, err := t.getObjectVersion(opts.Bucket, opts.Key, opts.VersionID)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 
 	t.lock.RUnlock()
 
-	seen := make(map[string]struct{})
+	seen := make(map[objval.TestObjectIdentifier]struct{})
 
 	for objID, object := range cpy {
 		if !opts.Versions && objID.VersionID != "" {
@@ -269,11 +269,11 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 		}
 
 		// Don't return duplicate values
-		if _, ok := seen[attrs.Key]; ok {
+		if _, ok := seen[objID]; ok {
 			continue
 		}
 
-		seen[attrs.Key] = struct{}{}
+		seen[objID] = struct{}{}
 
 		if err := opts.Func(&attrs); err != nil {
 			return err
@@ -510,6 +510,7 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 		}
 
 		versionID, _ := uuid.NewRandom()
+		oldVersion.VersionID = versionID.String()
 		t.Buckets[bucket][objval.TestObjectIdentifier{Key: key, VersionID: versionID.String()}] = oldVersion
 	}
 

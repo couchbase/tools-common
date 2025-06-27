@@ -1,5 +1,9 @@
 # Changes
 
+## v7.1.1
+
+- Fix `TestClient` object versioning.
+
 ## v7.1.0
 
 - Add the ability to lock an object for a specified period of time in compliance mode through a new `Lock`
