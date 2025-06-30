@@ -1,5 +1,9 @@
 # Changes
 
+## v7.2.0
+
+- Add option to multipart uploader to control the number of concurrent uploads.
+
 ## v7.1.1
 
 - Fix `TestClient` object versioning.

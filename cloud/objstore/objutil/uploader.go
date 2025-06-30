@@ -79,6 +79,9 @@ type MPUploaderOptions struct {
 	//
 	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
 	Lock *objcli.ObjectLock
+
+	// ConcurrentUploads is the number of parts that can be in-flight at once. Defaults to the number of CPUs.
+	ConcurrentUploads int
 }
 
 // defaults populates the options with sensible defaults.
@@ -123,7 +126,7 @@ func NewMPUploader(opts MPUploaderOptions) (*MPUploader, error) {
 	}
 
 	// Only create the pool after successfully creating the multipart upload to avoid having to handle cleanup
-	uploader.pool = hofp.NewPool(hofp.Options{})
+	uploader.pool = hofp.NewPool(hofp.Options{Size: opts.ConcurrentUploads})
 
 	return uploader, nil
 }

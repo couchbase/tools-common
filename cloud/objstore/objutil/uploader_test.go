@@ -42,6 +42,22 @@ func TestNewMPUploader(t *testing.T) {
 	require.NotNil(t, uploader.pool)
 }
 
+func TestNewMPUploaderConcurrentUploads(t *testing.T) {
+	options := MPUploaderOptions{
+		Client:            objcli.NewTestClient(t, objval.ProviderAWS),
+		Bucket:            "bucket",
+		Key:               "key",
+		ConcurrentUploads: 2,
+	}
+
+	uploader, err := NewMPUploader(options)
+	require.NoError(t, err)
+
+	defer uploader.Abort() //nolint:errcheck
+
+	require.Equal(t, 2, uploader.pool.Size())
+}
+
 func TestNewMPUploaderExistingUpload(t *testing.T) {
 	options := MPUploaderOptions{
 		Client: objcli.NewTestClient(t, objval.ProviderAWS),
