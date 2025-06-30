@@ -11,7 +11,10 @@ type TimeProvider interface {
 
 type CurrentTimeProvider struct{}
 
-var _ TimeProvider = &CurrentTimeProvider{}
+var (
+	_ TimeProvider = (*CurrentTimeProvider)(nil)
+	_ TimeProvider = (*MockTimeProvider)(nil)
+)
 
 func (tp CurrentTimeProvider) Now() time.Time {
 	return time.Now()

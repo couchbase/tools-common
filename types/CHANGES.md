@@ -1,5 +1,9 @@
 # Changes
 
+## v2.2.1
+
+- Regenerate `timeprovider` mocks.
+
 ## v2.2.0
 
 - Add a `Ticker` interface to `timeprovider`.

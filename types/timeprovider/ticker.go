@@ -16,12 +16,16 @@ type Ticker interface {
 	Stop()
 }
 
+var (
+	_ Ticker = (*RealTicker)(nil)
+	_ Ticker = (*FakeTicker)(nil)
+	_ Ticker = (*MockTicker)(nil)
+)
+
 // RealTicker is a wrapper around 'time.Ticker' that implements the 'Ticker' interface.
 type RealTicker struct {
 	ticker *time.Ticker
 }
-
-var _ Ticker = (*RealTicker)(nil)
 
 func NewRealTicker() *RealTicker {
 	return &RealTicker{}
@@ -47,8 +51,6 @@ type FakeTicker struct {
 	dur      time.Duration
 	lastTick time.Time
 }
-
-var _ Ticker = (*FakeTicker)(nil)
 
 func NewFakeTicker(provider TimeProvider) *FakeTicker {
 	return &FakeTicker{ch: make(chan time.Time), provider: provider, lastTick: provider.Now()}
