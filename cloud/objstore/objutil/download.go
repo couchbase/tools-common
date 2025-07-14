@@ -27,6 +27,9 @@ type DownloadOptions struct {
 	// NOTE: This attribute is required.
 	Key string
 
+	// VersionID is used to identify a specific version when object versioning is enabled.
+	VersionID string
+
 	// ByteRange to download from the object.
 	//
 	// NOTE: Download will not create sparse files, a non-zero start offset will be "shifted" prior to being written to

@@ -38,22 +38,26 @@ func (o *tracker) WriteAt(data []byte, offset int64) (int, error) {
 
 func TestDownload(t *testing.T) {
 	type test struct {
-		name string
-		data []byte
+		name  string
+		data1 []byte
+		data2 []byte
 	}
 
 	tests := []*test{
 		{
-			name: "SmallerThanPartSize",
-			data: []byte("a"),
+			name:  "SmallerThanPartSize",
+			data1: []byte("b"),
+			data2: []byte("a"),
 		},
 		{
-			name: "EqualToPartSize",
-			data: []byte(strings.Repeat("a", MinPartSize)),
+			name:  "EqualToPartSize",
+			data1: []byte(strings.Repeat("b", MinPartSize)),
+			data2: []byte(strings.Repeat("a", MinPartSize)),
 		},
 		{
-			name: "GreaterThanPartSize",
-			data: []byte(strings.Repeat("a", MinPartSize+1)),
+			name:  "GreaterThanPartSize",
+			data1: []byte(strings.Repeat("b", MinPartSize+1)),
+			data2: []byte(strings.Repeat("a", MinPartSize+1)),
 		},
 	}
 
@@ -67,11 +71,18 @@ func TestDownload(t *testing.T) {
 			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 				Bucket: "bucket",
 				Key:    "key",
-				Body:   bytes.NewReader(test.data),
+				Body:   bytes.NewReader(test.data1),
 			})
 			require.NoError(t, err)
 
-			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
+			err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "bucket",
+				Key:    "key",
+				Body:   bytes.NewReader(test.data2),
+			})
+			require.NoError(t, err)
+
+			file, err := fsutil.Create(filepath.Join(testDir, "test.file2"))
 			require.NoError(t, err)
 			defer file.Close()
 
@@ -84,9 +95,36 @@ func TestDownload(t *testing.T) {
 
 			require.NoError(t, Download(options))
 
-			data, err := os.ReadFile(filepath.Join(testDir, "test.file"))
+			data, err := os.ReadFile(filepath.Join(testDir, "test.file2"))
 			require.NoError(t, err)
-			require.Equal(t, test.data, data)
+			require.Equal(t, test.data2, data)
+
+			file, err = fsutil.Create(filepath.Join(testDir, "test.file1"))
+			require.NoError(t, err)
+			defer file.Close()
+
+			firstVersionID := ""
+
+			for versionIdentifier := range client.Buckets["bucket"] {
+				if versionIdentifier.VersionID != "" {
+					firstVersionID = versionIdentifier.VersionID
+					break
+				}
+			}
+
+			options = DownloadOptions{
+				Client:    client,
+				Bucket:    "bucket",
+				Key:       "key",
+				VersionID: firstVersionID,
+				Writer:    file,
+			}
+
+			require.NoError(t, Download(options))
+
+			data, err = os.ReadFile(filepath.Join(testDir, "test.file1"))
+			require.NoError(t, err)
+			require.Equal(t, test.data1, data)
 		})
 	}
 }

@@ -30,6 +30,9 @@ type MPDownloaderOptions struct {
 	// NOTE: This attribute is required.
 	Key string
 
+	// VersionID is used to identify a specific version when object versioning is enabled.
+	VersionID string
+
 	// ByteRange to download from the object.
 	//
 	// NOTE: Download will not create sparse files, a non-zero start offset will be "shifted" prior to being written to
@@ -81,8 +84,9 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 	}
 
 	attrs, err := m.opts.Client.GetObjectAttrs(m.opts.Context, objcli.GetObjectAttrsOptions{
-		Bucket: m.opts.Bucket,
-		Key:    m.opts.Key,
+		Bucket:    m.opts.Bucket,
+		Key:       m.opts.Key,
+		VersionID: m.opts.VersionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object attributes: %w", err)
@@ -121,6 +125,7 @@ func (m *MPDownloader) downloadChunk(ctx context.Context, br *objval.ByteRange) 
 	object, err := m.opts.Client.GetObject(ctx, objcli.GetObjectOptions{
 		Bucket:    m.opts.Bucket,
 		Key:       m.opts.Key,
+		VersionID: m.opts.VersionID,
 		ByteRange: br,
 	})
 	if err != nil {

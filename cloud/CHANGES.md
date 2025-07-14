@@ -1,5 +1,9 @@
 # Changes
 
+## v7.2.1
+
+- Add the ability to download specific object versions using a `Downloader`.
+
 ## v7.2.0
 
 - Add option to multipart uploader to control the number of concurrent uploads.

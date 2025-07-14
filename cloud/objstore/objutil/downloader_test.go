@@ -49,34 +49,73 @@ func TestNewMPDownloader(t *testing.T) {
 }
 
 func TestMPDownloaderDownload(t *testing.T) {
-	type test struct {
-		name     string
+	type version struct {
 		data     []byte
 		br       *objval.ByteRange
 		expected []byte
 	}
 
+	type test struct {
+		name string
+
+		version1 version
+		version2 version
+	}
+
 	tests := []*test{
 		{
-			name:     "SmallerThanPartSize",
-			data:     []byte("a"),
-			expected: []byte("a"),
+			name: "SmallerThanPartSize",
+
+			version2: version{
+				data:     []byte("a"),
+				expected: []byte("a"),
+			},
+
+			version1: version{
+				data:     []byte("b"),
+				expected: []byte("b"),
+			},
 		},
 		{
-			name:     "EqualToPartSize",
-			data:     []byte(strings.Repeat("a", MinPartSize)),
-			expected: []byte(strings.Repeat("a", MinPartSize)),
+			name: "EqualToPartSize",
+
+			version2: version{
+				data:     []byte(strings.Repeat("a", MinPartSize)),
+				expected: []byte(strings.Repeat("a", MinPartSize)),
+			},
+
+			version1: version{
+				data:     []byte(strings.Repeat("b", MinPartSize)),
+				expected: []byte(strings.Repeat("b", MinPartSize)),
+			},
 		},
 		{
-			name:     "GreaterThanPartSize",
-			data:     []byte(strings.Repeat("a", MinPartSize+1)),
-			expected: []byte(strings.Repeat("a", MinPartSize+1)),
+			name: "GreaterThanPartSize",
+
+			version2: version{
+				data:     []byte(strings.Repeat("a", MinPartSize+1)),
+				expected: []byte(strings.Repeat("a", MinPartSize+1)),
+			},
+
+			version1: version{
+				data:     []byte(strings.Repeat("b", MinPartSize+1)),
+				expected: []byte(strings.Repeat("b", MinPartSize+1)),
+			},
 		},
 		{
-			name:     "NoSparseFile",
-			br:       &objval.ByteRange{Start: 2, End: 4},
-			data:     []byte("value"),
-			expected: []byte("lue"),
+			name: "NoSparseFile",
+
+			version2: version{
+				br:       &objval.ByteRange{Start: 2, End: 4},
+				data:     []byte("value"),
+				expected: []byte("lue"),
+			},
+
+			version1: version{
+				br:       &objval.ByteRange{Start: 2, End: 4},
+				data:     []byte("incorrect value"),
+				expected: []byte("cor"),
+			},
 		},
 	}
 
@@ -90,11 +129,18 @@ func TestMPDownloaderDownload(t *testing.T) {
 			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 				Bucket: "bucket",
 				Key:    "key",
-				Body:   bytes.NewReader(test.data),
+				Body:   bytes.NewReader(test.version1.data),
 			})
 			require.NoError(t, err)
 
-			file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
+			err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+				Bucket: "bucket",
+				Key:    "key",
+				Body:   bytes.NewReader(test.version2.data),
+			})
+			require.NoError(t, err)
+
+			file, err := fsutil.Create(filepath.Join(testDir, "test.file2"))
 			require.NoError(t, err)
 			defer file.Close()
 
@@ -102,15 +148,43 @@ func TestMPDownloaderDownload(t *testing.T) {
 				Client:    client,
 				Bucket:    "bucket",
 				Key:       "key",
-				ByteRange: test.br,
+				ByteRange: test.version2.br,
 				Writer:    file,
 			}
 
 			require.NoError(t, Download(options))
 
-			data, err := os.ReadFile(filepath.Join(testDir, "test.file"))
+			data, err := os.ReadFile(filepath.Join(testDir, "test.file2"))
 			require.NoError(t, err)
-			require.Equal(t, test.expected, data)
+			require.Equal(t, test.version2.expected, data)
+
+			firstVersionID := ""
+
+			for versionIdentifier := range client.Buckets["bucket"] {
+				if versionIdentifier.VersionID != "" {
+					firstVersionID = versionIdentifier.VersionID
+					break
+				}
+			}
+
+			file, err = fsutil.Create(filepath.Join(testDir, "test.file1"))
+			require.NoError(t, err)
+			defer file.Close()
+
+			options = DownloadOptions{
+				Client:    client,
+				Bucket:    "bucket",
+				Key:       "key",
+				VersionID: firstVersionID,
+				ByteRange: test.version1.br,
+				Writer:    file,
+			}
+
+			require.NoError(t, Download(options))
+
+			data, err = os.ReadFile(filepath.Join(testDir, "test.file1"))
+			require.NoError(t, err)
+			require.Equal(t, test.version1.expected, data)
 		})
 	}
 }
