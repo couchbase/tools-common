@@ -3,6 +3,7 @@ package objcli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,7 +74,7 @@ func TestRequireKeyNotFound(t *testing.T, client Client, key string) {
 		Bucket: "bucket",
 		Key:    key,
 	})
-	require.True(t, objerr.IsNotFoundError(err))
+	require.True(t, objerr.IsNotFoundError(err), fmt.Sprintf("Expected key %q to not exist", key))
 }
 
 // TestListObjects returns the attributes of all the existing objects.

@@ -3,6 +3,7 @@
 ## v7.2.1
 
 - Add the ability to download specific object versions using a `Downloader`.
+- Add more descriptive error message to the `TestRequireKeyNotFound` test helper.
 
 ## v7.2.0
 
