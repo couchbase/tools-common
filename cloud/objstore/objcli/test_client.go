@@ -261,19 +261,19 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 		// If this is a nested key, convert it into a directory stub. AWS allows a filesystem style API when you pass a
 		// delimiter - if your prefix has a "directory" in it we get a stub, rather than the actual object which could
 		// be nested.
-		if opts.Delimiter != "" && strings.Count(trimmed, opts.Delimiter) > 1 {
-			attrs.Key = parentDirectory(objID.Key)
-			attrs.ETag = nil
-			attrs.Size = nil
-			attrs.LastModified = nil
+		if opts.Delimiter != "" && strings.Count(trimmed, opts.Delimiter) > 0 {
+			attrs = objval.ObjectAttrs{}
+			attrs.Key = opts.Prefix + strings.Split(trimmed, opts.Delimiter)[0] + opts.Delimiter
 		}
 
+		returnObjID := objval.TestObjectIdentifier{Key: attrs.Key, VersionID: attrs.VersionID}
+
 		// Don't return duplicate values
-		if _, ok := seen[objID]; ok {
+		if _, ok := seen[returnObjID]; ok {
 			continue
 		}
 
-		seen[objID] = struct{}{}
+		seen[returnObjID] = struct{}{}
 
 		if err := opts.Func(&attrs); err != nil {
 			return err
@@ -564,14 +564,4 @@ func partKey(id, key string) string {
 // partPrefix returns the prefix which will be used for all parts in the given upload for the provided key.
 func partPrefix(id, key string) string {
 	return fmt.Sprintf("%s-mpu-%s", key, id)
-}
-
-// parentDirectory returns the root directory for the provided key, or the key itself if it's the top-level.
-func parentDirectory(key string) string {
-	dir := path.Dir(key)
-	if dir == "." || dir == "/" {
-		return key
-	}
-
-	return dir
 }

@@ -95,9 +95,9 @@ func TestCopyObjectsWithDelimiter(t *testing.T) {
 	options := CopyObjectsOptions{
 		Client:            client,
 		DestinationBucket: "dstBucket",
-		DestinationPrefix: "dst",
+		DestinationPrefix: "dst/",
 		SourceBucket:      "srcBucket",
-		SourcePrefix:      "src",
+		SourcePrefix:      "src/",
 		SourceDelimiter:   "/",
 	}
 
