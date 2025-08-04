@@ -1,10 +1,15 @@
 # Changes
 
+## v7.3.0
+
+- Add support for 'If-Match' conditional writes (i.e. CAS operations)
+
 ## v7.2.1
 
 - Add the ability to download specific object versions using a `Downloader`.
 - Add more descriptive error message to the `TestRequireKeyNotFound` test helper.
 - Fix `TestClient.IterateObject` directory grouping
+
 
 ## v7.2.0
 

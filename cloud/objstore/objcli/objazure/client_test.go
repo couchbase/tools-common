@@ -109,6 +109,31 @@ func ifAbsentMatcher() customMatcher {
 	}
 }
 
+func ifMatchMatcher(etag string) customMatcher {
+	return customMatcher{
+		message: fmt.Sprintf("ifMatch should be %q ", etag),
+		match: func(arg interface{}) bool {
+			var accessConditions *blob.AccessConditions
+
+			switch inputOpts := arg.(type) {
+			case *blockblob.UploadOptions:
+				accessConditions = inputOpts.AccessConditions
+			case *blockblob.CommitBlockListOptions:
+				accessConditions = inputOpts.AccessConditions
+			default:
+				return false
+			}
+
+			if accessConditions == nil || accessConditions.ModifiedAccessConditions == nil {
+				return false
+			}
+
+			ifMatch := accessConditions.ModifiedAccessConditions.IfMatch
+			return ifMatch != nil && *ifMatch == azcore.ETag(etag)
+		},
+	}
+}
+
 func TestNewClient(t *testing.T) {
 	require.Equal(
 		t,
@@ -358,6 +383,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:          "blob",
 		ETag:         ptr.To("etag"),
+		CAS:          "etag",
 		Size:         ptr.To[int64](42),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
@@ -392,6 +418,7 @@ func TestClientGetObjectAttrsVersionID(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:          "blob",
 		ETag:         ptr.To("etag"),
+		CAS:          "etag",
 		Size:         ptr.To[int64](42),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		VersionID:    "version1",
@@ -426,6 +453,7 @@ func TestClientGetObjectAttrsLockData(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:            "blob",
 		ETag:           ptr.To("etag"),
+		CAS:            "etag",
 		Size:           ptr.To[int64](42),
 		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 		LockType:       objval.LockTypeCompliance,
@@ -524,6 +552,37 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 		Key:          "blob",
 		Body:         strings.NewReader("value"),
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+}
+
+func TestClientPutObjectIfMatch(t *testing.T) {
+	testEnvironment := newTestEnvironment(t)
+	client := testEnvironment.client
+	bAPI := testEnvironment.blockBlobAPI
+
+	output := blockblob.UploadResponse{}
+
+	fn := func(
+		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
+	) (blockblob.UploadResponse, error) {
+		b := md5.Sum([]byte("value"))
+		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
+
+		return output, nil
+	}
+
+	bAPI.
+		EXPECT().
+		Upload(gomock.Any(), gomock.Any(), ifMatchMatcher("my-etag")).
+		DoAndReturn(fn)
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket:           "container",
+		Key:              "blob",
+		Body:             strings.NewReader("value"),
+		Precondition:     objcli.OperationPreconditionIfMatch,
+		PreconditionData: "my-etag",
 	})
 	require.NoError(t, err)
 }

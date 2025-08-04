@@ -115,6 +115,10 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		attrs.VersionID = *resp.VersionId
 	}
 
+	if resp.ETag != nil {
+		attrs.CAS = *resp.ETag
+	}
+
 	object := &objval.Object{
 		ObjectAttrs: attrs,
 		Body:        resp.Body,
@@ -151,6 +155,10 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		attrs.VersionID = *resp.VersionId
 	}
 
+	if resp.ETag != nil {
+		attrs.CAS = *resp.ETag
+	}
+
 	return attrs, nil
 }
 
@@ -162,8 +170,11 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		ChecksumAlgorithm: types.ChecksumAlgorithmCrc32,
 	}
 
-	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
+	switch opts.Precondition {
+	case objcli.OperationPreconditionOnlyIfAbsent:
 		input.IfNoneMatch = ptr.To("*")
+	case objcli.OperationPreconditionIfMatch:
+		input.IfMatch = ptr.To(opts.PreconditionData)
 	}
 
 	if opts.Lock != nil {

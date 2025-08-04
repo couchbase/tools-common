@@ -16,9 +16,14 @@ import (
 type OperationPrecondition string
 
 const (
-	// OperationPreconditionOnlyIfAbsent - Perform the operation only if the object does not already exist. If the
+	// OperationPreconditionOnlyIfAbsent performs the operation only if the object does not already exist. If the
 	// object does not exist the operation will fail with an error.
 	OperationPreconditionOnlyIfAbsent OperationPrecondition = "OnlyIfAbsent"
+
+	// OperationPreconditionIfMatch will performs the operation only if the object matches the given entity ID, which
+	// should be passed alongside this value. The entity ID differs per cloud service provider but is exposed in
+	// 'ObjectAttrs' as 'CAS'.
+	OperationPreconditionIfMatch OperationPrecondition = "IfMatch"
 )
 
 // GetObjectOptions encapsulates the options available when using the 'GetObject' function.
@@ -64,6 +69,11 @@ type PutObjectOptions struct {
 	// Precondition is used to perform a conditional operation. If the precondition is not satisfied the operation will
 	// fail.
 	Precondition OperationPrecondition
+
+	// PreconditionData is some data to pass to the request, depending on 'Precondition'. It should be set to:
+	//   * 'ObjectAttrs.CAS' if 'OperationPreconditionIfMatch'
+	//   * the empty string otherwise
+	PreconditionData string
 
 	// Lock is the object lock which determines the period during which the object will be immutable. If set to nil the
 	// object will be mutable.

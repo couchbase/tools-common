@@ -314,6 +314,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:          "key",
 		ETag:         ptr.To("etag"),
+		CAS:          "etag",
 		Size:         ptr.To[int64](5),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 	}
@@ -358,6 +359,7 @@ func TestClientGetObjectAttrsVersionId(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:          "key",
 		ETag:         ptr.To("etag"),
+		CAS:          "etag",
 		Size:         ptr.To[int64](5),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		VersionID:    "version1",
@@ -402,6 +404,7 @@ func TestClientGetObjectAttrsLockData(t *testing.T) {
 	expected := &objval.ObjectAttrs{
 		Key:            "key",
 		ETag:           ptr.To("etag"),
+		CAS:            "etag",
 		Size:           ptr.To[int64](5),
 		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 		LockExpiration: output.ObjectLockRetainUntilDate,
@@ -465,6 +468,37 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 		Key:          "key",
 		Body:         strings.NewReader("value"),
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
+	})
+	require.NoError(t, err)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "PutObject", 1)
+}
+
+func TestClientPutObjectIfMatch(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.PutObjectInput) bool {
+		var (
+			body    = input.Body != nil && bytes.Equal(testutil.ReadAll(t, input.Body), []byte("value"))
+			bucket  = input.Bucket != nil && *input.Bucket == "bucket"
+			key     = input.Key != nil && *input.Key == "key"
+			ifMatch = input.IfMatch != nil && *input.IfMatch == "my-etag"
+		)
+
+		return body && bucket && key && ifMatch
+	}
+
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+
+	client := &Client{serviceAPI: api}
+
+	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket:           "bucket",
+		Key:              "key",
+		Body:             strings.NewReader("value"),
+		Precondition:     objcli.OperationPreconditionIfMatch,
+		PreconditionData: "my-etag",
 	})
 	require.NoError(t, err)
 

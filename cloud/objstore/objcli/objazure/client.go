@@ -132,6 +132,10 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		attrs.VersionID = *resp.VersionID
 	}
 
+	if resp.ETag != nil {
+		attrs.CAS = string(*resp.ETag)
+	}
+
 	object := &objval.Object{
 		ObjectAttrs: attrs,
 		Body:        resp.Body,
@@ -175,6 +179,10 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		attrs.VersionID = *resp.VersionID
 	}
 
+	if resp.ETag != nil {
+		attrs.CAS = string(*resp.ETag)
+	}
+
 	return attrs, nil
 }
 
@@ -192,10 +200,17 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil)),
 	}
 
-	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
+	switch opts.Precondition {
+	case objcli.OperationPreconditionOnlyIfAbsent:
 		inputOpts.AccessConditions = &blob.AccessConditions{
 			ModifiedAccessConditions: &blob.ModifiedAccessConditions{
 				IfNoneMatch: ptr.To(azcore.ETagAny),
+			},
+		}
+	case objcli.OperationPreconditionIfMatch:
+		inputOpts.AccessConditions = &blob.AccessConditions{
+			ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+				IfMatch: ptr.To(azcore.ETag(opts.PreconditionData)),
 			},
 		}
 	}

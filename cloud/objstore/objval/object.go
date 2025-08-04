@@ -51,6 +51,12 @@ type ObjectAttrs struct {
 
 	// IsDeleteMarker determines whether this describes a delete marker instead of an object or a version.
 	IsDeleteMarker bool
+
+	// CAS is the value to use when doing a conditional-write, i.e. what to pass as the 'PreconditionData' when doing a
+	// 'PutObject' with 'OperationPreconditionIfMatch'.
+	//
+	// NOTE: Not populated during object iteration.
+	CAS string
 }
 
 // IsDir returns a boolean indicating whether these attributes represent a synthetic directory, created by the library

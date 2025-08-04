@@ -128,7 +128,9 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 	}
 
 	if remote.Generation != 0 {
-		attrs.VersionID = strconv.FormatInt(remote.Generation, 10)
+		v := strconv.FormatInt(remote.Generation, 10)
+		attrs.VersionID = v
+		attrs.CAS = v
 	}
 
 	objectRes := &objval.Object{
@@ -173,7 +175,9 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 	}
 
 	if remote.Generation != 0 {
-		attrs.VersionID = strconv.FormatInt(remote.Generation, 10)
+		v := strconv.FormatInt(remote.Generation, 10)
+		attrs.VersionID = v
+		attrs.CAS = v
 	}
 
 	return attrs, nil
@@ -192,10 +196,16 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 		object = c.serviceAPI.Bucket(opts.Bucket).Object(opts.Key).Retryer(storage.WithPolicy(storage.RetryAlways))
 	)
 
-	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
-		object = object.If(storage.Conditions{
-			DoesNotExist: true,
-		})
+	switch opts.Precondition {
+	case objcli.OperationPreconditionOnlyIfAbsent:
+		object = object.If(storage.Conditions{DoesNotExist: true})
+	case objcli.OperationPreconditionIfMatch:
+		gen, err := strconv.ParseInt(opts.PreconditionData, 10, 64)
+		if err != nil {
+			return fmt.Errorf("could not parse If-Match value as int64: %w", err)
+		}
+
+		object = object.If(storage.Conditions{GenerationMatch: gen})
 	}
 
 	writer := object.NewWriter(ctx)
