@@ -24,6 +24,12 @@ func handleError(bucket, key *string, err error) error {
 		return objerr.ErrUnauthenticated
 	case "AccessDenied":
 		return objerr.ErrUnauthorized
+	case "PreconditionFailed", "Conflict":
+		if key == nil {
+			key = ptr.To("<empty key name>")
+		}
+
+		return &objerr.PreconditionFailedError{Key: *key}
 	case "NoSuchKey", "NotFound":
 		if key == nil {
 			key = ptr.To("<empty key name>")

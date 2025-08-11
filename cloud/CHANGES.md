@@ -1,5 +1,9 @@
 # Changes
 
+## v7.3.1
+
+- Add error for pre-condition failure
+
 ## v7.3.0
 
 - Add support for 'If-Match' conditional writes (i.e. CAS operations)

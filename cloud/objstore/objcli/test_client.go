@@ -489,11 +489,13 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 	var (
 		now  = t.TimeProvider.Now()
 		data = testutil.ReadAll(t.t, body)
+		etag = strings.ReplaceAll(uuid.NewString(), "-", "")
 	)
 
 	attrs := objval.ObjectAttrs{
 		Key:          key,
-		ETag:         ptr.To(strings.ReplaceAll(uuid.NewString(), "-", "")),
+		ETag:         &etag,
+		CAS:          etag,
 		Size:         ptr.To(int64(len(data))),
 		LastModified: &now,
 	}
@@ -505,8 +507,13 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 
 	oldVersion, ok := t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}]
 	if ok {
-		if opts.Precondition == OperationPreconditionOnlyIfAbsent {
+		switch opts.Precondition {
+		case OperationPreconditionOnlyIfAbsent:
 			return "", errors.New("object already exists")
+		case OperationPreconditionIfMatch:
+			if oldVersion.CAS != opts.PreconditionData {
+				return "", &objerr.PreconditionFailedError{Key: opts.Key}
+			}
 		}
 
 		versionID, _ := uuid.NewRandom()

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
 )
 
@@ -63,4 +64,42 @@ func TestIterateObjectsWithDelimiter(t *testing.T) {
 			require.ElementsMatch(t, test.expected, secondLevelContent)
 		})
 	}
+}
+
+func TestIfMatch(t *testing.T) {
+	cli := NewTestClient(t, objval.ProviderAWS)
+	require.NoError(t, cli.PutObject(context.Background(), PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("foo"),
+	}))
+
+	attrs, err := cli.GetObjectAttrs(context.Background(), GetObjectAttrsOptions{
+		Bucket: "bucket",
+		Key:    "key",
+	})
+	require.NoError(t, err)
+
+	cas := attrs.CAS
+
+	require.NoError(t, cli.PutObject(context.Background(), PutObjectOptions{
+		Bucket:           "bucket",
+		Key:              "key",
+		Body:             strings.NewReader("bar"),
+		Precondition:     OperationPreconditionIfMatch,
+		PreconditionData: cas,
+	}))
+
+	var precondErr *objerr.PreconditionFailedError
+
+	require.ErrorAs(
+		t,
+		cli.PutObject(context.Background(), PutObjectOptions{
+			Bucket:           "bucket",
+			Key:              "key",
+			Body:             strings.NewReader("baz"),
+			Precondition:     OperationPreconditionIfMatch,
+			PreconditionData: cas,
+		}),
+		&precondErr)
 }

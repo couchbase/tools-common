@@ -16,6 +16,10 @@ func handleError(bucket, key string, err error) error {
 		return objerr.ErrUnauthorized
 	}
 
+	if bloberror.HasCode(err, bloberror.ConditionNotMet) {
+		return &objerr.PreconditionFailedError{Key: key}
+	}
+
 	if bloberror.HasCode(err, bloberror.BlobNotFound) {
 		// This shouldn't trigger but may aid in debugging in the future
 		if key == "" {

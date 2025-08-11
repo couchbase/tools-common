@@ -33,6 +33,8 @@ func handleError(bucket, key string, err error) error {
 		return objerr.ErrUnauthenticated
 	case http.StatusForbidden:
 		return objerr.ErrUnauthorized
+	case http.StatusPreconditionFailed:
+		return &objerr.PreconditionFailedError{Key: key}
 	}
 
 	if errors.Is(err, storage.ErrBucketNotExist) {
