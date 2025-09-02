@@ -1,5 +1,9 @@
 # Changes
 
+## v3.3.9
+
+- Change minimum delay on retry after failing to get credentials to 250ms, not seconds
+
 ## v3.3.8
 
 - Correct version parsing for Enterprise Analytics

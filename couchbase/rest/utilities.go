@@ -96,7 +96,7 @@ func getCredentials(provider aprov.Provider, host string, logger *slog.Logger) (
 	retryer := retry.NewRetryer[aprov.Credentials](retry.RetryerOptions[aprov.Credentials]{
 		Algorithm:  retry.AlgorithmExponential,
 		MaxRetries: 3,
-		MinDelay:   250 * time.Second,
+		MinDelay:   250 * time.Millisecond,
 		Log:        log,
 	})
 
