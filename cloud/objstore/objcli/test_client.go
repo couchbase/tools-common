@@ -90,15 +90,6 @@ func (t *TestClient) PutObject(_ context.Context, opts PutObjectOptions) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if opts.Precondition == OperationPreconditionOnlyIfAbsent {
-		b := t.getBucketLocked(opts.Bucket)
-		for objID := range b {
-			if objID.Key == opts.Key {
-				return errors.New("object already exists")
-			}
-		}
-	}
-
 	_, err := t.putObjectLocked(opts)
 	if err != nil {
 		return err
@@ -509,7 +500,7 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 	if ok {
 		switch opts.Precondition {
 		case OperationPreconditionOnlyIfAbsent:
-			return "", errors.New("object already exists")
+			return "", &objerr.PreconditionFailedError{Key: opts.Key}
 		case OperationPreconditionIfMatch:
 			if oldVersion.CAS != opts.PreconditionData {
 				return "", &objerr.PreconditionFailedError{Key: opts.Key}

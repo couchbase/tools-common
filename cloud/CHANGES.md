@@ -1,5 +1,9 @@
 # Changes
 
+## v7.3.2
+
+- Return precondition error from test client when a `PutObject` would fail due to the object already existing.
+
 ## v7.3.1
 
 - Add error for pre-condition failure
