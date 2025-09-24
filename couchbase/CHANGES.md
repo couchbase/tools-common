@@ -1,5 +1,9 @@
 # Changes
 
+## v3.4.0
+
+- Added a `cbcrypto` package for reading and writing cbcrypto files.
+
 ## v3.3.9
 
 - Change minimum delay on retry after failing to get credentials to 250ms, not seconds

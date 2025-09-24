@@ -14,9 +14,12 @@ require (
 	github.com/couchbase/tools-common/testing v1.0.2
 	github.com/couchbase/tools-common/types/v2 v2.0.1
 	github.com/couchbase/tools-common/utils/v3 v3.0.2
+	github.com/dsnet/compress v0.0.1
 	github.com/foxcpp/go-mockdns v1.0.0
+	github.com/golang/snappy v1.0.0
 	github.com/google/uuid v1.6.0
 	github.com/json-iterator/go v1.1.12
+	github.com/klauspost/compress v1.18.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
 	golang.org/x/mod v0.22.0
