@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 )
 
@@ -67,19 +67,21 @@ func (c *CopyObjectsOptions) defaults() {
 // CopyObjects from one location to another using a worker pool.
 //
 // NOTE: When copying within the same bucket, the source/destination prefix can't be the same.
-func CopyObjects(opts CopyObjectsOptions) error {
+func CopyObjects(opts CopyObjectsOptions) ([]*objval.ObjectAttrs, error) {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
 	// Don't allow users to copy to the same prefix, it doesn't make sense
 	if opts.SourceBucket == opts.DestinationBucket && opts.SourcePrefix == opts.DestinationPrefix {
-		return ErrCopyToSamePrefix
+		return nil, ErrCopyToSamePrefix
 	}
 
 	pool := hofp.NewPool(hofp.Options{
 		Context: opts.Context,
 		Logger:  opts.Logger,
 	})
+
+	attrsList := make([]*objval.ObjectAttrs, 0)
 
 	cp := func(ctx context.Context, attrs *objval.ObjectAttrs) error {
 		if attrs.IsDir() {
@@ -95,7 +97,11 @@ func CopyObjects(opts CopyObjectsOptions) error {
 			SourceKey:         attrs.Key,
 		}
 
-		return CopyObject(options)
+		attrs, err := CopyObject(options)
+
+		attrsList = append(attrsList, attrs)
+
+		return err
 	}
 
 	queue := func(attrs *objval.ObjectAttrs) error {
@@ -111,13 +117,13 @@ func CopyObjects(opts CopyObjectsOptions) error {
 		Func:      queue,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to iterate objects: %w", err)
+		return nil, fmt.Errorf("failed to iterate objects: %w", err)
 	}
 
 	err = pool.Stop()
 	if err != nil {
-		return fmt.Errorf("failed to stop worker pool: %w", err)
+		return nil, fmt.Errorf("failed to stop worker pool: %w", err)
 	}
 
-	return nil
+	return attrsList, nil
 }

@@ -12,9 +12,9 @@ import (
 	"path"
 	"regexp"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -162,7 +162,7 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 	return attrs, nil
 }
 
-func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
+func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*objval.ObjectAttrs, error) {
 	input := &s3.PutObjectInput{
 		Body:              opts.Body,
 		Bucket:            ptr.To(opts.Bucket),
@@ -183,28 +183,57 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 			input.ObjectLockMode = types.ObjectLockModeCompliance
 			input.ObjectLockRetainUntilDate = aws.Time(opts.Lock.Expiration)
 		default:
-			return errors.New("unsupported lock type")
+			return nil, errors.New("unsupported lock type")
 		}
 	}
 
-	_, err := c.serviceAPI.PutObject(ctx, input)
+	output, err := c.serviceAPI.PutObject(ctx, input)
+	if err != nil {
+		return nil, handleError(input.Bucket, input.Key, err)
+	}
 
-	return handleError(input.Bucket, input.Key, err)
+	attrs := &objval.ObjectAttrs{
+		Key:  opts.Key,
+		ETag: output.ETag,
+		Size: output.Size,
+	}
+
+	if output.VersionId != nil {
+		attrs.VersionID = *output.VersionId
+	}
+
+	return attrs, nil
 }
 
-func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
+func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) (*objval.ObjectAttrs, error) {
 	input := &s3.CopyObjectInput{
 		Bucket:     ptr.To(opts.DestinationBucket),
 		Key:        ptr.To(opts.DestinationKey),
 		CopySource: ptr.To(url.PathEscape(opts.SourceBucket + "/" + opts.SourceKey)),
 	}
 
-	_, err := c.serviceAPI.CopyObject(ctx, input)
+	output, err := c.serviceAPI.CopyObject(ctx, input)
+	if err != nil {
+		return nil, handleError(nil, nil, err)
+	}
 
-	return handleError(nil, nil, err)
+	attrs := &objval.ObjectAttrs{
+		Key: opts.DestinationKey,
+	}
+
+	if output.CopyObjectResult != nil {
+		attrs.ETag = output.CopyObjectResult.ETag
+		attrs.LastModified = output.CopyObjectResult.LastModified
+	}
+
+	if output.VersionId != nil {
+		attrs.VersionID = *output.VersionId
+	}
+
+	return attrs, nil
 }
 
-func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) error {
+func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) (*objval.ObjectAttrs, error) {
 	var (
 		bucket = opts.Bucket
 		key    = opts.Key
@@ -221,16 +250,16 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 			Body:   opts.Body,
 		}
 
-		err := c.PutObject(ctx, putOpts)
+		attrs, err := c.PutObject(ctx, putOpts)
 		if err != nil {
-			return fmt.Errorf("failed to put object: %w", err)
+			return nil, fmt.Errorf("failed to put object: %w", err)
 		}
 
-		return nil
+		return attrs, nil
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to get object attributes: %w", err)
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
 	if ptr.From(attrs.Size) < MinUploadSize {
@@ -247,29 +276,29 @@ func (c *Client) downloadAndAppend(
 	bucket string,
 	attrs *objval.ObjectAttrs,
 	body io.ReadSeeker,
-) error {
+) (*objval.ObjectAttrs, error) {
 	object, err := c.GetObject(ctx, objcli.GetObjectOptions{Bucket: bucket, Key: attrs.Key})
 	if err != nil {
-		return fmt.Errorf("failed to get object: %w", err)
+		return nil, fmt.Errorf("failed to get object: %w", err)
 	}
 
 	var buffer bytes.Buffer
 
 	_, err = io.Copy(&buffer, io.MultiReader(object.Body, body))
 	if err != nil {
-		return fmt.Errorf("failed to download and append to object: %w", err)
+		return nil, fmt.Errorf("failed to download and append to object: %w", err)
 	}
 
-	err = c.PutObject(ctx, objcli.PutObjectOptions{
+	outputAttrs, err := c.PutObject(ctx, objcli.PutObjectOptions{
 		Bucket: bucket,
 		Key:    attrs.Key,
 		Body:   bytes.NewReader(buffer.Bytes()),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload updated object: %w", err)
+		return nil, fmt.Errorf("failed to upload updated object: %w", err)
 	}
 
-	return nil
+	return outputAttrs, nil
 }
 
 // createMPUThenCopyAndAppend creates a multipart upload, then kicks off the copy and append operation.
@@ -278,18 +307,18 @@ func (c *Client) createMPUThenCopyAndAppend(
 	bucket string,
 	attrs *objval.ObjectAttrs,
 	data io.ReadSeeker,
-) error {
+) (*objval.ObjectAttrs, error) {
 	id, err := c.CreateMultipartUpload(ctx, objcli.CreateMultipartUploadOptions{
 		Bucket: bucket,
 		Key:    attrs.Key,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
 	}
 
-	err = c.copyAndAppend(ctx, bucket, id, attrs, data)
+	outputAttrs, err := c.copyAndAppend(ctx, bucket, id, attrs, data)
 	if err == nil {
-		return nil
+		return outputAttrs, nil
 	}
 
 	aOpts := objcli.AbortMultipartUploadOptions{
@@ -304,7 +333,7 @@ func (c *Client) createMPUThenCopyAndAppend(
 		c.logger.Error("failed to abort multipart upload, it should be aborted manually", "id", id, "key", attrs.Key)
 	}
 
-	return err
+	return nil, err
 }
 
 // copyAndAppend copies all the data from the source object, then uploads a new part and completes the multipart upload.
@@ -314,7 +343,7 @@ func (c *Client) copyAndAppend(
 	bucket, id string,
 	attrs *objval.ObjectAttrs,
 	body io.ReadSeeker,
-) error {
+) (*objval.ObjectAttrs, error) {
 	copied, err := c.UploadPartCopy(ctx, objcli.UploadPartCopyOptions{
 		DestinationBucket: bucket,
 		UploadID:          id,
@@ -326,7 +355,7 @@ func (c *Client) copyAndAppend(
 		ByteRange: &objval.ByteRange{End: ptr.From(attrs.Size) - 1},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to copy source object: %w", err)
+		return nil, fmt.Errorf("failed to copy source object: %w", err)
 	}
 
 	appended, err := c.UploadPart(ctx, objcli.UploadPartOptions{
@@ -337,20 +366,20 @@ func (c *Client) copyAndAppend(
 		Body:     body,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload part: %w", err)
+		return nil, fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
+	outputAttrs, err := c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
 		Bucket:   bucket,
 		UploadID: id,
 		Key:      attrs.Key,
 		Parts:    []objval.Part{copied, appended},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	return nil
+	return outputAttrs, nil
 }
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
@@ -815,7 +844,9 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 	return part, nil
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
+func (c *Client) CompleteMultipartUpload(
+	ctx context.Context, opts objcli.CompleteMultipartUploadOptions,
+) (*objval.ObjectAttrs, error) {
 	converted := make([]types.CompletedPart, len(opts.Parts))
 
 	for index, part := range opts.Parts {
@@ -833,9 +864,21 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 		input.IfNoneMatch = ptr.To("*")
 	}
 
-	_, err := c.serviceAPI.CompleteMultipartUpload(ctx, input)
+	output, err := c.serviceAPI.CompleteMultipartUpload(ctx, input)
+	if err != nil {
+		return nil, handleError(input.Bucket, input.Key, err)
+	}
 
-	return handleError(input.Bucket, input.Key, err)
+	attrs := &objval.ObjectAttrs{
+		Key:  opts.Key,
+		ETag: output.ETag,
+	}
+
+	if output.VersionId != nil {
+		attrs.VersionID = *output.VersionId
+	}
+
+	return attrs, nil
 }
 
 func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMultipartUploadOptions) error {

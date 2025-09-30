@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	ioiface "github.com/couchbase/tools-common/types/v2/iface"
@@ -72,7 +72,9 @@ func (s *Syncer) Upload(source, destination *CloudOrFileURL) error {
 			return fmt.Errorf("could not parse file path: %w", err)
 		}
 
-		return s.uploadFile(ctx, newSource, newDestination)
+		_, err = s.uploadFile(ctx, newSource, newDestination)
+
+		return err
 	}
 
 	err := filepath.Walk(source.Path, func(path string, info os.FileInfo, err error) error {
@@ -96,12 +98,12 @@ func (s *Syncer) Upload(source, destination *CloudOrFileURL) error {
 
 // uploadFile uploads a file to the given cloud provider. Assumes source is a file:// URL to a file, and
 // destination is a cloud path.
-func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFileURL) error {
+func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFileURL) (*objval.ObjectAttrs, error) {
 	s.logger.Debug("uploading file", "source", source, "destination", destination)
 
 	file, err := fsutil.OpenRandAccess(source.Path, 0, 0)
 	if err != nil {
-		return fmt.Errorf("could not open specified file: %w", err)
+		return nil, fmt.Errorf("could not open specified file: %w", err)
 	}
 	defer file.Close()
 

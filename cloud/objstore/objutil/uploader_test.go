@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,7 +96,13 @@ func TestMPUploaderUpload(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.NoError(t, uploader.Commit())
+	attrs, err := uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(4), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
@@ -124,7 +130,13 @@ func TestMPUploaderUploadLock(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.NoError(t, uploader.Commit())
+	attrs, err := uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(4), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
@@ -158,7 +170,13 @@ func TestMPUploaderUploadTwoTimes(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.NoError(t, uploader.Commit())
+	attrs, err := uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(4), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
@@ -173,7 +191,14 @@ func TestMPUploaderUploadTwoTimes(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.NoError(t, uploader.Commit())
+
+	attrs, err = uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(4), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestMPUploaderUploadIfAbsent(t *testing.T) {
@@ -192,7 +217,13 @@ func TestMPUploaderUploadIfAbsent(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.NoError(t, uploader.Commit())
+	attrs, err := uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(4), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
@@ -207,7 +238,9 @@ func TestMPUploaderUploadIfAbsent(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.Error(t, uploader.Commit())
+
+	_, err = uploader.Commit()
+	require.Error(t, err)
 }
 
 func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
@@ -235,7 +268,13 @@ func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.UploadWithMeta(42, strings.NewReader("body")))
-	require.NoError(t, uploader.Commit())
+	attrs, err := uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(4), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
@@ -263,7 +302,9 @@ func TestMPUploaderUploadWithOnPartCompletePropagateUserError(t *testing.T) {
 	defer uploader.Abort() //nolint:errcheck
 
 	require.NoError(t, uploader.Upload(strings.NewReader("body")))
-	require.ErrorIs(t, uploader.Commit(), assert.AnError)
+
+	_, err = uploader.Commit()
+	require.ErrorIs(t, err, assert.AnError)
 }
 
 func TestMPUploaderUploadAlmostGreaterThanMaxCount(t *testing.T) {
@@ -401,7 +442,14 @@ func TestMPUploaderCommit(t *testing.T) {
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 4)
 
-	require.NoError(t, uploader.Commit())
+	attrs, err := uploader.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(2), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})

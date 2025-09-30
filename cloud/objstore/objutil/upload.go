@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	ioiface "github.com/couchbase/tools-common/types/v2/iface"
 )
 
@@ -68,13 +69,13 @@ func (u *UploadOptions) defaults() {
 }
 
 // Upload an object to a remote cloud breaking it down into a multipart upload if the body is over a given size.
-func Upload(opts UploadOptions) error {
+func Upload(opts UploadOptions) (*objval.ObjectAttrs, error) {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
 	length, err := objcli.SeekerLength(opts.Body)
 	if err != nil {
-		return fmt.Errorf("failed to determine length of body: %w", err)
+		return nil, fmt.Errorf("failed to determine length of body: %w", err)
 	}
 
 	// Under the threshold, upload using a single request
@@ -82,19 +83,22 @@ func Upload(opts UploadOptions) error {
 		return upload(opts)
 	}
 
-	err = opts.Client.PutObject(opts.Context, objcli.PutObjectOptions{
+	attrs, err := opts.Client.PutObject(opts.Context, objcli.PutObjectOptions{
 		Bucket:       opts.Bucket,
 		Key:          opts.Key,
 		Body:         opts.Body,
 		Precondition: opts.Precondition,
 		Lock:         opts.Lock,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to put object: %w", err)
+	}
 
-	return err
+	return attrs, nil
 }
 
 // upload an object to a remote cloud by breaking it down into individual chunks and uploading them concurrently.
-func upload(opts UploadOptions) error {
+func upload(opts UploadOptions) (*objval.ObjectAttrs, error) {
 	mpu, err := NewMPUploader(MPUploaderOptions{
 		Client:       opts.Client,
 		Bucket:       opts.Bucket,
@@ -104,7 +108,7 @@ func upload(opts UploadOptions) error {
 		Lock:         opts.Lock,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create uploader: %w", err)
+		return nil, fmt.Errorf("failed to create uploader: %w", err)
 	}
 	defer mpu.Abort() //nolint:errcheck
 
@@ -112,13 +116,13 @@ func upload(opts UploadOptions) error {
 
 	err = reader.ForEach(func(chunk *io.SectionReader) error { return mpu.Upload(chunk) })
 	if err != nil {
-		return fmt.Errorf("failed to queue chunks: %w", err)
+		return nil, fmt.Errorf("failed to queue chunks: %w", err)
 	}
 
-	err = mpu.Commit()
+	attrs, err := mpu.Commit()
 	if err != nil {
-		return fmt.Errorf("failed to complete upload: %w", err)
+		return nil, fmt.Errorf("failed to complete upload: %w", err)
 	}
 
-	return nil
+	return attrs, nil
 }

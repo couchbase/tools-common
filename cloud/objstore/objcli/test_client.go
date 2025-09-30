@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -86,58 +86,66 @@ func (t *TestClient) GetObjectAttrs(_ context.Context, opts GetObjectAttrsOption
 	return &object.ObjectAttrs, nil
 }
 
-func (t *TestClient) PutObject(_ context.Context, opts PutObjectOptions) error {
+func (t *TestClient) PutObject(_ context.Context, opts PutObjectOptions) (*objval.ObjectAttrs, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	_, err := t.putObjectLocked(opts)
+	attrs, err := t.putObjectLocked(opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return attrs, nil
 }
 
-func (t *TestClient) CopyObject(_ context.Context, opts CopyObjectOptions) error {
+func (t *TestClient) CopyObject(_ context.Context, opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	src, err := t.getObjectRLocked(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = t.putObjectLocked(PutObjectOptions{
+	attrs, err := t.putObjectLocked(PutObjectOptions{
 		Bucket: opts.DestinationBucket,
 		Key:    opts.DestinationKey,
 		Body:   bytes.NewReader(src.Body),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return attrs, nil
 }
 
-func (t *TestClient) AppendToObject(_ context.Context, opts AppendToObjectOptions) error {
+func (t *TestClient) AppendToObject(_ context.Context, opts AppendToObjectOptions) (*objval.ObjectAttrs, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	object, ok := t.getBucketLocked(opts.Bucket)[objval.TestObjectIdentifier{Key: opts.Key}]
+	var (
+		object *objval.TestObject
+		attrs  *objval.ObjectAttrs
+		ok     bool
+		err    error
+	)
+
+	object, ok = t.getBucketLocked(opts.Bucket)[objval.TestObjectIdentifier{Key: opts.Key}]
 	if ok {
 		object.Body = append(object.Body, testutil.ReadAll(t.t, opts.Body)...)
+		attrs = &object.ObjectAttrs
 	} else {
-		_, err := t.putObjectLocked(PutObjectOptions{
+		attrs, err = t.putObjectLocked(PutObjectOptions{
 			Bucket: opts.Bucket,
 			Key:    opts.Key,
 			Body:   opts.Body,
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return attrs, nil
 }
 
 func (t *TestClient) DeleteObjects(_ context.Context, opts DeleteObjectsOptions) error {
@@ -324,7 +332,7 @@ func (t *TestClient) UploadPart(_ context.Context, opts UploadPartOptions) (objv
 	size, err := SeekerLength(opts.Body)
 	require.NoError(t.t, err)
 
-	id, err := t.putObjectLocked(PutObjectOptions{
+	attrs, err := t.putObjectLocked(PutObjectOptions{
 		Bucket:       opts.Bucket,
 		Key:          partKey(opts.UploadID, opts.Key),
 		Body:         opts.Body,
@@ -336,7 +344,7 @@ func (t *TestClient) UploadPart(_ context.Context, opts UploadPartOptions) (objv
 	}
 
 	part := objval.Part{
-		ID:     id,
+		ID:     attrs.Key,
 		Number: opts.Number,
 		Size:   size,
 	}
@@ -356,7 +364,7 @@ func (t *TestClient) UploadPartCopy(_ context.Context, opts UploadPartCopyOption
 	body := make([]byte, opts.ByteRange.End-opts.ByteRange.Start+1)
 	copy(body, object.Body)
 
-	id, err := t.putObjectLocked(PutObjectOptions{
+	attrs, err := t.putObjectLocked(PutObjectOptions{
 		Bucket: opts.DestinationBucket,
 		Key:    partKey(opts.UploadID, opts.DestinationKey),
 		Body:   bytes.NewReader(body),
@@ -366,7 +374,7 @@ func (t *TestClient) UploadPartCopy(_ context.Context, opts UploadPartCopyOption
 	}
 
 	part := objval.Part{
-		ID:     id,
+		ID:     attrs.Key,
 		Number: opts.Number,
 		Size:   int64(len(body)),
 	}
@@ -374,7 +382,9 @@ func (t *TestClient) UploadPartCopy(_ context.Context, opts UploadPartCopyOption
 	return part, nil
 }
 
-func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMultipartUploadOptions) error {
+func (t *TestClient) CompleteMultipartUpload(
+	_ context.Context, opts CompleteMultipartUploadOptions,
+) (*objval.ObjectAttrs, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -383,13 +393,13 @@ func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMul
 	for _, part := range opts.Parts {
 		object, err := t.getObjectRLocked(opts.Bucket, part.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		buffer.Write(object.Body)
 	}
 
-	_, err := t.putObjectLocked(PutObjectOptions{
+	attrs, err := t.putObjectLocked(PutObjectOptions{
 		Bucket:       opts.Bucket,
 		Key:          opts.Key,
 		Body:         bytes.NewReader(buffer.Bytes()),
@@ -397,12 +407,12 @@ func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMul
 		Lock:         opts.Lock,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_ = t.deleteVersionsLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
 
-	return nil
+	return attrs, nil
 }
 
 func (t *TestClient) AbortMultipartUpload(_ context.Context, opts AbortMultipartUploadOptions) error {
@@ -480,7 +490,7 @@ func (t *TestClient) getObjectRLocked(bucket, key string) (*objval.TestObject, e
 	return o, nil
 }
 
-func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
+func (t *TestClient) putObjectLocked(opts PutObjectOptions) (*objval.ObjectAttrs, error) {
 	body := opts.Body
 	key := opts.Key
 	bucket := opts.Bucket
@@ -492,7 +502,7 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 		versionID = etag
 	)
 
-	attrs := objval.ObjectAttrs{
+	attrs := &objval.ObjectAttrs{
 		Key:              key,
 		ETag:             &etag,
 		CAS:              etag,
@@ -511,10 +521,10 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 	if ok {
 		switch opts.Precondition {
 		case OperationPreconditionOnlyIfAbsent:
-			return "", &objerr.PreconditionFailedError{Key: opts.Key}
+			return nil, &objerr.PreconditionFailedError{Key: opts.Key}
 		case OperationPreconditionIfMatch:
 			if currentVersion.CAS != opts.PreconditionData {
-				return "", &objerr.PreconditionFailedError{Key: opts.Key}
+				return nil, &objerr.PreconditionFailedError{Key: opts.Key}
 			}
 		}
 
@@ -522,7 +532,7 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 	}
 
 	obj := &objval.TestObject{
-		ObjectAttrs: attrs,
+		ObjectAttrs: *attrs,
 		Body:        data,
 	}
 
@@ -532,14 +542,14 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 			obj.LockType = objval.LockTypeCompliance
 			obj.LockExpiration = &opts.Lock.Expiration
 		default:
-			return "", errors.New("unported lock type")
+			return nil, errors.New("unported lock type")
 		}
 	}
 
 	t.Buckets[bucket][objval.TestObjectIdentifier{Key: key, VersionID: obj.VersionID}] = obj
 	t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}] = obj
 
-	return attrs.Key, nil
+	return attrs, nil
 }
 
 func (t *TestClient) deleteVersionsLocked(bucket, prefix string, include, exclude []*regexp.Regexp) error {

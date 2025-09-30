@@ -4,11 +4,12 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 )
 
 func TestIterateObjectsWithDelimiter(t *testing.T) {
@@ -39,12 +40,17 @@ func TestIterateObjectsWithDelimiter(t *testing.T) {
 			testClient := NewTestClient(t, objval.ProviderAWS)
 
 			for _, key := range test.keysToCreate {
-				err := testClient.PutObject(context.Background(), PutObjectOptions{
+				attrs, err := testClient.PutObject(context.Background(), PutObjectOptions{
 					Bucket: "bucket",
 					Key:    key,
 					Body:   strings.NewReader("asd"),
 				})
 				require.NoError(t, err)
+
+				require.Equal(t, key, attrs.Key)
+				require.Equal(t, int64(3), *attrs.Size)
+				require.NotEmpty(t, attrs.ETag)
+				require.True(t, time.Now().After(*attrs.LastModified))
 			}
 
 			secondLevelContent := make([]string, 0)
@@ -68,13 +74,20 @@ func TestIterateObjectsWithDelimiter(t *testing.T) {
 
 func TestIfMatch(t *testing.T) {
 	cli := NewTestClient(t, objval.ProviderAWS)
-	require.NoError(t, cli.PutObject(context.Background(), PutObjectOptions{
+
+	attrs, err := cli.PutObject(context.Background(), PutObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("foo"),
-	}))
+	})
+	require.NoError(t, err)
 
-	attrs, err := cli.GetObjectAttrs(context.Background(), GetObjectAttrsOptions{
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(3), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
+	attrs, err = cli.GetObjectAttrs(context.Background(), GetObjectAttrsOptions{
 		Bucket: "bucket",
 		Key:    "key",
 	})
@@ -82,24 +95,29 @@ func TestIfMatch(t *testing.T) {
 
 	cas := attrs.CAS
 
-	require.NoError(t, cli.PutObject(context.Background(), PutObjectOptions{
+	attrs, err = cli.PutObject(context.Background(), PutObjectOptions{
 		Bucket:           "bucket",
 		Key:              "key",
 		Body:             strings.NewReader("bar"),
 		Precondition:     OperationPreconditionIfMatch,
 		PreconditionData: cas,
-	}))
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(3), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	var precondErr *objerr.PreconditionFailedError
 
-	require.ErrorAs(
-		t,
-		cli.PutObject(context.Background(), PutObjectOptions{
-			Bucket:           "bucket",
-			Key:              "key",
-			Body:             strings.NewReader("baz"),
-			Precondition:     OperationPreconditionIfMatch,
-			PreconditionData: cas,
-		}),
-		&precondErr)
+	_, err = cli.PutObject(context.Background(), PutObjectOptions{
+		Bucket:           "bucket",
+		Key:              "key",
+		Body:             strings.NewReader("baz"),
+		Precondition:     OperationPreconditionIfMatch,
+		PreconditionData: cas,
+	})
+
+	require.ErrorAs(t, err, &precondErr)
 }

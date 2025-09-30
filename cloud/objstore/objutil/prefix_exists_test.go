@@ -6,12 +6,13 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 )
@@ -34,12 +35,17 @@ func TestPrefixExists(t *testing.T) {
 		prefix = "prefix"
 	)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: bucket,
 		Key:    path.Join(prefix, "new_beginnings.txt"),
 		Body:   strings.NewReader("Hello, World!"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, path.Join(prefix, "new_beginnings.txt"), attrs.Key)
+	require.Equal(t, int64(13), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	opts := PrefixExistsOptions{
 		Context: ctx,

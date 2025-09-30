@@ -9,9 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli/objaws"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 )
 
@@ -240,10 +240,10 @@ func (m *MPUploader) Abort() error {
 }
 
 // Commit the multipart upload and stop the worker pool.
-func (m *MPUploader) Commit() error {
+func (m *MPUploader) Commit() (*objval.ObjectAttrs, error) {
 	err := m.Stop()
 	if err != nil {
-		return fmt.Errorf("failed to stop worker pool: %w", err)
+		return nil, fmt.Errorf("failed to stop worker pool: %w", err)
 	}
 
 	// Sort the parts prior to completion to ensure the correct order; parts will be uploaded in any arbitrary order
@@ -252,7 +252,7 @@ func (m *MPUploader) Commit() error {
 		func(i, j int) bool { return m.opts.Parts[i].Number < m.opts.Parts[j].Number },
 	)
 
-	err = m.opts.Client.CompleteMultipartUpload(m.opts.Context, objcli.CompleteMultipartUploadOptions{
+	return m.opts.Client.CompleteMultipartUpload(m.opts.Context, objcli.CompleteMultipartUploadOptions{
 		Bucket:       m.opts.Bucket,
 		UploadID:     m.opts.ID,
 		Key:          m.opts.Key,
@@ -260,6 +260,4 @@ func (m *MPUploader) Commit() error {
 		Precondition: m.opts.Precondition,
 		Lock:         m.opts.Lock,
 	})
-
-	return err
 }

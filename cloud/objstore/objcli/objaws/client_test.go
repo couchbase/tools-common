@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/types/v2/ptr"
@@ -430,16 +430,24 @@ func TestClientPutObject(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(
+		&s3.PutObjectOutput{Size: ptr.To(int64(10)), ETag: ptr.To("asd"), VersionId: ptr.To("123")},
+		nil,
+	)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("value"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(10), *attrs.Size)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObject", 1)
@@ -459,17 +467,25 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 		return body && bucket && key && ifNoneMatch
 	}
 
-	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(
+		&s3.PutObjectOutput{Size: ptr.To(int64(10)), ETag: ptr.To("asd"), VersionId: ptr.To("123")},
+		nil,
+	)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket:       "bucket",
 		Key:          "key",
 		Body:         strings.NewReader("value"),
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(10), *attrs.Size)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObject", 1)
@@ -489,11 +505,14 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 		return body && bucket && key && ifMatch
 	}
 
-	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(
+		&s3.PutObjectOutput{Size: ptr.To(int64(10)), ETag: ptr.To("asd"), VersionId: ptr.To("123")},
+		nil,
+	)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket:           "bucket",
 		Key:              "key",
 		Body:             strings.NewReader("value"),
@@ -501,6 +520,11 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 		PreconditionData: "my-etag",
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(10), *attrs.Size)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObject", 1)
@@ -524,17 +548,25 @@ func TestClientPutObjectLockPeriod(t *testing.T) {
 		return body && bucket && key && lockMode && lockPeriod
 	}
 
-	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(
+		&s3.PutObjectOutput{Size: ptr.To(int64(10)), ETag: ptr.To("asd"), VersionId: ptr.To("123")},
+		nil,
+	)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("value"),
 		Lock:   objcli.NewComplianceLock(expirationTIme),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(10), *attrs.Size)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObject", 1)
@@ -565,16 +597,24 @@ func TestClientAppendToObjectNotFound(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObject", matchers.Context, mock.MatchedBy(fn2)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn2)).Return(
+		&s3.PutObjectOutput{
+			ETag:      ptr.To("asd"),
+			VersionId: ptr.To("123"),
+		}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+	attrs, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("appended"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "HeadObject", 1)
@@ -594,17 +634,27 @@ func TestClientCopyObject(t *testing.T) {
 		return bucket && key && source
 	}
 
-	api.On("CopyObject", matchers.Context, mock.MatchedBy(fn1)).Return(&s3.CopyObjectOutput{}, nil)
+	api.On("CopyObject", matchers.Context, mock.MatchedBy(fn1)).Return(&s3.CopyObjectOutput{
+		CopyObjectResult: &types.CopyObjectResult{
+			ETag:         ptr.To("asd"),
+			LastModified: ptr.To(time.Now()),
+		},
+		VersionId: ptr.To("123"),
+	}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
+	attrs, err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
 		DestinationBucket: "dstBucket",
 		DestinationKey:    "dstKey",
 		SourceBucket:      "srcBucket",
 		SourceKey:         "srcKey",
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "dstKey", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "CopyObject", 1)
@@ -626,6 +676,7 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		ETag:          ptr.To("etag"),
 		ContentLength: ptr.To(int64(len("value"))),
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
+		VersionId:     ptr.To("123"),
 	}
 
 	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn1)).Return(output1, nil)
@@ -658,16 +709,23 @@ func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 		return body && bucket && key
 	}
 
-	api.On("PutObject", matchers.Context, mock.MatchedBy(fn3)).Return(&s3.PutObjectOutput{}, nil)
+	api.On("PutObject", matchers.Context, mock.MatchedBy(fn3)).Return(&s3.PutObjectOutput{
+		ETag:      ptr.To("asd"),
+		VersionId: ptr.To("123"),
+	}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+	attrs, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("appended"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "HeadObject", 1)
@@ -761,16 +819,23 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppend(t *testing.T) {
 		return bucket && key && id && parts
 	}
 
-	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn5)).Return(nil, nil)
+	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn5)).Return(&s3.CompleteMultipartUploadOutput{
+		ETag:      ptr.To("asd"),
+		VersionId: ptr.To("123"),
+	}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+	attrs, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("appended"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "HeadObject", 1)
@@ -844,7 +909,7 @@ func TestClientAppendToObjectCreateMPUThenCopyAndAppendAbortOnFailure(t *testing
 
 	client := &Client{serviceAPI: api}
 
-	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+	_, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("appended"),
@@ -1935,17 +2000,24 @@ func TestClientCompleteMultipartUpload(t *testing.T) {
 		return bucket && key && id && parts
 	}
 
-	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
+	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(&s3.CompleteMultipartUploadOutput{
+		ETag:      ptr.To("asd"),
+		VersionId: ptr.To("123"),
+	}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	attrs, err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
 		Bucket:   "bucket",
 		UploadID: "id",
 		Key:      "key",
 		Parts:    []objval.Part{{ID: "etag1", Number: 1}, {ID: "etag2", Number: 2}},
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)
@@ -1969,11 +2041,14 @@ func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
 		return bucket && key && id && parts && ifNoneMatch
 	}
 
-	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(nil, nil)
+	api.On("CompleteMultipartUpload", matchers.Context, mock.MatchedBy(fn)).Return(&s3.CompleteMultipartUploadOutput{
+		ETag:      ptr.To("asd"),
+		VersionId: ptr.To("123"),
+	}, nil)
 
 	client := &Client{serviceAPI: api}
 
-	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	attrs, err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
 		Bucket:       "bucket",
 		UploadID:     "id",
 		Key:          "key",
@@ -1981,6 +2056,10 @@ func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "CompleteMultipartUpload", 1)

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli/objaws"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/strings/format"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/freelist"
@@ -307,7 +307,7 @@ func uploadFromReader(
 		}
 	}
 
-	if err = mp.Commit(); err != nil {
+	if _, err = mp.Commit(); err != nil {
 		return nil, fmt.Errorf("could not commit upload: %w", err)
 	}
 

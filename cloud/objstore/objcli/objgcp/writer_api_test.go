@@ -7,8 +7,8 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 )
 
 func TestWriterSetLock(t *testing.T) {

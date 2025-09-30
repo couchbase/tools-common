@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/types/v2/ratelimit"
 )
 
@@ -50,12 +50,14 @@ func (r *RateLimitedClient) GetObjectAttrs(
 	return r.c.GetObjectAttrs(ctx, opts)
 }
 
-func (r *RateLimitedClient) PutObject(ctx context.Context, opts PutObjectOptions) error {
+func (r *RateLimitedClient) PutObject(ctx context.Context, opts PutObjectOptions) (*objval.ObjectAttrs, error) {
 	opts.Body = ratelimit.NewRateLimitedReadSeeker(ctx, opts.Body, r.rl)
 	return r.c.PutObject(ctx, opts)
 }
 
-func (r *RateLimitedClient) AppendToObject(ctx context.Context, opts AppendToObjectOptions) error {
+func (r *RateLimitedClient) AppendToObject(
+	ctx context.Context, opts AppendToObjectOptions,
+) (*objval.ObjectAttrs, error) {
 	opts.Body = ratelimit.NewRateLimitedReadSeeker(ctx, opts.Body, r.rl)
 	return r.c.AppendToObject(ctx, opts)
 }
@@ -88,14 +90,20 @@ func (r *RateLimitedClient) UploadPart(ctx context.Context, opts UploadPartOptio
 	return r.c.UploadPart(ctx, opts)
 }
 
-func (r *RateLimitedClient) UploadPartCopy(ctx context.Context, opts UploadPartCopyOptions) (objval.Part, error) {
+func (r *RateLimitedClient) UploadPartCopy(
+	ctx context.Context, opts UploadPartCopyOptions,
+) (objval.Part, error) {
 	return r.c.UploadPartCopy(ctx, opts)
 }
 
-func (r *RateLimitedClient) CompleteMultipartUpload(ctx context.Context, opts CompleteMultipartUploadOptions) error {
+func (r *RateLimitedClient) CompleteMultipartUpload(
+	ctx context.Context, opts CompleteMultipartUploadOptions,
+) (*objval.ObjectAttrs, error) {
 	return r.c.CompleteMultipartUpload(ctx, opts)
 }
 
-func (r *RateLimitedClient) AbortMultipartUpload(ctx context.Context, opts AbortMultipartUploadOptions) error {
+func (r *RateLimitedClient) AbortMultipartUpload(
+	ctx context.Context, opts AbortMultipartUploadOptions,
+) error {
 	return r.c.AbortMultipartUpload(ctx, opts)
 }

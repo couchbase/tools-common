@@ -7,8 +7,8 @@ import (
 
 	"cloud.google.com/go/storage"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 )
 
 //go:generate mockery --all --case underscore --inpackage
@@ -177,6 +177,8 @@ type writerAPI interface {
 	SendMD5(md5 []byte)
 	SendCRC(crc uint32)
 	SetLock(lock *objcli.ObjectLock) error
+	// Attrs returns metadata about a successfully-written object. It's only valid to call it after Close returns nil.
+	Attrs() *storage.ObjectAttrs
 }
 
 // writer implements the 'writerAPI' and encapsulates the Google Storage SDK into a unit testable interface.
@@ -217,6 +219,11 @@ func (w writer) SetLock(lock *objcli.ObjectLock) error {
 	}
 
 	return nil
+}
+
+// Attrs returns metadata about a successfully-written object. It's only valid to call it after Close returns nil.
+func (w writer) Attrs() *storage.ObjectAttrs {
+	return w.w.Attrs()
 }
 
 // objectIteratorAPI is an object level iterator API which can be used to list objects in Google Storage.

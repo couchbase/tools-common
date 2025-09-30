@@ -19,8 +19,8 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -468,7 +468,11 @@ func TestClientPutObject(t *testing.T) {
 	client := testEnvironment.client
 	bAPI := testEnvironment.blockBlobAPI
 
-	output := blockblob.UploadResponse{}
+	output := blockblob.UploadResponse{
+		ETag:         ptr.To(azcore.ETag("asd")),
+		LastModified: ptr.To(time.Now()),
+		VersionID:    ptr.To("123"),
+	}
 
 	fn := func(
 		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
@@ -484,12 +488,17 @@ func TestClientPutObject(t *testing.T) {
 		Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(fn)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: "container",
 		Key:    "blob",
 		Body:   strings.NewReader("value"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientPutObjectLockData(t *testing.T) {
@@ -506,7 +515,11 @@ func TestClientPutObjectLockData(t *testing.T) {
 		b := md5.Sum([]byte("value"))
 		require.Equal(t, blob.TransferValidationTypeMD5(b[:]), opts.TransactionalValidation)
 
-		return blockblob.UploadResponse{}, nil
+		return blockblob.UploadResponse{
+			ETag:         ptr.To(azcore.ETag("asd")),
+			LastModified: ptr.To(time.Now()),
+			VersionID:    ptr.To("123"),
+		}, nil
 	}
 
 	bAPI.
@@ -517,13 +530,18 @@ func TestClientPutObjectLockData(t *testing.T) {
 			immutabilityPolicyMatcher(blob.ImmutabilityPolicySettingLocked, expirationTime),
 		).DoAndReturn(fn)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: "container",
 		Key:    "blob",
 		Body:   strings.NewReader("value"),
 		Lock:   objcli.NewComplianceLock(expirationTime),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientPutObjectIfAbsent(t *testing.T) {
@@ -531,7 +549,11 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 	client := testEnvironment.client
 	bAPI := testEnvironment.blockBlobAPI
 
-	output := blockblob.UploadResponse{}
+	output := blockblob.UploadResponse{
+		ETag:         ptr.To(azcore.ETag("asd")),
+		LastModified: ptr.To(time.Now()),
+		VersionID:    ptr.To("123"),
+	}
 
 	fn := func(
 		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
@@ -547,13 +569,18 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 		Upload(gomock.Any(), gomock.Any(), ifAbsentMatcher()).
 		DoAndReturn(fn)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket:       "container",
 		Key:          "blob",
 		Body:         strings.NewReader("value"),
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientPutObjectIfMatch(t *testing.T) {
@@ -561,7 +588,11 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 	client := testEnvironment.client
 	bAPI := testEnvironment.blockBlobAPI
 
-	output := blockblob.UploadResponse{}
+	output := blockblob.UploadResponse{
+		ETag:         ptr.To(azcore.ETag("asd")),
+		LastModified: ptr.To(time.Now()),
+		VersionID:    ptr.To("123"),
+	}
 
 	fn := func(
 		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
@@ -577,7 +608,7 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 		Upload(gomock.Any(), gomock.Any(), ifMatchMatcher("my-etag")).
 		DoAndReturn(fn)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket:           "container",
 		Key:              "blob",
 		Body:             strings.NewReader("value"),
@@ -585,6 +616,11 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 		PreconditionData: "my-etag",
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientAppendToObjectNotExists(t *testing.T) {
@@ -597,7 +633,11 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		GetProperties(gomock.Any(), gomock.Any()).
 		Return(blob.GetPropertiesResponse{}, &azcore.ResponseError{ErrorCode: string(bloberror.BlobNotFound)})
 
-	output := blockblob.UploadResponse{}
+	output := blockblob.UploadResponse{
+		ETag:         ptr.To(azcore.ETag("asd")),
+		LastModified: ptr.To(time.Now()),
+		VersionID:    ptr.To("123"),
+	}
 
 	fn := func(
 		_ context.Context, _ io.ReadSeekCloser, opts *blockblob.UploadOptions,
@@ -613,12 +653,17 @@ func TestClientAppendToObjectNotExists(t *testing.T) {
 		Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(fn)
 
-	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+	attrs, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
 		Bucket: "container",
 		Key:    "blob",
 		Body:   strings.NewReader("value"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientCopyObject(t *testing.T) {
@@ -645,7 +690,11 @@ func TestClientCopyObject(t *testing.T) {
 		_ string,
 		_ *blob.CopyFromURLOptions,
 	) (blob.CopyFromURLResponse, error) {
-		return blob.CopyFromURLResponse{}, nil
+		return blob.CopyFromURLResponse{
+			ETag:         ptr.To(azcore.ETag("asd")),
+			LastModified: ptr.To(time.Now()),
+			VersionID:    ptr.To("123"),
+		}, nil
 	}
 
 	dbAPI.
@@ -653,13 +702,18 @@ func TestClientCopyObject(t *testing.T) {
 		CopyFromURL(matchers.Context, gomock.Any(), gomock.Any()).
 		DoAndReturn(fn)
 
-	err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
+	attrs, err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
 		DestinationBucket: "dstContainer",
 		DestinationKey:    "dstBlob",
 		SourceBucket:      "srcContainer",
 		SourceKey:         "srcBlob",
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "dstBlob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientAppendToObject(t *testing.T) {
@@ -702,15 +756,25 @@ func TestClientAppendToObject(t *testing.T) {
 			_ context.Context, base64BlockIDs []string, _ *blockblob.CommitBlockListOptions,
 		) (blockblob.CommitBlockListResponse, error) {
 			require.Len(t, base64BlockIDs, 2)
-			return blockblob.CommitBlockListResponse{}, nil
+
+			return blockblob.CommitBlockListResponse{
+				ETag:         ptr.To(azcore.ETag("asd")),
+				LastModified: ptr.To(time.Now()),
+				VersionID:    ptr.To("123"),
+			}, nil
 		})
 
-	err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+	attrs, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
 		Bucket: "container",
 		Key:    "blob",
 		Body:   strings.NewReader("value"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientDeleteObjects(t *testing.T) {
@@ -1063,7 +1127,7 @@ func TestClientUploadPartCopyWithUploadID(t *testing.T) {
 func TestClientCompleteMultipartUploadWithUploadID(t *testing.T) {
 	client := &Client{}
 
-	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	_, err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
 		Bucket:   "bucket",
 		UploadID: "id",
 		Key:      "blob",
@@ -1084,7 +1148,11 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		) (blockblob.CommitBlockListResponse, error) {
 			require.Equal(t, []string{"blob1", "blob2", "blob3"}, base64BlockIDs)
 
-			return blockblob.CommitBlockListResponse{}, nil
+			return blockblob.CommitBlockListResponse{
+				ETag:         ptr.To(azcore.ETag("asd")),
+				LastModified: ptr.To(time.Now()),
+				VersionID:    ptr.To("123"),
+			}, nil
 		})
 
 	parts := make([]objval.Part, 0)
@@ -1093,13 +1161,18 @@ func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
 	}
 
-	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	attrs, err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
 		Bucket:   "container",
 		UploadID: objcli.NoUploadID,
 		Key:      "blob",
 		Parts:    parts,
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
@@ -1115,7 +1188,11 @@ func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
 		) (blockblob.CommitBlockListResponse, error) {
 			require.Equal(t, []string{"blob1", "blob2", "blob3"}, base64BlockIDs)
 
-			return blockblob.CommitBlockListResponse{}, nil
+			return blockblob.CommitBlockListResponse{
+				ETag:         ptr.To(azcore.ETag("asd")),
+				LastModified: ptr.To(time.Now()),
+				VersionID:    ptr.To("123"),
+			}, nil
 		})
 
 	parts := make([]objval.Part, 0)
@@ -1124,7 +1201,7 @@ func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
 		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
 	}
 
-	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	attrs, err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
 		Bucket:       "container",
 		UploadID:     objcli.NoUploadID,
 		Key:          "blob",
@@ -1132,6 +1209,11 @@ func TestClientCompleteMultipartUploadIfAbsent(t *testing.T) {
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientCompleteMultipartUploadLockPeriod(t *testing.T) {
@@ -1153,7 +1235,11 @@ func TestClientCompleteMultipartUploadLockPeriod(t *testing.T) {
 		) (blockblob.CommitBlockListResponse, error) {
 			require.Equal(t, []string{"blob1", "blob2", "blob3"}, base64BlockIDs)
 
-			return blockblob.CommitBlockListResponse{}, nil
+			return blockblob.CommitBlockListResponse{
+				ETag:         ptr.To(azcore.ETag("asd")),
+				LastModified: ptr.To(time.Now()),
+				VersionID:    ptr.To("123"),
+			}, nil
 		})
 
 	parts := make([]objval.Part, 0)
@@ -1162,7 +1248,7 @@ func TestClientCompleteMultipartUploadLockPeriod(t *testing.T) {
 		parts = append(parts, objval.Part{ID: fmt.Sprintf("blob%d", i), Number: i})
 	}
 
-	err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
+	attrs, err := client.CompleteMultipartUpload(context.Background(), objcli.CompleteMultipartUploadOptions{
 		Bucket:   "container",
 		UploadID: objcli.NoUploadID,
 		Key:      "blob",
@@ -1170,6 +1256,11 @@ func TestClientCompleteMultipartUploadLockPeriod(t *testing.T) {
 		Lock:     objcli.NewComplianceLock(expirationTime),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "blob", attrs.Key)
+	require.Equal(t, "asd", *attrs.ETag)
+	require.Equal(t, "123", attrs.VersionID)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestClientAbortMultipartUpload(t *testing.T) {

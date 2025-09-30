@@ -1,5 +1,25 @@
 # Changes
 
+## v8.0.0
+
+- BREAKING: Return `ObjectAttrs` after creating a new object. This affects the following functions: `Client.PutObject`,
+  `Client.CopyObject`, `Client.AppendToObject`, `Client.CompleteMultipartUpload`, `objutil.CopyObject`,
+  `objutil.CopyObjects`, `objutil.Upload`, `MPUploader.Commit`. Not all attributes are populated for all functions.
+  Which attributes are populated also varies per cloud provider:
+  - AWS
+    - `PutObject`: `Key`, `ETag`, `VersionID`, `Size`.
+    - `CopyObject`: `Key`, `ETag`, `VersionID`, `LastModified`.
+    - `CompleteMultipartUpload`: `Key`, `ETag`, `VersionID`.
+    - `AppendToObject`: Relies on `PutObject` or `CompleteMultipartUpload`.
+  - Azure
+    - `Key`, `ETag`, `VersionID`, `LastModified` are populated for all 4 functions.
+  - GCP
+    - `Key`, `ETag`, `VersionID`, `LastModified`, `Size`, `LockExpiration`, `LockType`, `CAS` are populated for all 4
+      functions.
+- The part format for multipart uploads on GCP has been changed. Previously the ID was key for the part object. Now,
+  the ID is a JSON object containing both the Key and VersionID.
+- `Client.GetObject` now populates the ETag on Azure.
+
 ## v7.3.3
 
 - Set versionID immediately after creating an object with TestClient

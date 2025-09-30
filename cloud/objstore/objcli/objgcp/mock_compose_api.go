@@ -7,7 +7,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	objcli "github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
 
 	storage "cloud.google.com/go/storage"
 )

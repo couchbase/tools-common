@@ -6,7 +6,7 @@ import (
 	"io"
 	"regexp"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 )
 
 //go:generate mockery --name Client --case underscore --inpackage
@@ -332,18 +332,18 @@ type Client interface {
 	GetObjectAttrs(ctx context.Context, opts GetObjectAttrsOptions) (*objval.ObjectAttrs, error)
 
 	// PutObject creates an object in the cloud with the given key/options.
-	PutObject(ctx context.Context, opts PutObjectOptions) error
+	PutObject(ctx context.Context, opts PutObjectOptions) (*objval.ObjectAttrs, error)
 
 	// CopyObject copies an object from one location to another, this may be within the same bucket.
 	//
 	// NOTE: Each cloud provider has limitations on the max size for copied objects therefore using this function
 	// directly is not recommend; see 'objutil.CopyObject' which handles these nuances.
-	CopyObject(ctx context.Context, opts CopyObjectOptions) error
+	CopyObject(ctx context.Context, opts CopyObjectOptions) (*objval.ObjectAttrs, error)
 
 	// AppendToObject appends the provided data to the object with the given key, this is a binary concatenation.
 	//
 	// NOTE: If the given object does not already exist, it will be created.
-	AppendToObject(ctx context.Context, opts AppendToObjectOptions) error
+	AppendToObject(ctx context.Context, opts AppendToObjectOptions) (*objval.ObjectAttrs, error)
 
 	// DeleteObjects deletes all the objects with the given keys ignoring any errors for keys which are not found.
 	//
@@ -387,7 +387,7 @@ type Client interface {
 
 	// CompleteMultipartUpload completes the multipart upload with the given id, the given parts should be provided in
 	// the order that they should be constructed.
-	CompleteMultipartUpload(ctx context.Context, opts CompleteMultipartUploadOptions) error
+	CompleteMultipartUpload(ctx context.Context, opts CompleteMultipartUploadOptions) (*objval.ObjectAttrs, error)
 
 	// AbortMultipartUpload aborts the multipart upload with the given id whilst cleaning up any abandoned parts.
 	AbortMultipartUpload(ctx context.Context, opts AbortMultipartUploadOptions) error

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 )
 
 const (
@@ -35,23 +35,33 @@ func TestRateLimitedClientAppendToObject(t *testing.T) {
 	expData = append(expData, dataToAppend...)
 
 	// First, insert an object
-	err := rlClient.PutObject(context.Background(), PutObjectOptions{
+	attrs, err := rlClient.PutObject(context.Background(), PutObjectOptions{
 		Bucket: bucket,
 		Key:    key,
 		Body:   bytes.NewReader(testData),
 	})
 	require.NoError(t, err)
 
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(len(testData)), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	// Append the object with new data, and check it takes at least expTimeToGet.
 	start := time.Now()
 
-	err = rlClient.AppendToObject(context.Background(), AppendToObjectOptions{
+	attrs, err = rlClient.AppendToObject(context.Background(), AppendToObjectOptions{
 		Bucket: bucket,
 		Key:    key,
 		Body:   bytes.NewReader(dataToAppend),
 	})
 	require.Greater(t, time.Now(), start.Add(time.Duration(expTimeToGet))) //nolint:wsl
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(len(testData)), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	// Sanity check that the object is there and contains the correct data.
 	obj, err := rlClient.GetObject(context.Background(), GetObjectOptions{
@@ -69,12 +79,17 @@ func TestRateLimitedClientGetObject(t *testing.T) {
 	rlClient := NewRateLimitedClient(NewTestClient(t, objval.ProviderAWS), rate.NewLimiter(1, bytesPerSecond))
 
 	// First, insert an object
-	err := rlClient.PutObject(context.Background(), PutObjectOptions{
+	attrs, err := rlClient.PutObject(context.Background(), PutObjectOptions{
 		Bucket: bucket,
 		Key:    key,
 		Body:   bytes.NewReader(testData),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(len(testData)), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	// Then attempt to retrieve it, and check it takes at least expTimeToGet.
 	start := time.Now()
@@ -98,13 +113,18 @@ func TestRateLimitedClientPutObject(t *testing.T) {
 	// Insert an object, and check it takes at least expTimeToGet to do so.
 	start := time.Now()
 
-	err := rlClient.PutObject(context.Background(), PutObjectOptions{
+	attrs, err := rlClient.PutObject(context.Background(), PutObjectOptions{
 		Bucket: bucket,
 		Key:    key,
 		Body:   bytes.NewReader(testData),
 	})
 	require.NoError(t, err)
 	require.Greater(t, time.Now(), start.Add(time.Duration(expTimeToGet)))
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(len(testData)), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	// Sanity check that the object is there and contains the correct data.
 	obj, err := rlClient.GetObject(context.Background(), GetObjectOptions{
@@ -139,11 +159,16 @@ func TestRateLimitedClientUploadPart(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, time.Now(), start.Add(time.Duration(expTimeToGet)))
 
-	err = rlClient.CompleteMultipartUpload(context.Background(), CompleteMultipartUploadOptions{
+	attrs, err := rlClient.CompleteMultipartUpload(context.Background(), CompleteMultipartUploadOptions{
 		Bucket:   bucket,
 		UploadID: id,
 		Key:      key,
 		Parts:    []objval.Part{part},
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(len(testData)), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }

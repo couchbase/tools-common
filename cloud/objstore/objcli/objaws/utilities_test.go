@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 

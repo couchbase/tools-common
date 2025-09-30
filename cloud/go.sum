@@ -105,6 +105,8 @@ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDk
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78 h1:QVw89YDxXxEe+l8gU8ETbOasdwEV+avkR75ZzsVV9WI=
 github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78/go.mod h1:W+zGtBO5Y1IgJhy4+A9GOqVhqLpfZi+vwmdNXUehLA8=
+github.com/couchbase/tools-common/cloud/v8 v7.3.2 h1:W77yY3Mxnc1diGz5Ntoe5ffeSDbDFkTnnZ/W5/xq3jI=
+github.com/couchbase/tools-common/cloud/v8 v7.3.2/go.mod h1:yyCF8/Da0KYsM4u+o1Jb2tJQ96lOKtIxr+8HX8u0p0c=
 github.com/couchbase/tools-common/environment v1.1.1 h1:ZPYB+o/H8zAjqn1X1QXewkrttGm+P6ollopHznPEd3M=
 github.com/couchbase/tools-common/environment v1.1.1/go.mod h1:OtRclgMhQYQa+zkn01YfsvUTbn6EJ2wjQm4boLd1ARo=
 github.com/couchbase/tools-common/errors v1.0.0 h1:lEPRdPrk7iHOiZIJspEH7OnywxRR+SKlrG78KkOWnXA=

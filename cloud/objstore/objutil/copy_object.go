@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 )
 
@@ -43,7 +43,7 @@ type CopyObjectOptions struct {
 // cloud provider limits will be hit.
 //
 // NOTE: Client must have permissions to both the source/destination buckets.
-func CopyObject(opts CopyObjectOptions) error {
+func CopyObject(opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 	// Fill out any missing fields with the sane defaults
 	opts.defaults()
 
@@ -52,7 +52,7 @@ func CopyObject(opts CopyObjectOptions) error {
 		Key:    opts.SourceKey,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get object attributes: %w", err)
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
 	var (
@@ -77,7 +77,7 @@ func CopyObject(opts CopyObjectOptions) error {
 		Key:    opts.DestinationKey,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
 	aopts := objcli.AbortMultipartUploadOptions{
@@ -116,20 +116,20 @@ func CopyObject(opts CopyObjectOptions) error {
 	// Break the object down into chunks, and perform copy operations for each
 	err = chunk(size, opts.PartSize, cp)
 	if err != nil {
-		return fmt.Errorf("failed to copy parts: %w", err)
+		return nil, fmt.Errorf("failed to copy parts: %w", err)
 	}
 
-	err = opts.Client.CompleteMultipartUpload(opts.Context, objcli.CompleteMultipartUploadOptions{
+	attrs, err = opts.Client.CompleteMultipartUpload(opts.Context, objcli.CompleteMultipartUploadOptions{
 		Bucket:   opts.DestinationBucket,
 		UploadID: id,
 		Key:      opts.DestinationKey,
 		Parts:    parts,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	return nil
+	return attrs, nil
 }
 
 // maxSingleOperationCopySize returns an integer representing the point at which copying must be broken down into a

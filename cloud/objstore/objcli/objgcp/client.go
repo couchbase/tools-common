@@ -17,9 +17,9 @@ import (
 	"golang.org/x/exp/slices"
 	"google.golang.org/api/iterator"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -29,7 +29,7 @@ import (
 type composeOptions struct {
 	bucket       string
 	key          string
-	parts        []string
+	parts        []partIdentifier
 	precondition objcli.OperationPrecondition
 	lock         *objcli.ObjectLock
 }
@@ -157,33 +157,15 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		object = object.Generation(int64(gen))
 	}
 
-	remote, err := object.Attrs(ctx)
+	attrs, err := object.Attrs(ctx)
 	if err != nil {
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
-	attrs := &objval.ObjectAttrs{
-		Key:          opts.Key,
-		ETag:         ptr.To(remote.Etag),
-		Size:         ptr.To(remote.Size),
-		LastModified: &remote.Updated,
-	}
-
-	if remote.Retention != nil {
-		attrs.LockExpiration = &remote.Retention.RetainUntil
-		attrs.LockType = getLockType(remote.Retention.Mode)
-	}
-
-	if remote.Generation != 0 {
-		v := strconv.FormatInt(remote.Generation, 10)
-		attrs.VersionID = v
-		attrs.CAS = v
-	}
-
-	return attrs, nil
+	return parseGCPAttrs(opts.Key, attrs), nil
 }
 
-func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
+func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*objval.ObjectAttrs, error) {
 	ctx, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
 
@@ -202,7 +184,7 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 	case objcli.OperationPreconditionIfMatch:
 		gen, err := strconv.ParseInt(opts.PreconditionData, 10, 64)
 		if err != nil {
-			return fmt.Errorf("could not parse If-Match value as int64: %w", err)
+			return nil, fmt.Errorf("could not parse If-Match value as int64: %w", err)
 		}
 
 		object = object.If(storage.Conditions{GenerationMatch: gen})
@@ -213,13 +195,13 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 	if opts.Lock != nil {
 		err := writer.SetLock(opts.Lock)
 		if err != nil {
-			return fmt.Errorf("failed to set object lock: %w", err)
+			return nil, fmt.Errorf("failed to set object lock: %w", err)
 		}
 	}
 
 	_, err := objcli.CopyReadSeeker(io.MultiWriter(md5sum, crc32c), opts.Body)
 	if err != nil {
-		return fmt.Errorf("failed to calculate checksums: %w", err)
+		return nil, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
 	writer.SendMD5(md5sum.Sum(nil))
@@ -227,13 +209,20 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 
 	_, err = io.Copy(writer, opts.Body)
 	if err != nil {
-		return handleError(opts.Bucket, opts.Key, err)
+		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
-	return handleError(opts.Bucket, opts.Key, writer.Close())
+	err = writer.Close()
+	if err != nil {
+		return nil, handleError(opts.Bucket, opts.Key, err)
+	}
+
+	attrs := writer.Attrs()
+
+	return parseGCPAttrs(opts.Key, attrs), nil
 }
 
-func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
+func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) (*objval.ObjectAttrs, error) {
 	var (
 		srcHandle = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
 		dstHandle = c.serviceAPI.Bucket(opts.DestinationBucket).Object(opts.DestinationKey)
@@ -241,12 +230,15 @@ func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) 
 
 	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 	// destination object, always retry.
-	_, err := dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
+	attrs, err := dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
+	if err != nil {
+		return nil, handleError("", "", err)
+	}
 
-	return handleError("", "", err)
+	return parseGCPAttrs(opts.DestinationKey, attrs), nil
 }
 
-func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) error {
+func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) (*objval.ObjectAttrs, error) {
 	attrs, err := c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions{
 		Bucket: opts.Bucket,
 		Key:    opts.Key,
@@ -260,11 +252,16 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 			Body:   opts.Body,
 		}
 
-		return c.PutObject(ctx, putOpts)
+		attrs, err := c.PutObject(ctx, putOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to put object: %w", err)
+		}
+
+		return attrs, nil
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to get object attributes: %w", err)
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
 	id, err := c.CreateMultipartUpload(ctx, objcli.CreateMultipartUploadOptions{
@@ -272,7 +269,7 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 		Key:    opts.Key,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
 	intermediate, err := c.UploadPart(ctx, objcli.UploadPartOptions{
@@ -283,26 +280,31 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 		Body:     opts.Body,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload part: %w", err)
+		return nil, fmt.Errorf("failed to upload part: %w", err)
+	}
+
+	partID, err := getPartID(opts.Key, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get partID: %w", err)
 	}
 
 	part := objval.Part{
-		ID:     opts.Key,
+		ID:     partID,
 		Number: 1,
 		Size:   ptr.From(attrs.Size),
 	}
 
-	err = c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
+	outputAttrs, err := c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
 		Bucket:   opts.Bucket,
 		UploadID: id,
 		Key:      opts.Key,
 		Parts:    []objval.Part{part, intermediate},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	return nil
+	return outputAttrs, nil
 }
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
@@ -547,8 +549,13 @@ func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([
 	)
 
 	fn := func(attrs *objval.ObjectAttrs) error {
+		partID, err := getPartID(attrs.Key, "")
+		if err != nil {
+			return fmt.Errorf("failed to get partID: %w", err)
+		}
+
 		parts = append(parts, objval.Part{
-			ID:   attrs.Key,
+			ID:   partID,
 			Size: ptr.From(attrs.Size),
 		})
 
@@ -576,7 +583,7 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 
 	intermediate := partKey(opts.UploadID, opts.Key)
 
-	err = c.PutObject(ctx, objcli.PutObjectOptions{
+	attrs, err := c.PutObject(ctx, objcli.PutObjectOptions{
 		Bucket:       opts.Bucket,
 		Key:          intermediate,
 		Body:         opts.Body,
@@ -587,7 +594,12 @@ func (c *Client) UploadPart(ctx context.Context, opts objcli.UploadPartOptions) 
 		return objval.Part{}, err // Purposefully not wrapped
 	}
 
-	return objval.Part{ID: intermediate, Number: opts.Number, Size: size}, nil
+	partID, err := getPartID(intermediate, attrs.VersionID)
+	if err != nil {
+		return objval.Part{}, fmt.Errorf("failed to get partID: %w", err)
+	}
+
+	return objval.Part{ID: partID, Number: opts.Number, Size: size}, nil
 }
 
 // NOTE: Google storage does not support byte range copying, therefore, only the entire object may be copied; this may
@@ -618,19 +630,28 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 
 	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 	// destination object, always retry.
-	_, err = dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
+	copyAttrs, err := dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
 	if err != nil {
 		return objval.Part{}, handleError(opts.DestinationBucket, intermediate, err)
 	}
 
-	return objval.Part{ID: intermediate, Number: opts.Number, Size: ptr.From(attrs.Size)}, nil
+	versionID := strconv.FormatInt(copyAttrs.Generation, 10)
+
+	partID, err := getPartID(intermediate, versionID)
+	if err != nil {
+		return objval.Part{}, fmt.Errorf("failed to get partID: %w", err)
+	}
+
+	return objval.Part{ID: partID, Number: opts.Number, Size: ptr.From(attrs.Size)}, nil
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
-	converted := make([]string, 0, len(opts.Parts))
+func (c *Client) CompleteMultipartUpload(
+	ctx context.Context, opts objcli.CompleteMultipartUploadOptions,
+) (*objval.ObjectAttrs, error) {
+	converted := make([]partIdentifier, 0, len(opts.Parts))
 
 	for _, part := range opts.Parts {
-		converted = append(converted, part.ID)
+		converted = append(converted, parsePartID(part.ID))
 	}
 
 	completeOpts := &composeOptions{
@@ -641,19 +662,34 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 		lock:         opts.Lock,
 	}
 
-	err := c.complete(ctx, completeOpts)
+	attrs, err := c.complete(ctx, completeOpts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Object composition may use the source object in the output, ensure that we don't delete it by mistake
-	if idx := slices.Index(converted, opts.Key); idx >= 0 {
-		converted = slices.Delete(converted, idx, idx+1)
+	sourceIndex := -1
+
+	for i, partID := range converted {
+		if partID.Key == opts.Key {
+			sourceIndex = i
+		}
 	}
 
-	c.cleanup(ctx, opts.Bucket, converted...)
+	if sourceIndex >= 0 {
+		converted = slices.Delete(converted, sourceIndex, sourceIndex+1)
+	}
 
-	return nil
+	// Cleanup parts after we are done
+	keys := make([]string, 0, len(converted))
+
+	for _, partID := range converted {
+		keys = append(keys, partID.Key)
+	}
+
+	c.cleanup(ctx, opts.Bucket, keys...)
+
+	return attrs, nil
 }
 
 func (c *Client) Close() error {
@@ -661,32 +697,35 @@ func (c *Client) Close() error {
 }
 
 // complete recursively composes the object in chunks of 32 eventually resulting in a single complete object.
-func (c *Client) complete(ctx context.Context, opts *composeOptions) error {
+func (c *Client) complete(ctx context.Context, opts *composeOptions) (*objval.ObjectAttrs, error) {
 	if len(opts.parts) <= MaxComposable {
 		return c.compose(ctx, opts)
 	}
 
-	intermediate := partKey(uuid.NewString(), opts.key)
+	intermediateKey := partKey(uuid.NewString(), opts.key)
 
-	defer c.cleanup(ctx, opts.bucket, intermediate)
+	defer c.cleanup(ctx, opts.bucket, intermediateKey)
 
 	intermediateOpts := &composeOptions{
 		bucket:       opts.bucket,
-		key:          intermediate,
+		key:          intermediateKey,
 		parts:        opts.parts[:MaxComposable],
 		precondition: opts.precondition,
 		lock:         opts.lock,
 	}
 
-	err := c.compose(ctx, intermediateOpts)
+	intermediateAttrs, err := c.compose(ctx, intermediateOpts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	finalOpts := &composeOptions{
-		bucket:       opts.bucket,
-		key:          opts.key,
-		parts:        append([]string{intermediate}, opts.parts[MaxComposable:]...),
+		bucket: opts.bucket,
+		key:    opts.key,
+		parts: append(
+			[]partIdentifier{{Key: intermediateAttrs.Key, VersionID: intermediateAttrs.VersionID}},
+			opts.parts[MaxComposable:]...,
+		),
 		precondition: opts.precondition,
 		lock:         opts.lock,
 	}
@@ -695,11 +734,28 @@ func (c *Client) complete(ctx context.Context, opts *composeOptions) error {
 }
 
 // compose the given parts into a single object.
-func (c *Client) compose(ctx context.Context, opts *composeOptions) error {
+func (c *Client) compose(ctx context.Context, opts *composeOptions) (*objval.ObjectAttrs, error) {
 	handles := make([]objectAPI, 0, len(opts.parts))
 
 	for _, part := range opts.parts {
-		handles = append(handles, c.serviceAPI.Bucket(opts.bucket).Object(part))
+		handle := c.serviceAPI.Bucket(opts.bucket).Object(part.Key)
+
+		if part.VersionID != "" {
+			gen, err := strconv.ParseUint(part.VersionID, 10, 64)
+			if err != nil {
+				return nil, handleError(
+					opts.bucket,
+					opts.key,
+					fmt.Errorf("failed to parse VersionID into GCP generation: %w", err),
+				)
+			}
+
+			if gen != 0 {
+				handle = handle.Generation(int64(gen))
+			}
+		}
+
+		handles = append(handles, handle)
 	}
 
 	// Object composition is non-destructive from the source perspective and we don't mind potentially "overwriting"
@@ -717,13 +773,16 @@ func (c *Client) compose(ctx context.Context, opts *composeOptions) error {
 	if opts.lock != nil {
 		err := composer.SetLock(opts.lock)
 		if err != nil {
-			return fmt.Errorf("failed to set object lock: %w", err)
+			return nil, fmt.Errorf("failed to set object lock: %w", err)
 		}
 	}
 
-	_, err := composer.Run(ctx)
+	attrs, err := composer.Run(ctx)
+	if err != nil {
+		return nil, handleError(opts.bucket, opts.key, err)
+	}
 
-	return handleError(opts.bucket, opts.key, err)
+	return parseGCPAttrs(opts.key, attrs), nil
 }
 
 // cleanup attempts to remove the given keys, logging them if we receive an error.
@@ -812,4 +871,27 @@ func getLockType(gcpLockMode string) objval.LockType {
 	default:
 		return objval.LockTypeUndefined
 	}
+}
+
+// parseGCPAttrs converts GCP's ObjectAttrs to objval.ObjectAttrs
+func parseGCPAttrs(key string, gcpAttrs *storage.ObjectAttrs) *objval.ObjectAttrs {
+	attrs := &objval.ObjectAttrs{
+		Key:          key,
+		ETag:         ptr.To(gcpAttrs.Etag),
+		Size:         ptr.To(gcpAttrs.Size),
+		LastModified: &gcpAttrs.Updated,
+	}
+
+	if gcpAttrs.Retention != nil {
+		attrs.LockExpiration = &gcpAttrs.Retention.RetainUntil
+		attrs.LockType = getLockType(gcpAttrs.Retention.Mode)
+	}
+
+	if gcpAttrs.Generation != 0 {
+		v := strconv.FormatInt(gcpAttrs.Generation, 10)
+		attrs.VersionID = v
+		attrs.CAS = v
+	}
+
+	return attrs
 }

@@ -9,9 +9,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	fsutil "github.com/couchbase/tools-common/fs/util"
 
 	"github.com/stretchr/testify/require"
@@ -68,19 +69,29 @@ func TestDownload(t *testing.T) {
 				client  = objcli.NewTestClient(t, objval.ProviderAWS)
 			)
 
-			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+			attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 				Bucket: "bucket",
 				Key:    "key",
 				Body:   bytes.NewReader(test.data1),
 			})
 			require.NoError(t, err)
 
-			err = client.PutObject(context.Background(), objcli.PutObjectOptions{
+			require.Equal(t, "key", attrs.Key)
+			require.Equal(t, int64(len(test.data1)), *attrs.Size)
+			require.NotEmpty(t, attrs.ETag)
+			require.True(t, time.Now().After(*attrs.LastModified))
+
+			attrs, err = client.PutObject(context.Background(), objcli.PutObjectOptions{
 				Bucket: "bucket",
 				Key:    "key",
 				Body:   bytes.NewReader(test.data2),
 			})
 			require.NoError(t, err)
+
+			require.Equal(t, "key", attrs.Key)
+			require.Equal(t, int64(len(test.data2)), *attrs.Size)
+			require.NotEmpty(t, attrs.ETag)
+			require.True(t, time.Now().After(*attrs.LastModified))
 
 			file, err := fsutil.Create(filepath.Join(testDir, "test.file2"))
 			require.NoError(t, err)
@@ -135,12 +146,17 @@ func TestDownloadTrackExpectedWrites(t *testing.T) {
 		writer = &tracker{}
 	)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader(strings.Repeat("a", MinPartSize*2+42)),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(MinPartSize*2+42), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	options := DownloadOptions{
 		Client: client,
@@ -169,12 +185,17 @@ func TestDownloadWithByteRange(t *testing.T) {
 		client  = objcli.NewTestClient(t, objval.ProviderAWS)
 	)
 
-	err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("value"),
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.Equal(t, int64(5), *attrs.Size)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 
 	file, err := fsutil.Create(filepath.Join(testDir, "test.file"))
 	require.NoError(t, err)

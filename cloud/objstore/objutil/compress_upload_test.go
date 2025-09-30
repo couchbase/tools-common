@@ -12,14 +12,15 @@ import (
 	"math"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli/objaws"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli/objaws"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/functional/slices"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/v2/ptr"
@@ -61,12 +62,17 @@ func setupTestClient(t *testing.T) *objcli.TestClient {
 		require.NoError(t, err)
 		require.Equal(t, len(buf), n)
 
-		err = cli.PutObject(context.Background(), objcli.PutObjectOptions{
+		attrs, err := cli.PutObject(context.Background(), objcli.PutObjectOptions{
 			Bucket: "bucket",
 			Key:    path.path,
 			Body:   bytes.NewReader(buf[0:path.size]),
 		})
 		require.NoError(t, err)
+
+		require.Equal(t, path.path, attrs.Key)
+		require.Equal(t, path.size, *attrs.Size)
+		require.NotEmpty(t, attrs.ETag)
+		require.True(t, time.Now().After(*attrs.LastModified))
 	}
 
 	return cli

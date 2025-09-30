@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
 
 	"cloud.google.com/go/storage"
 	"github.com/stretchr/testify/assert"
@@ -52,4 +52,39 @@ func TestPartKey(t *testing.T) {
 
 func TestPartPrefix(t *testing.T) {
 	require.Equal(t, "/path/to/key-mpu-id", partPrefix("id", "/path/to/key"))
+}
+
+func TestParsePartID(t *testing.T) {
+	type test struct {
+		name           string
+		partIDString   string
+		expectedPartID partIdentifier
+	}
+
+	tests := []test{
+		{
+			name: "Empty",
+		},
+		{
+			name:         "OnlyKey",
+			partIDString: "key",
+			expectedPartID: partIdentifier{
+				Key: "key",
+			},
+		},
+		{
+			name:         "KeyAndVersionID",
+			partIDString: "{\"key\":\"asd\", \"versionID\":\"123\"}",
+			expectedPartID: partIdentifier{
+				Key:       "asd",
+				VersionID: "123",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expectedPartID, parsePartID(test.partIDString))
+		})
+	}
 }

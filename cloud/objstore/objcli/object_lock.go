@@ -3,7 +3,7 @@ package objcli
 import (
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 )
 
 // ObjectLock represents an object lock.

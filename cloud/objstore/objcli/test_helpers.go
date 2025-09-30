@@ -8,14 +8,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 )
 
 // TestUploadRAW uploads the given raw data.
 func TestUploadRAW(t *testing.T, client Client, key string, body []byte) {
-	err := client.PutObject(context.Background(), PutObjectOptions{
+	_, err := client.PutObject(context.Background(), PutObjectOptions{
 		Bucket: "bucket",
 		Key:    key,
 		Body:   bytes.NewReader(body),
@@ -25,7 +25,7 @@ func TestUploadRAW(t *testing.T, client Client, key string, body []byte) {
 
 // TestUploadJSON uploads the given data as JSON.
 func TestUploadJSON(t *testing.T, client Client, key string, body any) {
-	err := client.PutObject(context.Background(), PutObjectOptions{
+	_, err := client.PutObject(context.Background(), PutObjectOptions{
 		Bucket: "bucket",
 		Key:    key,
 		Body:   bytes.NewReader(testutil.MarshalJSON(t, body)),

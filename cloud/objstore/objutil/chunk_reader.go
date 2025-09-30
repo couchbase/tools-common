@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
 	ioiface "github.com/couchbase/tools-common/types/v2/iface"
 )
 

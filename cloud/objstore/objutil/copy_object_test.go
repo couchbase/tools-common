@@ -5,11 +5,12 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	testutil "github.com/couchbase/tools-common/testing/util"
 )
 
@@ -37,12 +38,17 @@ func TestCopyObject(t *testing.T) {
 				body   = []byte("Hello, World!")
 			)
 
-			err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+			attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
 				Bucket: "srcBucket",
 				Key:    "srcKey",
 				Body:   bytes.NewReader(body),
 			})
 			require.NoError(t, err)
+
+			require.Equal(t, "srcKey", attrs.Key)
+			require.Equal(t, int64(len(body)), *attrs.Size)
+			require.NotEmpty(t, attrs.ETag)
+			require.True(t, time.Now().After(*attrs.LastModified))
 
 			options := CopyObjectOptions{
 				Client:            client,
@@ -52,8 +58,13 @@ func TestCopyObject(t *testing.T) {
 				SourceKey:         "srcKey",
 			}
 
-			err = CopyObject(options)
+			attrs, err = CopyObject(options)
 			require.NoError(t, err)
+
+			require.Equal(t, "dstKey", attrs.Key)
+			require.Equal(t, int64(len(body)), *attrs.Size)
+			require.NotEmpty(t, attrs.ETag)
+			require.True(t, time.Now().After(*attrs.LastModified))
 
 			dst, err := client.GetObject(context.Background(), objcli.GetObjectOptions{
 				Bucket: "dstBucket",

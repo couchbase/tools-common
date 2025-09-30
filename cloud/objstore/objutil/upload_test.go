@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +29,14 @@ func TestUploadObjectLessThanThreshold(t *testing.T) {
 		Body:   strings.NewReader("body"),
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
@@ -50,7 +57,14 @@ func TestUploadObjectLessThanThresholdLock(t *testing.T) {
 		Lock:   objcli.NewComplianceLock(now.AddDate(0, 0, 5)),
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
@@ -77,14 +91,27 @@ func TestUploadObjectLessThanThresholdTwoTimes(t *testing.T) {
 		Body:   strings.NewReader("body"),
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
 
-	require.NoError(t, Upload(options))
+	attrs, err = Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestUploadObjectLessThanThresholdIfAbsent(t *testing.T) {
@@ -98,14 +125,22 @@ func TestUploadObjectLessThanThresholdIfAbsent(t *testing.T) {
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
 
-	require.Error(t, Upload(options))
+	_, err = Upload(options)
+	require.Error(t, err)
 }
 
 func TestUploadObjectGreaterThanThreshold(t *testing.T) {
@@ -118,7 +153,13 @@ func TestUploadObjectGreaterThanThreshold(t *testing.T) {
 		Body:   bytes.NewReader(make([]byte, MPUThreshold+1)),
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
@@ -139,7 +180,14 @@ func TestUploadObjectGreaterThanThresholdLock(t *testing.T) {
 		Lock:   objcli.NewComplianceLock(now.AddDate(0, 0, 3)),
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 10)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
@@ -170,13 +218,26 @@ func TestUploadObjectGreaterThanThresholdTwoTimes(t *testing.T) {
 		Body:   bytes.NewReader(make([]byte, MPUThreshold+1)),
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, make([]byte, MPUThreshold+1), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 
-	require.NoError(t, Upload(options))
+	attrs, err = Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
 }
 
 func TestUploadObjectGreaterThanThresholdIfAbsent(t *testing.T) {
@@ -190,11 +251,19 @@ func TestUploadObjectGreaterThanThresholdIfAbsent(t *testing.T) {
 		Precondition: objcli.OperationPreconditionOnlyIfAbsent,
 	}
 
-	require.NoError(t, Upload(options))
+	attrs, err := Upload(options)
+	require.NoError(t, err)
+
+	require.Equal(t, "key", attrs.Key)
+
+	require.NotEmpty(t, attrs.ETag)
+	require.True(t, time.Now().After(*attrs.LastModified))
+
 	require.Len(t, client.Buckets, 1)
 	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, make([]byte, MPUThreshold+1), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 
-	require.Error(t, Upload(options))
+	_, err = Upload(options)
+	require.Error(t, err)
 }

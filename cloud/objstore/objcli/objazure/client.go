@@ -14,9 +14,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/google/uuid"
 
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v7/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -119,6 +119,7 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 
 	attrs := objval.ObjectAttrs{
 		Key:            opts.Key,
+		ETag:           (*string)(resp.ETag),
 		Size:           resp.ContentLength,
 		LastModified:   resp.LastModified,
 		LockExpiration: resp.ImmutabilityPolicyExpiresOn,
@@ -186,14 +187,14 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 	return attrs, nil
 }
 
-func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) error {
+func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*objval.ObjectAttrs, error) {
 	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
 
 	md5sum := md5.New()
 
 	_, err := objcli.CopyReadSeeker(md5sum, opts.Body)
 	if err != nil {
-		return fmt.Errorf("failed to calculate checksums: %w", err)
+		return nil, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
 	inputOpts := &blockblob.UploadOptions{
@@ -221,33 +222,65 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) er
 			inputOpts.ImmutabilityPolicyMode = ptr.To(blob.ImmutabilityPolicySettingLocked)
 			inputOpts.ImmutabilityPolicyExpiryTime = ptr.To(opts.Lock.Expiration)
 		default:
-			return errors.New("unsupported lock type")
+			return nil, errors.New("unsupported lock type")
 		}
 	}
 
-	_, err = blobClient.Upload(
+	res, err := blobClient.Upload(
 		ctx,
 		manager.ReadSeekCloser(opts.Body),
 		inputOpts,
 	)
+	if err != nil {
+		return nil, handleError(opts.Bucket, opts.Key, err)
+	}
 
-	return handleError(opts.Bucket, opts.Key, err)
+	attrs := &objval.ObjectAttrs{
+		Key:          opts.Key,
+		LastModified: res.LastModified,
+	}
+
+	if res.ETag != nil {
+		attrs.ETag = ptr.To(string(*res.ETag))
+	}
+
+	if res.VersionID != nil {
+		attrs.VersionID = *res.VersionID
+	}
+
+	return attrs, nil
 }
 
-func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) error {
+func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) (*objval.ObjectAttrs, error) {
 	dstClient := c.serviceAPI.NewContainerClient(opts.DestinationBucket).NewBlobClient(opts.DestinationKey)
 
 	srcURL, err := c.getSASURL(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
-		return fmt.Errorf("failed to get the source object URL: %w", err)
+		return nil, fmt.Errorf("failed to get the source object URL: %w", err)
 	}
 
-	_, err = dstClient.CopyFromURL(ctx, srcURL, &blob.CopyFromURLOptions{})
+	res, err := dstClient.CopyFromURL(ctx, srcURL, &blob.CopyFromURLOptions{})
+	if err != nil {
+		return nil, handleError("", "", err)
+	}
 
-	return handleError("", "", err)
+	attrs := &objval.ObjectAttrs{
+		Key:          opts.DestinationKey,
+		LastModified: res.LastModified,
+	}
+
+	if res.ETag != nil {
+		attrs.ETag = ptr.To(string(*res.ETag))
+	}
+
+	if res.VersionID != nil {
+		attrs.VersionID = *res.VersionID
+	}
+
+	return attrs, nil
 }
 
-func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) error {
+func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) (*objval.ObjectAttrs, error) {
 	attrs, err := c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions{
 		Bucket: opts.Bucket,
 		Key:    opts.Key,
@@ -261,16 +294,16 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 			Body:   opts.Body,
 		}
 
-		err := c.PutObject(ctx, putOpts)
+		outputAttrs, err := c.PutObject(ctx, putOpts)
 		if err != nil {
-			return fmt.Errorf("failed to put object: %w", err)
+			return nil, fmt.Errorf("failed to put object: %w", err)
 		}
 
-		return nil
+		return outputAttrs, nil
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to get object attributes: %w", err)
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
 	id, err := c.CreateMultipartUpload(ctx, objcli.CreateMultipartUploadOptions{
@@ -278,7 +311,7 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 		Key:    opts.Key,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to start multipart upload: %w", err)
 	}
 
 	existing, err := c.UploadPartCopy(ctx, objcli.UploadPartCopyOptions{
@@ -290,7 +323,7 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 		Number:            objcli.NoPartNumber,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get existing object part: %w", err)
+		return nil, fmt.Errorf("failed to get existing object part: %w", err)
 	}
 
 	intermediate, err := c.UploadPart(ctx, objcli.UploadPartOptions{
@@ -301,20 +334,20 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 		Body:     opts.Body,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload part: %w", err)
+		return nil, fmt.Errorf("failed to upload part: %w", err)
 	}
 
-	err = c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
+	outputAttrs, err := c.CompleteMultipartUpload(ctx, objcli.CompleteMultipartUploadOptions{
 		Bucket:   opts.Bucket,
 		UploadID: id,
 		Key:      opts.Key,
 		Parts:    []objval.Part{existing, intermediate},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
+		return nil, fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	return nil
+	return outputAttrs, nil
 }
 
 func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOptions) error {
@@ -804,9 +837,11 @@ func (c *Client) getSASURL(bucket, src string) (string, error) {
 	return "", fmt.Errorf("failed to get SAS URL: %w", err)
 }
 
-func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.CompleteMultipartUploadOptions) error {
+func (c *Client) CompleteMultipartUpload(
+	ctx context.Context, opts objcli.CompleteMultipartUploadOptions,
+) (*objval.ObjectAttrs, error) {
 	if opts.UploadID != objcli.NoUploadID {
-		return objcli.ErrExpectedNoUploadID
+		return nil, objcli.ErrExpectedNoUploadID
 	}
 
 	blobClient := c.getBlobBlockClient(opts.Bucket, opts.Key)
@@ -833,17 +868,33 @@ func (c *Client) CompleteMultipartUpload(ctx context.Context, opts objcli.Comple
 			inputOpts.ImmutabilityPolicyMode = ptr.To(blob.ImmutabilityPolicySettingLocked)
 			inputOpts.ImmutabilityPolicyExpiryTime = ptr.To(opts.Lock.Expiration)
 		default:
-			return errors.New("unsupported lock type")
+			return nil, errors.New("unsupported lock type")
 		}
 	}
 
-	_, err := blobClient.CommitBlockList(
+	res, err := blobClient.CommitBlockList(
 		ctx,
 		converted,
 		inputOpts,
 	)
+	if err != nil {
+		return nil, handleError(opts.Bucket, opts.Key, err)
+	}
 
-	return handleError(opts.Bucket, opts.Key, err)
+	attrs := &objval.ObjectAttrs{
+		Key:          opts.Key,
+		LastModified: res.LastModified,
+	}
+
+	if res.ETag != nil {
+		attrs.ETag = ptr.To(string(*res.ETag))
+	}
+
+	if res.VersionID != nil {
+		attrs.VersionID = *res.VersionID
+	}
+
+	return attrs, nil
 }
 
 func (c *Client) AbortMultipartUpload(_ context.Context, opts objcli.AbortMultipartUploadOptions) error {
