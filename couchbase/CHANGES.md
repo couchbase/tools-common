@@ -1,5 +1,9 @@
 # Changes
 
+## v3.5.0
+
+- Add `rest/server` for implementing Couchbase service REST servers
+
 ## v3.4.0
 
 - Added a `cbcrypto` package for reading and writing cbcrypto files.
