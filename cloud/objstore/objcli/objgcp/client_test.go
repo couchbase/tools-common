@@ -1142,6 +1142,77 @@ func TestClientIterateObjectsVersions(t *testing.T) {
 	miAPI.AssertNumberOfCalls(t, "Next", 1)
 }
 
+func TestClientIterateObjectsVersionsDeleteMarkers(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	fn1 := func(query *storage.Query) bool {
+		return query.Prefix == "prefix" && query.Projection == storage.ProjectionNoACL
+	}
+
+	mbAPI.On("Objects", mock.Anything, mock.MatchedBy(fn1)).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "/path/to/key1",
+		Size:    64,
+		Created: (time.Time{}).Add(time.Hour),
+		Deleted: (time.Time{}).Add(24 * time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	call = miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:    "/path/to/key2",
+		Size:    64,
+		Created: (time.Time{}).Add(time.Hour),
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	var (
+		client        = &Client{serviceAPI: msAPI}
+		objects       int
+		deleteMarkers int
+	)
+
+	fn := func(attrs *objval.ObjectAttrs) error {
+		if attrs.IsDeleteMarker {
+			deleteMarkers++
+		} else {
+			objects++
+		}
+
+		return nil
+	}
+
+	err := client.IterateObjects(context.Background(), objcli.IterateObjectsOptions{
+		Bucket:    "bucket",
+		Prefix:    "prefix",
+		Delimiter: "delimiter",
+		Versions:  true,
+		Func:      fn,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, deleteMarkers)
+	require.Equal(t, 2, objects)
+
+	msAPI.AssertExpectations(t)
+	msAPI.AssertNumberOfCalls(t, "Bucket", 1)
+
+	mbAPI.AssertExpectations(t)
+	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
+
+	miAPI.AssertExpectations(t)
+	miAPI.AssertNumberOfCalls(t, "Next", 3)
+}
+
 func TestClientIterateObjectsDirectoryStub(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}

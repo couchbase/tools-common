@@ -1,7 +1,9 @@
 # Changes
 
 ## v7.3.3
+
 - Set versionID immediately after creating an object with TestClient
+- Add delete markers to GCP `IterateObjects`
 
 ## v7.3.2
 

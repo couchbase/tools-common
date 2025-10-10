@@ -520,6 +520,17 @@ func (c *Client) iterateObjects(
 		if err = fn(*attrs); err != nil {
 			return err
 		}
+
+		if versions && remote.Deleted.After(remote.Created) {
+			err = fn(objval.ObjectAttrs{
+				Key:            remote.Name,
+				LastModified:   &remote.Deleted,
+				IsDeleteMarker: true,
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
