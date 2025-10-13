@@ -1,5 +1,8 @@
 # Changes
 
+## v7.3.3
+- Set versionID immediately after creating an object with TestClient
+
 ## v7.3.2
 
 - Return precondition error from test client when a `PutObject` would fail due to the object already existing.

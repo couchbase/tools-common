@@ -31,7 +31,7 @@ func TestUploadObjectLessThanThreshold(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -52,7 +52,7 @@ func TestUploadObjectLessThanThresholdLock(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(
@@ -79,7 +79,7 @@ func TestUploadObjectLessThanThresholdTwoTimes(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -100,7 +100,7 @@ func TestUploadObjectLessThanThresholdIfAbsent(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -120,7 +120,7 @@ func TestUploadObjectGreaterThanThreshold(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, make([]byte, MPUThreshold+1), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -141,7 +141,7 @@ func TestUploadObjectGreaterThanThresholdLock(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 5)
+	require.Len(t, client.Buckets["bucket"], 10)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(
 		t,
@@ -172,7 +172,7 @@ func TestUploadObjectGreaterThanThresholdTwoTimes(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, make([]byte, MPUThreshold+1), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 
@@ -192,7 +192,7 @@ func TestUploadObjectGreaterThanThresholdIfAbsent(t *testing.T) {
 
 	require.NoError(t, Upload(options))
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, make([]byte, MPUThreshold+1), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 

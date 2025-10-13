@@ -156,6 +156,8 @@ func (t *TestClient) DeleteObjects(_ context.Context, opts DeleteObjectsOptions)
 			return errors.New("cannot delete locked object")
 		}
 
+		obj.IsCurrentVersion = false
+
 		delete(b, objval.TestObjectIdentifier{Key: key})
 	}
 
@@ -176,6 +178,10 @@ func (t *TestClient) DeleteObjectVersions(_ context.Context, opts DeleteObjectVe
 
 		if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
 			return errors.New("cannot delete locked object")
+		}
+
+		if obj.IsCurrentVersion {
+			delete(b, objval.TestObjectIdentifier{Key: obj.Key})
 		}
 
 		delete(b, objval.TestObjectIdentifier(objVersion))
@@ -208,6 +214,8 @@ func (t *TestClient) DeleteDirectory(_ context.Context, opts DeleteDirectoryOpti
 			return errors.New("cannot delete locked object")
 		}
 
+		obj.IsCurrentVersion = false
+
 		delete(b, objID)
 	}
 
@@ -236,7 +244,7 @@ func (t *TestClient) IterateObjects(_ context.Context, opts IterateObjectsOption
 	seen := make(map[objval.TestObjectIdentifier]struct{})
 
 	for objID, object := range cpy {
-		if !opts.Versions && objID.VersionID != "" {
+		if (!opts.Versions && objID.VersionID != "") || (opts.Versions && objID.VersionID == "") {
 			continue
 		}
 
@@ -392,7 +400,7 @@ func (t *TestClient) CompleteMultipartUpload(_ context.Context, opts CompleteMul
 		return err
 	}
 
-	_ = t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	_ = t.deleteVersionsLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
 
 	return nil
 }
@@ -401,7 +409,7 @@ func (t *TestClient) AbortMultipartUpload(_ context.Context, opts AbortMultipart
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	err := t.deleteKeysLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
+	err := t.deleteVersionsLocked(opts.Bucket, partPrefix(opts.UploadID, opts.Key), nil, nil)
 	if err != nil {
 		return err
 	}
@@ -478,17 +486,20 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 	bucket := opts.Bucket
 
 	var (
-		now  = t.TimeProvider.Now()
-		data = testutil.ReadAll(t.t, body)
-		etag = strings.ReplaceAll(uuid.NewString(), "-", "")
+		now       = t.TimeProvider.Now()
+		data      = testutil.ReadAll(t.t, body)
+		etag      = strings.ReplaceAll(uuid.NewString(), "-", "")
+		versionID = etag
 	)
 
 	attrs := objval.ObjectAttrs{
-		Key:          key,
-		ETag:         &etag,
-		CAS:          etag,
-		Size:         ptr.To(int64(len(data))),
-		LastModified: &now,
+		Key:              key,
+		ETag:             &etag,
+		CAS:              etag,
+		Size:             ptr.To(int64(len(data))),
+		LastModified:     &now,
+		VersionID:        versionID,
+		IsCurrentVersion: true,
 	}
 
 	_, ok := t.Buckets[bucket]
@@ -496,20 +507,18 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 		t.Buckets[bucket] = make(objval.TestBucket)
 	}
 
-	oldVersion, ok := t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}]
+	currentVersion, ok := t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}]
 	if ok {
 		switch opts.Precondition {
 		case OperationPreconditionOnlyIfAbsent:
 			return "", &objerr.PreconditionFailedError{Key: opts.Key}
 		case OperationPreconditionIfMatch:
-			if oldVersion.CAS != opts.PreconditionData {
+			if currentVersion.CAS != opts.PreconditionData {
 				return "", &objerr.PreconditionFailedError{Key: opts.Key}
 			}
 		}
 
-		versionID, _ := uuid.NewRandom()
-		oldVersion.VersionID = versionID.String()
-		t.Buckets[bucket][objval.TestObjectIdentifier{Key: key, VersionID: versionID.String()}] = oldVersion
+		currentVersion.IsCurrentVersion = false
 	}
 
 	obj := &objval.TestObject{
@@ -527,17 +536,18 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (string, error) {
 		}
 	}
 
+	t.Buckets[bucket][objval.TestObjectIdentifier{Key: key, VersionID: obj.VersionID}] = obj
 	t.Buckets[bucket][objval.TestObjectIdentifier{Key: key}] = obj
 
 	return attrs.Key, nil
 }
 
-func (t *TestClient) deleteKeysLocked(bucket, prefix string, include, exclude []*regexp.Regexp) error {
+func (t *TestClient) deleteVersionsLocked(bucket, prefix string, include, exclude []*regexp.Regexp) error {
 	b := t.getBucketLocked(bucket)
 
 	for objID := range b {
 		if strings.HasPrefix(objID.Key, prefix) && !ShouldIgnore(objID.Key, include, exclude) {
-			obj, err := t.getObjectRLocked(bucket, objID.Key)
+			obj, err := t.getObjectVersion(bucket, objID.Key, objID.VersionID)
 			if err != nil {
 				return err
 			}

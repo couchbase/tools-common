@@ -160,9 +160,9 @@ func TestMPDownloaderDownload(t *testing.T) {
 
 			firstVersionID := ""
 
-			for versionIdentifier := range client.Buckets["bucket"] {
-				if versionIdentifier.VersionID != "" {
-					firstVersionID = versionIdentifier.VersionID
+			for _, obj := range client.Buckets["bucket"] {
+				if !obj.IsCurrentVersion {
+					firstVersionID = obj.VersionID
 					break
 				}
 			}

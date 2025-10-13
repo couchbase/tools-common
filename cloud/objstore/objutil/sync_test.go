@@ -79,7 +79,7 @@ func TestUploadDirectory(t *testing.T) {
 			}))
 
 			require.Len(t, client.Buckets, 1)
-			require.Len(t, client.Buckets["bucket"], len(files))
+			require.Len(t, client.Buckets["bucket"], len(files)*2)
 
 			for _, file := range files {
 				key := filepath.Join("foo", test.subdir, file.path)

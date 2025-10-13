@@ -100,7 +100,7 @@ func TestMPUploaderUpload(t *testing.T) {
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -128,7 +128,7 @@ func TestMPUploaderUploadLock(t *testing.T) {
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 2)
+	require.Len(t, client.Buckets["bucket"], 4)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(
@@ -162,7 +162,7 @@ func TestMPUploaderUploadTwoTimes(t *testing.T) {
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -196,7 +196,7 @@ func TestMPUploaderUploadIfAbsent(t *testing.T) {
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 	require.Equal(t, objval.LockTypeUndefined, client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].LockType)
@@ -239,7 +239,7 @@ func TestMPUploaderUploadWithMetaAndOnPartComplete(t *testing.T) {
 
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("body"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 
@@ -335,17 +335,17 @@ func TestMPUploaderStop(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 
 	require.NoError(t, uploader.Upload(strings.NewReader("2")))
 	time.Sleep(50 * time.Millisecond)
 	require.Len(t, uploader.opts.Parts, 2)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 2)
+	require.Len(t, client.Buckets["bucket"], 4)
 
 	require.NoError(t, uploader.Stop())
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 2) // Should not be committed or aborted
+	require.Len(t, client.Buckets["bucket"], 4) // Should not be committed or aborted
 
 	require.ErrorIs(t, uploader.Stop(), ErrMPUploaderAlreadyStopped)
 }
@@ -368,7 +368,7 @@ func TestMPUploaderAbort(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 
 	require.NoError(t, uploader.Abort())
 	require.Len(t, client.Buckets, 1)
@@ -393,17 +393,17 @@ func TestMPUploaderCommit(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	require.Len(t, uploader.opts.Parts, 1)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 
 	require.NoError(t, uploader.Upload(strings.NewReader("2")))
 	time.Sleep(50 * time.Millisecond)
 	require.Len(t, uploader.opts.Parts, 2)
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 2)
+	require.Len(t, client.Buckets["bucket"], 4)
 
 	require.NoError(t, uploader.Commit())
 	require.Len(t, client.Buckets, 1)
-	require.Len(t, client.Buckets["bucket"], 1)
+	require.Len(t, client.Buckets["bucket"], 2)
 	require.Contains(t, client.Buckets["bucket"], objval.TestObjectIdentifier{Key: "key"})
 	require.Equal(t, []byte("12"), client.Buckets["bucket"][objval.TestObjectIdentifier{Key: "key"}].Body)
 }
