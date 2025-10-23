@@ -155,6 +155,11 @@ func (m *MPUploader) UploadID() string {
 	return m.opts.ID
 }
 
+// Key returns the key for the object being uploaded.
+func (m *MPUploader) Key() string {
+	return m.opts.Key
+}
+
 // Upload the given body as a part for the multipart upload.
 //
 // NOTE: This function is not thread safe.

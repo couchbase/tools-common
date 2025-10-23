@@ -19,6 +19,7 @@
 - The part format for multipart uploads on GCP has been changed. Previously the ID was key for the part object. Now,
   the ID is a JSON object containing both the Key and VersionID.
 - `Client.GetObject` now populates the ETag on Azure.
+- Add a getter for the object key in `MPUploader`.
 
 ## v7.3.3
 
