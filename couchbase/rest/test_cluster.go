@@ -264,8 +264,13 @@ func (t *TestCluster) createNode(n *TestNode) *Node {
 		node.Services.ManagementSSL = port
 	}
 
-	for _, service := range n.Services {
-		addService(node.Services, service, n.SSL, port)
+	if n.ServicePorts != nil {
+		node.Services = n.ServicePorts
+		node.Services.Management = port
+	} else {
+		for _, service := range n.Services {
+			addService(node.Services, service, n.SSL, port)
+		}
 	}
 
 	if n.AltAddress {

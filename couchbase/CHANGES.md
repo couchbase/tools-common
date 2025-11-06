@@ -3,6 +3,7 @@
 ## v3.5.1
 
 - Added continuous backup gRPC port to `rest.Services`
+- Allow specifying ports explicitly in `rest.TestNode`s
 
 ## v3.5.0
 
