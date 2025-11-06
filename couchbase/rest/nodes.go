@@ -130,6 +130,7 @@ type Services struct {
 	CBASSSL           uint16 `json:"cbasSSL"`
 	Backup            uint16 `json:"backupAPI"`
 	BackupSSL         uint16 `json:"backupAPIHTTPS"`
+	ContBackupGRPC    uint16 `json:"contBackupGRPC"`
 }
 
 // GetPort returns the port which a request should be sent to whilst honoring whether to use ssl.

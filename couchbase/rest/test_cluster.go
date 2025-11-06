@@ -312,6 +312,7 @@ func addService(services *Services, service Service, ssl bool, port uint16) {
 
 		services.KV = port
 		services.CAPI = port
+		services.ContBackupGRPC = port
 	case ServiceEventing:
 		if ssl {
 			services.EventingSSL = port

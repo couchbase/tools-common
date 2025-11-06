@@ -1,5 +1,9 @@
 # Changes
 
+## v3.5.1
+
+- Added continuous backup gRPC port to `rest.Services`
+
 ## v3.5.0
 
 - Add `rest/server` for implementing Couchbase service REST servers
