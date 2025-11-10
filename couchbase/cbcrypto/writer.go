@@ -36,12 +36,20 @@ func NewCBCWriter(w io.Writer, compression CompressionType, keyID string, key []
 	//   - Key ID Length (1 byte)
 	//   - Key ID        (36 bytes)
 	//   - Salt          (16 bytes)
+	// The key ID must be 36 bytes. If it's shorter, it will be padded with zeros until it is 36 bytes.
+	if len(keyID) > maxIDLength {
+		return nil, fmt.Errorf("key ID cannot be longer than %d bytes", maxIDLength)
+	}
+
 	header := make([]byte, headerSize)
 	copy(header, magicBytes)
 	header[versionOffset] = CurrentVersion
 	header[compressionOff] = byte(compression)
 	header[idLenOffset] = byte(len(keyID))
-	copy(header[idStartOffset:], keyID)
+
+	paddedKeyID := make([]byte, maxIDLength)
+	copy(paddedKeyID, keyID)
+	copy(header[idStartOffset:], paddedKeyID)
 
 	if _, err := io.ReadFull(rand.Reader, header[saltOffset:]); err != nil {
 		return nil, fmt.Errorf("failed to generate salt: %w", err)
@@ -54,14 +62,9 @@ func NewCBCWriter(w io.Writer, compression CompressionType, keyID string, key []
 	headerAD := make([]byte, headerSize+8)
 	copy(headerAD, header)
 
-	block, err := aes.NewCipher(key)
+	gcm, err := newGCM(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GCM: %w", err)
+		return nil, err
 	}
 
 	return &CBCWriter{
@@ -69,6 +72,49 @@ func NewCBCWriter(w io.Writer, compression CompressionType, keyID string, key []
 		header:   header,
 		headerAD: headerAD,
 		offset:   headerSize,
+		gcm:      gcm,
+	}, nil
+}
+
+// Open initializes a CBCWriter for an existing cbcrypto file, allowing new chunks to be appended.
+//
+// The provided 'rws' must be an io.ReadWriteSeeker containing an existing cbcrypto-formatted stream. Upon successful
+// return, the seeker will be positioned at the end of the stream, ready for appending.
+func Open(rws io.ReadWriteSeeker, key []byte) (*CBCWriter, error) {
+	// Ensure we're at the beginning of the file to read the header.
+	if _, err := rws.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("failed to seek to start: %w", err)
+	}
+
+	headerBytes := make([]byte, headerSize)
+	if _, err := io.ReadFull(rws, headerBytes); err != nil {
+		return nil, fmt.Errorf("failed to read header: %w", err)
+	}
+
+	_, err := parseHeader(headerBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse header: %w", err)
+	}
+
+	gcm, err := newGCM(key)
+	if err != nil {
+		return nil, err
+	}
+
+	headerAD := make([]byte, headerSize+8)
+	copy(headerAD, headerBytes)
+
+	// Seek to the end of the file to get its size and prepare for appending.
+	size, err := rws.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek to end: %w", err)
+	}
+
+	return &CBCWriter{
+		writer:   rws,
+		header:   headerBytes,
+		headerAD: headerAD,
+		offset:   size,
 		gcm:      gcm,
 	}, nil
 }
@@ -89,7 +135,7 @@ func (c *CBCWriter) AppendChunk(data io.Reader) error {
 	// Update headerAD with the new offset.
 	binary.BigEndian.PutUint64(c.headerAD[headerSize:], uint64(c.offset))
 
-	// Encrypt the chunk and write it to the file.
+	// Encrypt the chunk.
 	cipherTextWithTag := c.gcm.Seal(nil, nonce, compressedData.Bytes(), c.headerAD)
 
 	// cbcrypto chunk format: 4-byte chunk length | 12-byte nonce | ciphertext | 16-byte GCM tag
@@ -109,6 +155,24 @@ func (c *CBCWriter) AppendChunk(data io.Reader) error {
 	c.offset += 4 + int64(chunkLength)
 
 	return nil
+}
+
+func newGCM(key []byte) (cipher.AEAD, error) {
+	if len(key) != 32 {
+		return nil, fmt.Errorf("key must be 32 bytes")
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	return gcm, nil
 }
 
 // compressData is a helper function that compresses data based on the given compression type.

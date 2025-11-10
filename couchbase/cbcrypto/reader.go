@@ -24,6 +24,7 @@ const (
 	idStartOffset  = 28
 	saltOffset     = 64
 
+	maxIDLength = 36
 	minChunkLen = 12 + 16 // per cbcrypto spec: nonce (12 bytes) + GCM tag (16 bytes)
 )
 
@@ -95,7 +96,7 @@ func NewReader(r io.Reader, provider KeyProvider) (*Reader, error) {
 		return nil, fmt.Errorf("failed to read header: %w", err)
 	}
 
-	header, err := parseheader(headerData)
+	header, err := parseHeader(headerData)
 	if err != nil {
 		return nil, err
 	}
@@ -244,9 +245,12 @@ func Validate(r io.Reader) error {
 		return fmt.Errorf("failed to read header: %w", err)
 	}
 
-	_, err := parseheader(header)
+	_, err := parseHeader(header)
+	if err != nil {
+		return fmt.Errorf("failed to parse header: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // newChunkReader is a helper function that returns a streaming reader for a chunk based on the given compression type.
@@ -291,8 +295,8 @@ type Header struct {
 	KeyID       string
 }
 
-// parseheader parses the header of a cbcrypto file and returns a Header struct.
-func parseheader(headerData []byte) (*Header, error) {
+// parseHeader parses the header of a cbcrypto file and returns a Header struct.
+func parseHeader(headerData []byte) (*Header, error) {
 	if len(headerData) < headerSize {
 		return nil, fmt.Errorf("file is too small to be a valid cbcrypto file")
 	}
@@ -309,8 +313,8 @@ func parseheader(headerData []byte) (*Header, error) {
 	compression := headerData[compressionOff]
 
 	idLen := int(headerData[idLenOffset])
-	if idLen == 0 || idStartOffset+idLen > saltOffset {
-		return nil, fmt.Errorf("invalid key identifier length in cbcrypto file header")
+	if idStartOffset+idLen > saltOffset {
+		return nil, fmt.Errorf("key identifier length too large")
 	}
 
 	keyID := string(headerData[idStartOffset : idStartOffset+idLen])

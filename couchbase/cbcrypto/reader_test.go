@@ -13,13 +13,13 @@ import (
 
 var (
 	testKey   = []byte("0123456789abcdef0123456789abcdef") // 32 bytes for AES-256
-	testKeyID = "test-key"
+	testKeyID = "01234567-89ab-cdef-0123-456789abcdef"
 	testData  = []byte("The quick brown fox jumps over the lazy dog.")
 )
 
 func TestNewReader(t *testing.T) {
 	keyProvider := func(keyID string) ([]byte, error) {
-		if keyID == testKeyID {
+		if keyID == testKeyID || keyID == "" {
 			return testKey, nil
 		}
 
@@ -33,6 +33,7 @@ func TestNewReader(t *testing.T) {
 		"compressed-gzip",
 		"compressed-zstd",
 		"compressed-bzip2",
+		"zero-length-key-id",
 	}
 
 	for _, name := range testCases {
@@ -65,6 +66,11 @@ func TestNewReaderErrorCases(t *testing.T) {
 			name:          "invalid-header",
 			file:          "bad-magic",
 			expectedError: "does not contain the cbcrypto magic string",
+		},
+		{
+			name:          "key-id-too-long",
+			file:          "too-long-key-id",
+			expectedError: "key identifier length too large",
 		},
 		{
 			name: "key-provider-error",
@@ -158,6 +164,10 @@ func TestValidate(t *testing.T) {
 			path: filepath.Join("testdata", "uncompressed"),
 		},
 		{
+			name: "zero-length-key-id",
+			path: filepath.Join("testdata", "zero-length-key-id"),
+		},
+		{
 			name:          "file-too-small",
 			path:          filepath.Join("testdata", "file-too-small"),
 			expectedError: "failed to read header",
@@ -173,9 +183,9 @@ func TestValidate(t *testing.T) {
 			expectedError: "unsupported encrypted cbcrypto file version",
 		},
 		{
-			name:          "invalid-key-id-length",
-			path:          filepath.Join("testdata", "invalid-key-id-length"),
-			expectedError: "invalid key identifier length",
+			name:          "key-id-too-long",
+			path:          filepath.Join("testdata", "too-long-key-id"),
+			expectedError: "key identifier length too large",
 		},
 	}
 

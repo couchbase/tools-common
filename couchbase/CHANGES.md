@@ -1,5 +1,10 @@
 # Changes
 
+## v3.6.0
+
+- Added `Open` to the `cbcrypto` package to allow appending to existing cbcrypto files.
+- Added validation for key ID length in `cbcrypto`.
+
 ## v3.5.1
 
 - Added continuous backup gRPC port to `rest.Services`
