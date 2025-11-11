@@ -160,10 +160,6 @@ func (t *TestClient) DeleteObjects(_ context.Context, opts DeleteObjectsOptions)
 			continue
 		}
 
-		if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
-			return errors.New("cannot delete locked object")
-		}
-
 		obj.IsCurrentVersion = false
 
 		delete(b, objval.TestObjectIdentifier{Key: key})
@@ -218,7 +214,7 @@ func (t *TestClient) DeleteDirectory(_ context.Context, opts DeleteDirectoryOpti
 			return err
 		}
 
-		if obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
+		if opts.Versions && obj.LockExpiration != nil && obj.LockExpiration.After(t.TimeProvider.Now()) {
 			return errors.New("cannot delete locked object")
 		}
 
