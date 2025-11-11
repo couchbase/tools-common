@@ -1,5 +1,9 @@
 # Changes
 
+## v3.7.0
+
+- Add `audit` package with support for populating event data from a request
+
 ## v3.6.0
 
 - Added `Open` to the `cbcrypto` package to allow appending to existing cbcrypto files.
