@@ -1,5 +1,9 @@
 # Changes
 
+## v8.0.1
+
+- Add support for marking locked objects as deleted in TestClient.
+
 ## v8.0.0
 
 - BREAKING: Return `ObjectAttrs` after creating a new object. This affects the following functions: `Client.PutObject`,
