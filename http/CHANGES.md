@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.10
+
+- Add a `Close` function to drain and close response bodies
+
 ## v1.0.9
 
 - `ReplaceLocalhost` now wraps IPv6 addresses correctly
