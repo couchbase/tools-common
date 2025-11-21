@@ -6,7 +6,7 @@ toolchain go1.23.4
 
 require (
 	github.com/couchbase/goutils v0.2.0
-	github.com/couchbase/tools-common/auth/v2 v2.0.0
+	github.com/couchbase/tools-common/auth/v2 v2.1.0
 	github.com/couchbase/tools-common/environment v1.1.1
 	github.com/couchbase/tools-common/errors v1.0.0
 	github.com/couchbase/tools-common/http v1.0.7

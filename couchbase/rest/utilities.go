@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -79,6 +80,12 @@ func setAuthHeaders(host string, provider aprov.Provider, req *http.Request, log
 	credentials, err := getCredentials(provider, host, logger)
 	if err != nil {
 		return err
+	}
+
+	// Prefer auth token over username/password.
+	if credentials.AuthToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", credentials.AuthToken))
+		return nil
 	}
 
 	// Use the auth provider to populate the credentials

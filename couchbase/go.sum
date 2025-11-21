@@ -9,8 +9,8 @@ github.com/couchbase/gomemcached v0.3.3/go.mod h1:pISAjweI42vljCumsJIo7CVhqIMIIP
 github.com/couchbase/goutils v0.1.2/go.mod h1:h89Ek/tiOxxqjz30nPPlwZdQbdB8BwgnuBxeoUe/ViE=
 github.com/couchbase/goutils v0.2.0 h1:2hTV1VUunDcgd2ctYZ27Zv5ShACS0NAZ86viOFwp1gU=
 github.com/couchbase/goutils v0.2.0/go.mod h1:h89Ek/tiOxxqjz30nPPlwZdQbdB8BwgnuBxeoUe/ViE=
-github.com/couchbase/tools-common/auth/v2 v2.0.0 h1:d90qZEOGBag+4uF052t/HUaV/b7kWb4T/0OD11UB4uA=
-github.com/couchbase/tools-common/auth/v2 v2.0.0/go.mod h1:xMgH0GBF9h4k7Y/pGnoDA6qZ96E1Ni8gnsrMxyzUi2E=
+github.com/couchbase/tools-common/auth/v2 v2.1.0 h1:EuVoWmf3oxCMlTzknJTnpfRt8fJQTYoLLudtDUqNZAA=
+github.com/couchbase/tools-common/auth/v2 v2.1.0/go.mod h1:VVoRvfTZYqDd+WNiaON0BvAituh39yLV07Rpv78qQWs=
 github.com/couchbase/tools-common/environment v1.1.1 h1:ZPYB+o/H8zAjqn1X1QXewkrttGm+P6ollopHznPEd3M=
 github.com/couchbase/tools-common/environment v1.1.1/go.mod h1:OtRclgMhQYQa+zkn01YfsvUTbn6EJ2wjQm4boLd1ARo=
 github.com/couchbase/tools-common/errors v1.0.0 h1:lEPRdPrk7iHOiZIJspEH7OnywxRR+SKlrG78KkOWnXA=
