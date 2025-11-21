@@ -1,5 +1,9 @@
 # Changes
 
+## v2.1.0
+
+- Add support for auth tokens.
+
 ## v2.0.0
 
 - BREAKING: The `Provider` interface now allows returning an error.
