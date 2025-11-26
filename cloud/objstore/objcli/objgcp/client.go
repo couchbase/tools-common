@@ -807,6 +807,24 @@ func (c *Client) AbortMultipartUpload(ctx context.Context, opts objcli.AbortMult
 	return err
 }
 
+func (c *Client) GetBucketVersioningStatus(
+	ctx context.Context,
+	opts objcli.GetBucketLockingStatusOptions,
+) (*objval.BucketVersioningStatus, error) {
+	bucket := c.serviceAPI.Bucket(opts.Bucket)
+
+	attrs, err := bucket.Attrs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &objval.BucketVersioningStatus{
+		Enabled: attrs.VersioningEnabled,
+	}
+
+	return res, nil
+}
+
 func (c *Client) GetBucketLockingStatus(
 	ctx context.Context,
 	opts objcli.GetBucketLockingStatusOptions,

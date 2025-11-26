@@ -908,6 +908,19 @@ func (c *Client) AbortMultipartUpload(_ context.Context, opts objcli.AbortMultip
 	return nil
 }
 
+// GetBucketVersioningStatus always returns an UnimplementedOperationError.
+func (c *Client) GetBucketVersioningStatus(
+	_ context.Context,
+	_ objcli.GetBucketLockingStatusOptions,
+) (*objval.BucketVersioningStatus, error) {
+	// NOTE: This is possible to implement, but is not currently needed so it is not worth it just for consistency.
+	// On Azure versioning is enabled at the storage account level so we cannot do this through azblob. We would need
+	// to create (and authenticate) a separate client to access the storage account.
+	return nil, &objerr.UnimplementedOperationError{
+		Name: "GetBucketVersioningStatus",
+	}
+}
+
 func (c *Client) GetBucketLockingStatus(
 	ctx context.Context,
 	opts objcli.GetBucketLockingStatusOptions,

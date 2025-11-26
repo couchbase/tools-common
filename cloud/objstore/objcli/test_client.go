@@ -430,6 +430,12 @@ func (t *TestClient) GetBucketLockingStatus(
 	return &objval.BucketLockingStatus{Enabled: true}, nil
 }
 
+func (t *TestClient) GetBucketVersioningStatus(
+	_ context.Context, _ GetBucketLockingStatusOptions,
+) (*objval.BucketVersioningStatus, error) {
+	return &objval.BucketVersioningStatus{Enabled: true}, nil
+}
+
 func (t *TestClient) SetObjectLock(_ context.Context, opts SetObjectLockOptions) error {
 	b, ok := t.Buckets[opts.Bucket]
 	if !ok {

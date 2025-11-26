@@ -253,6 +253,36 @@ func (_m *MockClient) GetBucketLockingStatus(ctx context.Context, opts GetBucket
 	return r0, r1
 }
 
+// GetBucketVersioningStatus provides a mock function with given fields: ctx, opts
+func (_m *MockClient) GetBucketVersioningStatus(ctx context.Context, opts GetBucketLockingStatusOptions) (*objval.BucketVersioningStatus, error) {
+	ret := _m.Called(ctx, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBucketVersioningStatus")
+	}
+
+	var r0 *objval.BucketVersioningStatus
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, GetBucketLockingStatusOptions) (*objval.BucketVersioningStatus, error)); ok {
+		return rf(ctx, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, GetBucketLockingStatusOptions) *objval.BucketVersioningStatus); ok {
+		r0 = rf(ctx, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*objval.BucketVersioningStatus)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, GetBucketLockingStatusOptions) error); ok {
+		r1 = rf(ctx, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetObject provides a mock function with given fields: ctx, opts
 func (_m *MockClient) GetObject(ctx context.Context, opts GetObjectOptions) (*objval.Object, error) {
 	ret := _m.Called(ctx, opts)

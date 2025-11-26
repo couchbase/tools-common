@@ -392,6 +392,11 @@ type Client interface {
 	// AbortMultipartUpload aborts the multipart upload with the given id whilst cleaning up any abandoned parts.
 	AbortMultipartUpload(ctx context.Context, opts AbortMultipartUploadOptions) error
 
+	// GetBucketVersioningStatus checks whether object versioning is enabled in the provided bucket.
+	GetBucketVersioningStatus(
+		ctx context.Context, opts GetBucketLockingStatusOptions,
+	) (*objval.BucketVersioningStatus, error)
+
 	// GetBucketLockingStatus checks whether it is possible to lock an object in the provided bucket.
 	GetBucketLockingStatus(ctx context.Context, opts GetBucketLockingStatusOptions) (*objval.BucketLockingStatus, error)
 

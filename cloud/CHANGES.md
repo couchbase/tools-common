@@ -1,5 +1,10 @@
 # Changes
 
+## v8.1.0
+
+- Add a `GetBucketVersioningStatus` function to check whether object versioning is enabled for the specified bucket. We
+  currently support this only for S3 and GCP. For Azure we always return an `UnimplementedOperationError`.
+
 ## v8.0.1
 
 - Add support for marking locked objects as deleted in TestClient.
