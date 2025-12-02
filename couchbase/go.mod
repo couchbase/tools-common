@@ -15,7 +15,10 @@ require (
 	github.com/couchbase/tools-common/testing v1.0.2
 	github.com/couchbase/tools-common/types/v2 v2.0.1
 	github.com/couchbase/tools-common/utils/v3 v3.0.2
-	github.com/dsnet/compress v0.0.1
+	// Pinned to this version as earlier versions of this library triggered
+	// false positives in security checks, and there are no tagged commits
+	// which include the fix. See MB-69613 for more info.
+	github.com/dsnet/compress v0.0.2-0.20210315054119-f66993602bf5
 	github.com/foxcpp/go-mockdns v1.0.0
 	github.com/golang/snappy v1.0.0
 	github.com/google/uuid v1.6.0
