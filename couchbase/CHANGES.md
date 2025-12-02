@@ -1,5 +1,10 @@
 # Changes
 
+## v3.7.1
+
+- Use newer version of `dsnet/compress` so vulnerable version of xz doesn't
+show up in `go.sum` (code was never vulnerable though - see MB-69613).
+
 ## v3.7.0
 
 - Add `audit` package with support for populating event data from a request
