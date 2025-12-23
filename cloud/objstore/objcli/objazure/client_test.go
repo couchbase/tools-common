@@ -76,7 +76,7 @@ func immutabilityPolicyMatcher(mode blob.ImmutabilityPolicySetting, expiryTime t
 			}
 
 			modeMatch := immutabilityPolicyMode != nil && *immutabilityPolicyMode == mode
-			expiryMatch := immutabilityPolicyExpiryTime != nil && *immutabilityPolicyExpiryTime == expiryTime
+			expiryMatch := immutabilityPolicyExpiryTime != nil && immutabilityPolicyExpiryTime.Equal(expiryTime)
 
 			return modeMatch && expiryMatch
 		},

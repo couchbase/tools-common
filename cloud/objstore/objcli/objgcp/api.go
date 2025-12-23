@@ -195,12 +195,12 @@ func (w writer) Close() error {
 }
 
 func (w writer) SendMD5(md5 []byte) {
-	w.w.ObjectAttrs.MD5 = md5
+	w.w.MD5 = md5
 }
 
 func (w writer) SendCRC(crc uint32) {
 	w.w.SendCRC32C = true
-	w.w.ObjectAttrs.CRC32C = crc
+	w.w.CRC32C = crc
 }
 
 func (w writer) SetLock(lock *objcli.ObjectLock) error {

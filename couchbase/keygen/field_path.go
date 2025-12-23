@@ -81,11 +81,7 @@ func parseFPField(path string, idx int) (string, int, error) {
 		err   error
 	)
 
-	for {
-		if idx >= len(path) {
-			break
-		}
-
+	for idx < len(path) {
 		var char string
 
 		if open {

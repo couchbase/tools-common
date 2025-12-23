@@ -89,7 +89,7 @@ func CopyObjects(opts CopyObjectsOptions) ([]*objval.ObjectAttrs, error) {
 		}
 
 		options := CopyObjectOptions{
-			Options:           opts.Options.WithContext(ctx),
+			Options:           opts.WithContext(ctx),
 			Client:            opts.Client,
 			DestinationBucket: opts.DestinationBucket,
 			DestinationKey:    strings.Replace(attrs.Key, opts.SourcePrefix, opts.DestinationPrefix, 1),

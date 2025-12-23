@@ -57,11 +57,11 @@ func CopyObject(opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 
 	var (
 		size = ptr.From(attrs.Size)
-		max  = maxSingleOperationCopySize(opts.Client.Provider())
+		mx   = maxSingleOperationCopySize(opts.Client.Provider())
 	)
 
 	// If we're able to perform this operation with a single request, do that instead.
-	if size <= max {
+	if size <= mx {
 		copts := objcli.CopyObjectOptions{
 			DestinationBucket: opts.DestinationBucket,
 			DestinationKey:    opts.DestinationKey,

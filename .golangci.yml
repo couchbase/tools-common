@@ -1,18 +1,13 @@
-issues:
-  max-issues-per-linter: 0 # Unlimited
-  max-same-issues: 0 # Unlimited
+version: "2"
+run:
+  issues-exit-code: 1
+  tests: true
 linters:
-  fast: false
   enable:
     - asciicheck
     - bodyclose
     - dogsled
     - godox
-    - gofmt
-    - gofumpt
-    - goimports
-    - gosimple
-    - ineffassign
     - lll
     - misspell
     - nakedret
@@ -22,17 +17,45 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - staticcheck
     - unconvert
     - unparam
-    - unused
     - wastedassign
     - whitespace
     - wsl
-run:
-  go: 1.18
-linters-settings:
-  lll:
-    line-length: 120
-  unparam:
-    check-exported: true
+  settings:
+    lll:
+      line-length: 120
+    unparam:
+      check-exported: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+    rules:
+      # We have quite a few packages named 'util', and it's too late to change them.
+      - path: ".*/util/"
+        text: 'var-naming: avoid meaningless package names'
+      # De Morgan's Law; ignoring because the compiler should do this anyway, and prefer readability.
+      - linters: 'staticcheck'
+        text: 'QF1001'
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -160,11 +160,12 @@ func TestServerExhaustive(t *testing.T) {
 
 		testName = func(f ProtoFlag, m modes) string {
 			var s string
-			if f == ProtoFlagAll {
+			switch f {
+			case ProtoFlagAll:
 				s = "HTTP+S"
-			} else if f == ProtoFlagHTTP {
+			case ProtoFlagHTTP:
 				s = "HTTP"
-			} else {
+			default:
 				s = "HTTPS"
 			}
 

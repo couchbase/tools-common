@@ -23,7 +23,7 @@ func next(exp string, idx int) (rune, bool) {
 // unescape reverse escapes all the provided delimiters in the given expression.
 func unescape(exp string, del ...rune) string {
 	for _, d := range del {
-		exp = strings.Replace(exp, string(d)+string(d), string(d), -1)
+		exp = strings.ReplaceAll(exp, string(d)+string(d), string(d))
 	}
 
 	return exp

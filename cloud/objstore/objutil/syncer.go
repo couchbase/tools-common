@@ -113,7 +113,7 @@ func (s *Syncer) uploadFile(ctx context.Context, source, destination *CloudOrFil
 	}
 
 	opts := UploadOptions{
-		Options:      s.opts.Options.WithContext(ctx),
+		Options:      s.opts.WithContext(ctx),
 		Client:       s.opts.Client,
 		Bucket:       destination.Bucket,
 		Key:          destination.Path,
@@ -203,7 +203,7 @@ func (s *Syncer) downloadFile(ctx context.Context, source, destination *CloudOrF
 	}
 
 	opts := DownloadOptions{
-		Options: s.opts.Options.WithContext(ctx),
+		Options: s.opts.WithContext(ctx),
 		Client:  s.opts.Client,
 		Bucket:  source.Bucket,
 		Key:     source.Path,

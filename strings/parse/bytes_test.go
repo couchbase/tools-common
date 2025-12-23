@@ -106,7 +106,7 @@ func TestBytes(t *testing.T) {
 		{
 			name:     "FloatWithTrailing",
 			input:    "90.0000000005GiB",
-			expected: uint64(90.0000000005 * math.Pow(1024, 3)),
+			expected: uint64(90.0000000005 * math.Pow(1024, 3)), //nolint:staticcheck
 		},
 		{
 			name:     "WithSpace",

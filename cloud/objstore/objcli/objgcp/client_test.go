@@ -2422,7 +2422,7 @@ func TestClientSetObjectLock(t *testing.T) {
 			}
 
 			modeMatch := attrs.Retention.Mode == "Locked"
-			periodMatch := attrs.Retention.RetainUntil == expirationTime
+			periodMatch := attrs.Retention.RetainUntil.Equal(expirationTime)
 
 			return modeMatch && periodMatch
 		},

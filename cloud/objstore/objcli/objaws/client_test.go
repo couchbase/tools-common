@@ -534,7 +534,7 @@ func TestClientPutObjectLockPeriod(t *testing.T) {
 	api := &mockServiceAPI{}
 
 	now := time.Now()
-	expirationTIme := now.AddDate(0, 0, int(5))
+	expirationTime := now.AddDate(0, 0, int(5))
 
 	fn := func(input *s3.PutObjectInput) bool {
 		var (
@@ -542,7 +542,7 @@ func TestClientPutObjectLockPeriod(t *testing.T) {
 			bucket     = input.Bucket != nil && *input.Bucket == "bucket"
 			key        = input.Key != nil && *input.Key == "key"
 			lockMode   = input.ObjectLockMode == types.ObjectLockModeCompliance
-			lockPeriod = input.ObjectLockRetainUntilDate != nil && *input.ObjectLockRetainUntilDate == expirationTIme
+			lockPeriod = input.ObjectLockRetainUntilDate != nil && input.ObjectLockRetainUntilDate.Equal(expirationTime)
 		)
 
 		return body && bucket && key && lockMode && lockPeriod
@@ -559,7 +559,7 @@ func TestClientPutObjectLockPeriod(t *testing.T) {
 		Bucket: "bucket",
 		Key:    "key",
 		Body:   strings.NewReader("value"),
-		Lock:   objcli.NewComplianceLock(expirationTIme),
+		Lock:   objcli.NewComplianceLock(expirationTime),
 	})
 	require.NoError(t, err)
 
@@ -1789,7 +1789,7 @@ func TestClientCreateMultipartUploadLockPeriod(t *testing.T) {
 			bucket      = input.Bucket != nil && *input.Bucket == "bucket"
 			key         = input.Key != nil && *input.Key == "key"
 			lockMode    = input.ObjectLockMode == types.ObjectLockModeCompliance
-			retainUntil = input.ObjectLockRetainUntilDate != nil && *input.ObjectLockRetainUntilDate == expirationTime
+			retainUntil = input.ObjectLockRetainUntilDate != nil && input.ObjectLockRetainUntilDate.Equal(expirationTime)
 		)
 
 		return bucket && key && lockMode && retainUntil
@@ -2185,7 +2185,7 @@ func TestClientSetObjectLock(t *testing.T) {
 	api := &mockServiceAPI{}
 
 	now := time.Now()
-	expirationTIme := now.AddDate(0, 0, int(5))
+	expirationTime := now.AddDate(0, 0, int(5))
 
 	fn := func(input *s3.PutObjectRetentionInput) bool {
 		var (
@@ -2194,7 +2194,7 @@ func TestClientSetObjectLock(t *testing.T) {
 			versionID     = input.VersionId != nil && *input.VersionId == "version1"
 			retentionMode = input.Retention != nil && input.Retention.Mode == types.ObjectLockRetentionModeCompliance
 			retainUntil   = input.Retention != nil && input.Retention.RetainUntilDate != nil &&
-				*input.Retention.RetainUntilDate == expirationTIme
+				input.Retention.RetainUntilDate.Equal(expirationTime)
 		)
 
 		return bucket && key && versionID && retentionMode && retainUntil
@@ -2208,7 +2208,7 @@ func TestClientSetObjectLock(t *testing.T) {
 		Bucket:    "bucket",
 		Key:       "key",
 		VersionID: "version1",
-		Lock:      objcli.NewComplianceLock(expirationTIme),
+		Lock:      objcli.NewComplianceLock(expirationTime),
 	})
 	require.NoError(t, err)
 

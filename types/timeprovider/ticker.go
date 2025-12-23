@@ -74,7 +74,7 @@ func (f *FakeTicker) TickIfElapsed() {
 		now      = f.provider.Now()
 	)
 
-	if nextTick.Before(now) || nextTick == now {
+	if nextTick.Before(now) || nextTick.Equal(now) {
 		f.ForceTick()
 	}
 }
