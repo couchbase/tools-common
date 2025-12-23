@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.11
+
+- Upgraded dependencies
+
 ## v1.0.10
 
 - Add a `Close` function to drain and close response bodies
