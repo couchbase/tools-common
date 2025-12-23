@@ -1,12 +1,10 @@
 module github.com/couchbase/tools-common/functional
 
-go 1.22.0
-
-toolchain go1.23.4
+go 1.24.0
 
 require (
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
+	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
 )
 
 require (
