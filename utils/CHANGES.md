@@ -1,5 +1,9 @@
 # Changes
 
+## v3.1.1
+
+- Upgraded dependencies.
+
 ## v3.1.0
 
 - `Retryer` now allows more than 50 retries, after which a constant back-off is

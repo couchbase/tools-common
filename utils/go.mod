@@ -1,12 +1,12 @@
 module github.com/couchbase/tools-common/utils/v3
 
-go 1.21
+go 1.24.0
 
 require (
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
-	golang.org/x/sys v0.28.0
+	golang.org/x/sys v0.39.0
 )
 
 require (
