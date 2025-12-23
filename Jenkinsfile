@@ -8,7 +8,7 @@ pipeline {
     agent { label "linux&&master&&!aarch64" }
 
     environment {
-        GO_TARBALL_URL = "https://golang.org/dl/go1.23.4.linux-amd64.tar.gz"
+        GO_TARBALL_URL = "https://golang.org/dl/go1.24.11.linux-amd64.tar.gz"
 
         GOROOT = "${WORKSPACE}/go"
         GOBIN = "${GOROOT}/bin"
