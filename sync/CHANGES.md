@@ -1,5 +1,9 @@
 # Changes
 
+## v2.0.2
+
+- Upgraded dependencies
+
 ## v2.0.1
 
 - Upgraded dependencies
