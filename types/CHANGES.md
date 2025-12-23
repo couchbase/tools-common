@@ -1,5 +1,9 @@
 # Changes
 
+## v2.2.2
+
+- Upgraded dependencies
+
 ## v2.2.1
 
 - Regenerate `timeprovider` mocks.
