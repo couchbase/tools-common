@@ -1,5 +1,9 @@
 # Changes
 
+## v8.1.1
+
+- Upgraded dependencies
+
 ## v8.1.0
 
 - Add a `GetBucketVersioningStatus` function to check whether object versioning is enabled for the specified bucket. We
