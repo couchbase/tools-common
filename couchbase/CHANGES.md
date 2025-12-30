@@ -1,5 +1,9 @@
 # Changes
 
+## v3.8.1
+
+- Upgraded dependencies
+
 ## v3.8.0
 
 - Add support for bearer authentication
