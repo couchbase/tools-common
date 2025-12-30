@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.3
+
+- Upgraded dependencies
+
 ## v1.2.2
 
 - Upgraded tools-common/couchbase dependency
