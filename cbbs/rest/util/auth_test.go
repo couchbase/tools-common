@@ -24,6 +24,14 @@ func (c *creds) IsAllowed(_ string) (bool, error) {
 	return c.isAllowed, c.err
 }
 
+func (c *creds) IsAllowedInternal(_ string) (bool, error) {
+	return false, nil
+}
+
+func (c *creds) GetBuckets() ([]string, error) {
+	return nil, nil
+}
+
 var _ cbauth.Creds = &creds{}
 
 type authoriser struct {
