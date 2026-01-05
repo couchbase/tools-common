@@ -1,5 +1,9 @@
 # Changes
 
+## v8.1.2
+
+- Removed unused dependency
+
 ## v8.1.1
 
 - Upgraded dependencies

@@ -3,7 +3,6 @@ package objazure
 import (
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"os"
 	"testing"
 
@@ -11,25 +10,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
-	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type azureMockTokenRefreshError struct {
-	msg  string
-	resp *http.Response
-}
-
-func (a *azureMockTokenRefreshError) Error() string {
-	return a.msg
-}
-
-func (a *azureMockTokenRefreshError) Response() *http.Response {
-	return a.resp
-}
-
-var _ adal.TokenRefreshError = (*azureMockTokenRefreshError)(nil)
 
 func TestAzureGetStaticCredentials(t *testing.T) {
 	type test struct {
