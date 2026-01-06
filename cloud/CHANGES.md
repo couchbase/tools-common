@@ -1,5 +1,9 @@
 # Changes
 
+## v8.1.3
+
+- Downgraded `cloud.google.com/go/storage` (https://github.com/googleapis/google-api-go-client/commit/2c337321d374c3e9f02c09c75cb94b73eaf23fd2)
+
 ## v8.1.2
 
 - Removed unused dependency
