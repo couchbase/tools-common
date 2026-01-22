@@ -34,6 +34,8 @@ func TestNewReader(t *testing.T) {
 		"compressed-zstd",
 		"compressed-bzip2",
 		"zero-length-key-id",
+		"v1-kbkdf",
+		"v1-pbkdf",
 	}
 
 	for _, name := range testCases {

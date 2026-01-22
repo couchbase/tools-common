@@ -44,7 +44,7 @@ func NewCBCWriter(w io.Writer, compression CompressionType, keyID string, key []
 	header := make([]byte, headerSize)
 	copy(header, magicBytes)
 	header[versionOffset] = CurrentVersion
-	header[compressionOff] = byte(compression)
+	header[compressionOffset] = byte(compression)
 	header[idLenOffset] = byte(len(keyID))
 
 	paddedKeyID := make([]byte, maxIDLength)
@@ -123,7 +123,7 @@ func Open(rws io.ReadWriteSeeker, key []byte) (*CBCWriter, error) {
 func (c *CBCWriter) AppendChunk(data io.Reader) error {
 	// Compress the data.
 	var compressedData bytes.Buffer
-	if err := compressData(&compressedData, data, CompressionType(c.header[compressionOff])); err != nil {
+	if err := compressData(&compressedData, data, CompressionType(c.header[compressionOffset])); err != nil {
 		return fmt.Errorf("failed to compress data: %w", err)
 	}
 

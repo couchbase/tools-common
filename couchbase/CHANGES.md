@@ -1,5 +1,10 @@
 # Changes
 
+## v3.9.0
+
+- Added support for reading v1 cbcrypto encrypted files with key derivation
+(KBKDF and PBKDF2).
+
 ## v3.8.1
 
 - Upgraded dependencies

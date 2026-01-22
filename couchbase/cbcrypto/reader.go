@@ -6,26 +6,56 @@ import (
 	"compress/zlib"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/dsnet/compress/bzip2"
 	"github.com/golang/snappy"
+	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 const (
-	headerSize     = 80
-	versionOffset  = 21
-	compressionOff = 22
-	idLenOffset    = 27
-	idStartOffset  = 28
-	saltOffset     = 64
+	headerSize          = 80
+	versionOffset       = 21
+	compressionOffset   = 22
+	keyDerivationOffset = 23
+	idLenOffset         = 27
+	idStartOffset       = 28
+	saltOffset          = 64
+	saltSize            = 16
+	aes256KeySize       = 32
 
 	maxIDLength = 36
 	minChunkLen = 12 + 16 // per cbcrypto spec: nonce (12 bytes) + GCM tag (16 bytes)
+)
+
+// KeyDerivationMethod specifies how the encryption key is derived from the provided base key.
+type KeyDerivationMethod uint8
+
+const (
+	// NoDerivation means the key is used directly without derivation (v0 behavior).
+	NoDerivation KeyDerivationMethod = 0
+	// KeyBasedKDF uses KBKDF HMAC/SHA2-256/Counter (introduced in v1).
+	KeyBasedKDF KeyDerivationMethod = 1
+	// PasswordBasedKDF uses PBKDF2 SHA2-256 (introduced in v1).
+	PasswordBasedKDF KeyDerivationMethod = 2
+)
+
+const (
+	kdfLabel         = "Couchbase File Encryption"
+	kdfContextPrefix = "Couchbase Encrypted File/"
+
+	// pbkdf2IterationMultiplier is the base multiplier for PBKDF2 iterations. The actual iteration count is:
+	// pbkdf2IterationMultiplier * 2^(encodedValue) where encodedValue is stored in the upper 4 bits of the key
+	// derivation byte.
+	pbkdf2IterationMultiplier = 1024
 )
 
 // magicBytes is the cbcrypto file format magic string: "\x00Couchbase Encrypted\x00"
@@ -101,13 +131,19 @@ func NewReader(r io.Reader, provider KeyProvider) (*Reader, error) {
 		return nil, err
 	}
 
-	// Obtain the key using the provided KeyProvider, and create an AES cipher.
-	dek, err := provider(header.KeyID)
+	// Obtain the baseKey using the provided KeyProvider.
+	baseKey, err := provider(header.KeyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain data-encryption-key for %q: %w", header.KeyID, err)
 	}
 
-	block, err := aes.NewCipher(dek)
+	// Derive the actual encryption key if specified by the header.
+	derivedKey, err := deriveKey(baseKey, header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive encryption key: %w", err)
+	}
+
+	block, err := aes.NewCipher(derivedKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
@@ -290,9 +326,12 @@ func newChunkReader(data []byte, compressionType CompressionType) (io.ReadCloser
 
 // Header represents the parsed metadata from the cbcrypto file header.
 type Header struct {
-	Version     Version
-	Compression CompressionType
-	KeyID       string
+	Version          Version
+	Compression      CompressionType
+	KeyDerivation    KeyDerivationMethod
+	PBKDF2Iterations uint32 // Only valid when KeyDerivation == PasswordBasedKDF
+	KeyID            string
+	Salt             [saltSize]byte
 }
 
 // parseHeader parses the header of a cbcrypto file and returns a Header struct.
@@ -310,7 +349,26 @@ func parseHeader(headerData []byte) (*Header, error) {
 		return nil, fmt.Errorf("unsupported encrypted cbcrypto file version %d", version)
 	}
 
-	compression := headerData[compressionOff]
+	compression := headerData[compressionOffset]
+
+	// Key derivation byte layout (v1+):
+	//   - Lower 4 bits: key derivation method
+	//   - Upper 4 bits: PBKDF2 iteration exponent (only used when method is PBKDF2)
+	// For v0, this byte is unused and should be 0.
+	keyDerivationByte := headerData[keyDerivationOffset]
+	keyDerivation := KeyDerivationMethod(keyDerivationByte & 0x0f)
+
+	if keyDerivation > PasswordBasedKDF {
+		return nil, fmt.Errorf("unsupported key derivation method %d", keyDerivation)
+	}
+
+	// PBKDF2 iterations: 1024 * 2^(upper 4 bits). Only used when keyDerivation == PasswordBasedKDF.
+	var pbkdf2Iterations uint32
+
+	if keyDerivation == PasswordBasedKDF {
+		exponent := keyDerivationByte >> 4
+		pbkdf2Iterations = uint32(pbkdf2IterationMultiplier * math.Pow(2, float64(exponent)))
+	}
 
 	idLen := int(headerData[idLenOffset])
 	if idStartOffset+idLen > saltOffset {
@@ -319,9 +377,65 @@ func parseHeader(headerData []byte) (*Header, error) {
 
 	keyID := string(headerData[idStartOffset : idStartOffset+idLen])
 
+	var salt [saltSize]byte
+
+	copy(salt[:], headerData[saltOffset:saltOffset+saltSize])
+
 	return &Header{
-		Version:     version,
-		Compression: CompressionType(compression),
-		KeyID:       keyID,
+		Version:          version,
+		Compression:      CompressionType(compression),
+		KeyDerivation:    keyDerivation,
+		PBKDF2Iterations: pbkdf2Iterations,
+		KeyID:            keyID,
+		Salt:             salt,
 	}, nil
+}
+
+// deriveKey derives the encryption key from the provided base key based on the header's key derivation method.
+func deriveKey(baseKey []byte, header *Header) ([]byte, error) {
+	if header.KeyDerivation == NoDerivation {
+		return baseKey, nil
+	}
+
+	saltUUID, err := uuid.FromBytes(header.Salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("invalid salt UUID %x: %w", header.Salt, err)
+	}
+
+	switch header.KeyDerivation {
+	case KeyBasedKDF:
+		context := kdfContextPrefix + saltUUID.String()
+		return kbkdfHMACSHA256(baseKey, []byte(kdfLabel), []byte(context)), nil
+	case PasswordBasedKDF:
+		salt := kdfContextPrefix + saltUUID.String()
+		return pbkdf2.Key(baseKey, []byte(salt), int(header.PBKDF2Iterations), aes256KeySize, sha256.New), nil
+	default:
+		return nil, fmt.Errorf("unsupported key derivation method %d", header.KeyDerivation)
+	}
+}
+
+// kbkdfHMACSHA256 derives a 32-byte key from an existing key using KBKDF HMAC/SHA2-256/Counter (NIST SP 800-108).
+//
+// Since we only need 32 bytes (one SHA-256 output), we use a single iteration with counter=1.
+func kbkdfHMACSHA256(key, label, context []byte) []byte {
+	// Build the HMAC input: counter || label || 0x00 || context || outputLenBits
+	//   - counter:       32-bit integer, always 1 (one HMAC call produces 32 bytes)
+	//   - label:         describes the purpose of the derived key
+	//   - 0x00:          separator byte
+	//   - context:       unique data for this derivation (includes a file-specific salt)
+	//   - outputLenBits: output length in bits (256 for a 32-byte key)
+	input := make([]byte, 4+len(label)+1+len(context)+4)
+	offset := 0
+	binary.BigEndian.PutUint32(input[offset:], 1) // counter = 1
+	offset += 4
+	offset += copy(input[offset:], label)
+	input[offset] = 0x00 // separator
+	offset++
+	offset += copy(input[offset:], context)
+	binary.BigEndian.PutUint32(input[offset:], 256) // 256 bits = 32 bytes
+
+	h := hmac.New(sha256.New, key)
+	h.Write(input)
+
+	return h.Sum(nil)
 }
