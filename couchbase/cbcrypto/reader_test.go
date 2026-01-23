@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	testKey   = []byte("0123456789abcdef0123456789abcdef") // 32 bytes for AES-256
-	testKeyID = "01234567-89ab-cdef-0123-456789abcdef"
-	testData  = []byte("The quick brown fox jumps over the lazy dog.")
+	testKey           = []byte("0123456789abcdef0123456789abcdef") // 32 bytes for AES-256
+	testKeyID         = "01234567-89ab-cdef-0123-456789abcdef"
+	testKeyIDPassword = "password"
+	testData          = []byte("The quick brown fox jumps over the lazy dog.")
 )
 
 func TestNewReader(t *testing.T) {

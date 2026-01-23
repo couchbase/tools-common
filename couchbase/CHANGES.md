@@ -1,5 +1,12 @@
 # Changes
 
+## v4.0.0
+
+- BREAKING: `NewCBCWriter` now takes a `WriterOptions` struct instead of
+  individual parameters.
+- Added support for writing v1 cbcrypto files with key derivation (KBKDF and
+  PBKDF2).
+
 ## v3.9.0
 
 - Added support for reading v1 cbcrypto encrypted files with key derivation
