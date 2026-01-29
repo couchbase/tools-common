@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	cbrest "github.com/couchbase/tools-common/couchbase/v3/rest"
+	cbrest "github.com/couchbase/tools-common/couchbase/v4/rest"
 )
 
 func TestNewClient(t *testing.T) {

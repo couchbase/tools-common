@@ -1,6 +1,10 @@
 # Changes
 
-## v4.0.0
+## v4.0.1
+
+- Fixed incorrect module path in v4.0.0 (was still v3)
+
+## v4.0.0 (Retracted)
 
 - BREAKING: `NewCBCWriter` now takes a `WriterOptions` struct instead of
   individual parameters.

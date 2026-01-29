@@ -1,6 +1,6 @@
 package rest
 
-import cbvalue "github.com/couchbase/tools-common/couchbase/v3/value"
+import cbvalue "github.com/couchbase/tools-common/couchbase/v4/value"
 
 // node is the structure used when marshalling basic node information.
 type node struct {

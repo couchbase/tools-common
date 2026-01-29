@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/couchbase/v3/connstr"
+	"github.com/couchbase/tools-common/couchbase/v4/connstr"
 
 	"github.com/stretchr/testify/require"
 )

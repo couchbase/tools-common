@@ -19,7 +19,7 @@ import (
 	"time"
 
 	aprov "github.com/couchbase/tools-common/auth/v2/provider"
-	"github.com/couchbase/tools-common/couchbase/v3/connstr"
+	"github.com/couchbase/tools-common/couchbase/v4/connstr"
 	netutil "github.com/couchbase/tools-common/http/util"
 	testutil "github.com/couchbase/tools-common/testing/util"
 	"github.com/couchbase/tools-common/utils/v3/retry"

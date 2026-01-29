@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/couchbase/v3
+module github.com/couchbase/tools-common/couchbase/v4
 
 go 1.24.0
 
@@ -45,9 +45,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// Retracted in MB-63328 as the release contained an API that we weren't
-// committed to supporting.
-retract v3.1.0
-
-// Retracted due to incorrect commit being tagged
-retract v3.3.5
+// Retracted due to incorrect module path (was still v3)
+retract v4.0.0
