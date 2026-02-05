@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -246,5 +247,16 @@ func TestOpenErrorCases(t *testing.T) {
 
 		_, err = Open(f, testKey)
 		require.ErrorContains(t, err, "failed to read header")
+	})
+
+	t.Run("open-too-short", func(t *testing.T) {
+		f, err := os.Open(filepath.Join("testdata", "too-short-file"))
+		require.NoError(t, err)
+		defer f.Close()
+
+		errNotEncrypted := &ErrNotEncrypted{}
+
+		_, err = Open(f, nil)
+		require.ErrorAs(t, err, &errNotEncrypted)
 	})
 }

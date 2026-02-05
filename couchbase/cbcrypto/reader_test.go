@@ -57,18 +57,26 @@ func TestNewReader(t *testing.T) {
 
 func TestNewReaderErrorCases(t *testing.T) {
 	type testCase struct {
-		name          string
-		file          string
-		data          []byte
-		keyProvider   KeyProvider
-		expectedError string
+		name             string
+		file             string
+		data             []byte
+		keyProvider      KeyProvider
+		unencryptedError bool
+		expectedError    string
 	}
 
 	testCases := []testCase{
 		{
-			name:          "invalid-header",
-			file:          "bad-magic",
-			expectedError: "does not contain the cbcrypto magic string",
+			name:             "file-too-short",
+			file:             "too-short-file",
+			unencryptedError: true,
+			expectedError:    "file is too small to be a valid cbcrypto file",
+		},
+		{
+			name:             "invalid-header",
+			file:             "bad-magic",
+			unencryptedError: true,
+			expectedError:    "does not contain the cbcrypto magic string",
 		},
 		{
 			name:          "key-id-too-long",
@@ -141,10 +149,18 @@ func TestNewReaderErrorCases(t *testing.T) {
 
 			// This handles errors that occur during header parsing and setup.
 			cryptoReader, err := NewReader(reader, tc.keyProvider)
-			if err != nil {
+			if tc.unencryptedError {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tc.expectedError)
 
+				unencryptedErr := &ErrNotEncrypted{}
+				require.ErrorAs(t, err, &unencryptedErr)
+				require.Equal(t, tc.expectedError, unencryptedErr.Reason)
+
+				return
+			}
+
+			if err != nil {
+				require.Contains(t, err.Error(), tc.expectedError)
 				return
 			}
 

@@ -1,5 +1,10 @@
 # Changes
 
+## v4.0.2
+
+- Return a known error from `cbcrypto.Reader` if the file does not seem to be
+  encrypted
+
 ## v4.0.1
 
 - Fixed incorrect module path in v4.0.0 (was still v3)

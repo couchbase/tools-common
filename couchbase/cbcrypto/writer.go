@@ -8,6 +8,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
@@ -163,7 +164,13 @@ func Open(rws io.ReadWriteSeeker, baseKey []byte) (*CBCWriter, error) {
 	}
 
 	headerBytes := make([]byte, headerSize)
-	if _, err := io.ReadFull(rws, headerBytes); err != nil {
+
+	_, err := io.ReadFull(rws, headerBytes)
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, &ErrNotEncrypted{Reason: "file is too small to be a valid cbcrypto file"}
+	}
+
+	if err != nil {
 		return nil, fmt.Errorf("failed to read header: %w", err)
 	}
 

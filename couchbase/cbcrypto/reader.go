@@ -64,6 +64,16 @@ var magicBytes = []byte("\x00Couchbase Encrypted\x00")
 // CompressionType defines the compression algorithm used in an encrypted file.
 type CompressionType int
 
+// ErrNotEncrypted is returned when the file we were asked to read doesn't appear to be encrypted. This is determined
+// based on the cbcrypto header.
+type ErrNotEncrypted struct {
+	Reason string
+}
+
+func (e *ErrNotEncrypted) Error() string {
+	return fmt.Sprintf("asked to decrypt data that is not encrypted - %s", e.Reason)
+}
+
 const (
 	// These values are based on the cbcrypto encrypted file format specification.
 	None CompressionType = iota
@@ -122,7 +132,13 @@ func NewReader(r io.Reader, provider KeyProvider) (*Reader, error) {
 	// After decrypting all chunks the resulting stream is optionally decompressed (Snappy / zlib / gzip / bzip2) to
 	// obtain the original payload.
 	headerData := make([]byte, headerSize)
-	if _, err := io.ReadFull(r, headerData); err != nil {
+
+	_, err := io.ReadFull(r, headerData)
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, &ErrNotEncrypted{Reason: "file is too small to be a valid cbcrypto file"}
+	}
+
+	if err != nil {
 		return nil, fmt.Errorf("failed to read header: %w", err)
 	}
 
@@ -337,11 +353,11 @@ type Header struct {
 // parseHeader parses the header of a cbcrypto file and returns a Header struct.
 func parseHeader(headerData []byte) (*Header, error) {
 	if len(headerData) < headerSize {
-		return nil, fmt.Errorf("file is too small to be a valid cbcrypto file")
+		return nil, &ErrNotEncrypted{Reason: "file is too small to be a valid cbcrypto file"}
 	}
 
 	if !bytes.Equal(headerData[:len(magicBytes)], magicBytes) {
-		return nil, fmt.Errorf("does not contain the cbcrypto magic string")
+		return nil, &ErrNotEncrypted{Reason: "does not contain the cbcrypto magic string"}
 	}
 
 	version := headerData[versionOffset]
