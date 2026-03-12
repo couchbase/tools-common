@@ -1,5 +1,9 @@
 # Changes
 
+## v8.1.4
+- Treat all Azure blob versions as current if the versionID is missing. This fixes a bug where DeleteDirectory does not
+  delete objects if versioning is not enabled.
+
 ## v8.1.3
 
 - Downgraded `cloud.google.com/go/storage` (https://github.com/googleapis/google-api-go-client/commit/2c337321d374c3e9f02c09c75cb94b73eaf23fd2)
