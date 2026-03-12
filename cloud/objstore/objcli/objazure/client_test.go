@@ -1331,3 +1331,135 @@ func TestClientSetObjectLock(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestBlobsToAttrs(t *testing.T) {
+	var (
+		client = Client{}
+		now    = time.Now()
+	)
+
+	type test struct {
+		name     string
+		prefixes []*string
+		blobs    []*container.BlobItem
+		expected []objval.ObjectAttrs
+	}
+
+	tests := []*test{
+		{
+			name:     "Empty",
+			prefixes: []*string{},
+			blobs:    []*container.BlobItem{},
+			expected: []objval.ObjectAttrs{},
+		},
+		{
+			name:     "OnlyPrefixes",
+			prefixes: []*string{ptr.To("prefix1/"), ptr.To("prefix2/")},
+			blobs:    []*container.BlobItem{},
+			expected: []objval.ObjectAttrs{{Key: "prefix1/"}, {Key: "prefix2/"}},
+		},
+		{
+			name:     "OnlyBlobs",
+			prefixes: []*string{},
+			blobs: []*container.BlobItem{
+				{Name: ptr.To("blob1")},
+				{Name: ptr.To("blob2")},
+			},
+			expected: []objval.ObjectAttrs{
+				{Key: "blob1", IsCurrentVersion: true},
+				{Key: "blob2", IsCurrentVersion: true},
+			},
+		},
+		{
+			name:     "PrefixesBlobs",
+			prefixes: []*string{ptr.To("prefix1/")},
+			blobs: []*container.BlobItem{
+				{Name: ptr.To("blob1")},
+			},
+			expected: []objval.ObjectAttrs{
+				{Key: "prefix1/"},
+				{Key: "blob1", IsCurrentVersion: true},
+			},
+		},
+		{
+			name:     "BlobsWithVersionInformation",
+			prefixes: []*string{},
+			blobs: []*container.BlobItem{
+				{
+					Name:             ptr.To("blob1"),
+					VersionID:        ptr.To("version1"),
+					IsCurrentVersion: ptr.To(true),
+				},
+				{
+					Name:             ptr.To("blob2"),
+					VersionID:        ptr.To("version2"),
+					IsCurrentVersion: ptr.To(false),
+				},
+			},
+			expected: []objval.ObjectAttrs{
+				{Key: "blob1", VersionID: "version1", IsCurrentVersion: true},
+				{Key: "blob2", VersionID: "version2", IsCurrentVersion: false},
+			},
+		},
+		{
+			name:     "BlobsWithProperties",
+			prefixes: []*string{},
+			blobs: []*container.BlobItem{
+				{
+					Name: ptr.To("blob1"),
+					Properties: &container.BlobProperties{
+						ContentLength:               ptr.To(int64(1024)),
+						LastModified:                ptr.To(now),
+						ImmutabilityPolicyExpiresOn: ptr.To(now.Add(24 * time.Hour)),
+						ImmutabilityPolicyMode:      ptr.To(blob.ImmutabilityPolicyModeLocked),
+					},
+				},
+				{
+					Name: ptr.To("blob2"),
+					Properties: &container.BlobProperties{
+						ContentLength: ptr.To(int64(512)),
+					},
+				},
+			},
+			expected: []objval.ObjectAttrs{
+				{
+					Key:              "blob1",
+					Size:             ptr.To(int64(1024)),
+					LastModified:     ptr.To(now),
+					LockExpiration:   ptr.To(now.Add(24 * time.Hour)),
+					LockType:         objval.LockTypeCompliance,
+					IsCurrentVersion: true,
+				},
+				{
+					Key:              "blob2",
+					Size:             ptr.To(int64(512)),
+					IsCurrentVersion: true,
+				},
+			},
+		},
+		{
+			name:     "VersionIDWithoutIsCurrentVersion",
+			prefixes: []*string{ptr.To("prefix1/")},
+			blobs: []*container.BlobItem{
+				{
+					Name:      ptr.To("blob"),
+					VersionID: ptr.To("version-id"),
+				},
+			},
+			expected: []objval.ObjectAttrs{
+				{Key: "prefix1/"},
+				{
+					Key:       "blob",
+					VersionID: "version-id",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := client.blobsToAttrs(test.prefixes, test.blobs)
+			require.Equal(t, test.expected, actual)
+		})
+	}
+}

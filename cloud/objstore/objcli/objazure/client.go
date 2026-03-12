@@ -646,13 +646,21 @@ func (c *Client) blobsToAttrs(prefixes []*string, blobs []*container.BlobItem) [
 
 	for _, b := range blobs {
 		attrs := objval.ObjectAttrs{
-			Key:          *b.Name,
-			Size:         b.Properties.ContentLength,
-			LastModified: b.Properties.LastModified,
+			Key: *b.Name,
+		}
+
+		if b.Properties != nil {
+			attrs.Size = b.Properties.ContentLength
+			attrs.LastModified = b.Properties.LastModified
 		}
 
 		if b.VersionID != nil {
 			attrs.VersionID = *b.VersionID
+		} else {
+			// If we don't have a versionID assume that we are not getting versioning information so all versions must
+			// be current. See https://github.com/Azure/azure-sdk-for-python/issues/28447 for more details about
+			// IsCurrentVersion values.
+			attrs.IsCurrentVersion = true
 		}
 
 		if b.IsCurrentVersion != nil {
