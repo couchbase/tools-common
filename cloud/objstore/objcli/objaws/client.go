@@ -11,10 +11,12 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"strings"
 
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
+	"github.com/couchbase/tools-common/functional/maps"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -103,12 +105,18 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		return nil, handleError(input.Bucket, input.Key, err)
 	}
 
+	metadata := maps.Map[map[string]string, map[string]string](
+		resp.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
 	attrs := objval.ObjectAttrs{
 		Key:            opts.Key,
 		Size:           resp.ContentLength,
 		LastModified:   resp.LastModified,
 		LockExpiration: resp.ObjectLockRetainUntilDate,
 		LockType:       getLockType(resp.ObjectLockMode),
+		Metadata:       metadata,
 	}
 
 	if resp.VersionId != nil {
@@ -142,6 +150,11 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		return nil, handleError(input.Bucket, input.Key, err)
 	}
 
+	metadata := maps.Map[map[string]string, map[string]string](
+		resp.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
 	attrs := &objval.ObjectAttrs{
 		Key:            opts.Key,
 		ETag:           resp.ETag,
@@ -149,6 +162,7 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		LastModified:   resp.LastModified,
 		LockExpiration: resp.ObjectLockRetainUntilDate,
 		LockType:       getLockType(resp.ObjectLockMode),
+		Metadata:       metadata,
 	}
 
 	if resp.VersionId != nil {
@@ -163,11 +177,17 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 }
 
 func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*objval.ObjectAttrs, error) {
+	metadata := maps.Map[map[string]string, map[string]string](
+		opts.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
 	input := &s3.PutObjectInput{
 		Body:              opts.Body,
 		Bucket:            ptr.To(opts.Bucket),
 		Key:               ptr.To(opts.Key),
 		ChecksumAlgorithm: types.ChecksumAlgorithmCrc32,
+		Metadata:          metadata,
 	}
 
 	switch opts.Precondition {
@@ -193,9 +213,10 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*
 	}
 
 	attrs := &objval.ObjectAttrs{
-		Key:  opts.Key,
-		ETag: output.ETag,
-		Size: output.Size,
+		Key:      opts.Key,
+		ETag:     output.ETag,
+		Size:     output.Size,
+		Metadata: metadata,
 	}
 
 	if output.VersionId != nil {

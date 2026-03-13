@@ -64,12 +64,18 @@ func TestClientGetObject(t *testing.T) {
 		mock.MatchedBy(func(length int64) bool { return length == -1 }),
 	).Return(mrAPI, nil)
 
-	output := storage.ReaderObjectAttrs{
+	oattrs := &storage.ObjectAttrs{
+		Metadata: map[string]string{"FOO": "bar"},
+	}
+
+	moAPI.On("Attrs", mock.Anything).Return(oattrs, nil)
+
+	rattrs := storage.ReaderObjectAttrs{
 		Size:         42,
 		LastModified: (time.Time{}).Add(24 * time.Hour),
 	}
 
-	mrAPI.On("Attrs", mock.Anything).Return(output, nil)
+	mrAPI.On("Attrs", mock.Anything).Return(rattrs, nil)
 
 	client := &Client{serviceAPI: msAPI}
 
@@ -84,6 +90,7 @@ func TestClientGetObject(t *testing.T) {
 			Key:          "key",
 			Size:         ptr.To[int64](42),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			Metadata:     map[string]string{"foo": "bar"},
 		},
 		Body: mrAPI,
 	}
@@ -122,12 +129,18 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 		mock.MatchedBy(func(length int64) bool { return length == 65 }),
 	).Return(mrAPI, nil)
 
-	output := storage.ReaderObjectAttrs{
+	oattrs := &storage.ObjectAttrs{
+		Metadata: map[string]string{"FOO": "bar"},
+	}
+
+	moAPI.On("Attrs", mock.Anything).Return(oattrs, nil)
+
+	rattrs := storage.ReaderObjectAttrs{
 		Size:         64,
 		LastModified: (time.Time{}).Add(24 * time.Hour),
 	}
 
-	mrAPI.On("Attrs", mock.Anything).Return(output, nil)
+	mrAPI.On("Attrs", mock.Anything).Return(rattrs, nil)
 
 	client := &Client{serviceAPI: msAPI}
 
@@ -143,6 +156,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 			Key:          "key",
 			Size:         ptr.To[int64](64),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			Metadata:     map[string]string{"foo": "bar"},
 		},
 		Body: mrAPI,
 	}
@@ -197,13 +211,19 @@ func TestClientGetObjectVersionID(t *testing.T) {
 		mock.MatchedBy(func(length int64) bool { return length == -1 }),
 	).Return(mrAPI, nil)
 
-	output := storage.ReaderObjectAttrs{
+	oattrs := &storage.ObjectAttrs{
+		Metadata: map[string]string{"FOO": "bar"},
+	}
+
+	moAPI.On("Attrs", mock.Anything).Return(oattrs, nil)
+
+	rattrs := storage.ReaderObjectAttrs{
 		Size:         42,
 		LastModified: (time.Time{}).Add(24 * time.Hour),
 		Generation:   1234,
 	}
 
-	mrAPI.On("Attrs", mock.Anything).Return(output, nil)
+	mrAPI.On("Attrs", mock.Anything).Return(rattrs, nil)
 
 	client := &Client{serviceAPI: msAPI}
 
@@ -221,6 +241,7 @@ func TestClientGetObjectVersionID(t *testing.T) {
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			VersionID:    "1234",
 			CAS:          "1234",
+			Metadata:     map[string]string{"foo": "bar"},
 		},
 		Body: mrAPI,
 	}
@@ -253,10 +274,11 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
 
 	output := &storage.ObjectAttrs{
-		Name:    "key",
-		Etag:    "etag",
-		Size:    5,
-		Updated: (time.Time{}).Add(24 * time.Hour),
+		Name:     "key",
+		Etag:     "etag",
+		Size:     5,
+		Updated:  (time.Time{}).Add(24 * time.Hour),
+		Metadata: map[string]string{"FOO": "bar"},
 	}
 
 	moAPI.On("Attrs", mock.Anything).Return(output, nil)
@@ -274,6 +296,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		ETag:         ptr.To("etag"),
 		Size:         ptr.To[int64](5),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		Metadata:     map[string]string{"foo": "bar"},
 	}
 
 	require.Equal(t, expected, attrs)
@@ -327,6 +350,7 @@ func TestClientGetObjectAttrsVersionID(t *testing.T) {
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		VersionID:    "1234",
 		CAS:          "1234",
+		Metadata:     make(map[string]string),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -383,6 +407,7 @@ func TestClientGetObjectAttrsLockData(t *testing.T) {
 		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 		LockType:       objval.LockTypeCompliance,
 		LockExpiration: &now,
+		Metadata:       make(map[string]string),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -436,6 +461,12 @@ func TestClientPutObject(t *testing.T) {
 		return bytes.Equal(data, []byte("value"))
 	}
 
+	fn4 := func(metadata map[string]string) bool {
+		return reflect.DeepEqual(metadata, map[string]string{"foo": "bar"})
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn4))
+
 	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
@@ -443,6 +474,7 @@ func TestClientPutObject(t *testing.T) {
 		Size:       10,
 		Updated:    time.Now(),
 		Generation: 123,
+		Metadata:   map[string]string{"FOO": "bar"},
 	})
 
 	mwAPI.On("Close").Return(nil)
@@ -450,9 +482,10 @@ func TestClientPutObject(t *testing.T) {
 	client := &Client{serviceAPI: msAPI}
 
 	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
-		Bucket: "bucket",
-		Key:    "key",
-		Body:   strings.NewReader("value"),
+		Bucket:   "bucket",
+		Key:      "key",
+		Body:     strings.NewReader("value"),
+		Metadata: map[string]string{"FOO": "bar"},
 	})
 	require.NoError(t, err)
 
@@ -460,6 +493,7 @@ func TestClientPutObject(t *testing.T) {
 	require.Equal(t, int64(10), *attrs.Size)
 	require.Equal(t, "asd", *attrs.ETag)
 	require.Equal(t, "123", attrs.VersionID)
+	require.Equal(t, map[string]string{"foo": "bar"}, attrs.Metadata)
 	require.True(t, time.Now().After(*attrs.LastModified))
 
 	msAPI.AssertExpectations(t)
@@ -474,6 +508,7 @@ func TestClientPutObject(t *testing.T) {
 
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -520,6 +555,12 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 		return bytes.Equal(data, []byte("value"))
 	}
 
+	fn4 := func(map[string]string) bool {
+		return true
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn4))
+
 	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
@@ -560,6 +601,7 @@ func TestClientPutObjectIfAbsent(t *testing.T) {
 
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -608,6 +650,12 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 		return bytes.Equal(data, []byte("value"))
 	}
 
+	fn4 := func(map[string]string) bool {
+		return true
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn4))
+
 	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
@@ -648,6 +696,7 @@ func TestClientPutObjectIfMatch(t *testing.T) {
 
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -696,6 +745,12 @@ func TestClientPutObjectWithLockPeriod(t *testing.T) {
 		return bytes.Equal(data, []byte("value"))
 	}
 
+	fn4 := func(map[string]string) bool {
+		return true
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn4))
+
 	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
@@ -736,6 +791,7 @@ func TestClientPutObjectWithLockPeriod(t *testing.T) {
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "SetLock", 1)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -781,6 +837,7 @@ func TestClientAppendToObjectNotFoundOrEmpty(t *testing.T) {
 			moAPI.On("Attrs", mock.Anything).Return(test.attrs, test.err)
 			moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
 
+			mwAPI.On("SendMetadata", mock.Anything)
 			mwAPI.On("SendMD5", mock.Anything)
 			mwAPI.On("SendCRC", mock.Anything)
 
@@ -826,6 +883,7 @@ func TestClientAppendToObjectNotFoundOrEmpty(t *testing.T) {
 
 			mwAPI.AssertExpectations(t)
 			mwAPI.AssertNumberOfCalls(t, "Write", 1)
+			mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 			mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 			mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 			mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -855,6 +913,7 @@ func TestClientAppendToObjectUsingObjectComposition(t *testing.T) {
 	moAPI.On("Attrs", mock.Anything).Return(&storage.ObjectAttrs{Size: 5}, nil)
 	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
 
+	mwAPI.On("SendMetadata", mock.Anything)
 	mwAPI.On("SendMD5", mock.Anything)
 	mwAPI.On("SendCRC", mock.Anything)
 
@@ -916,6 +975,7 @@ func TestClientAppendToObjectUsingObjectComposition(t *testing.T) {
 
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -1714,11 +1774,17 @@ func TestClientUploadPart(t *testing.T) {
 
 	mwAPI.On("SendCRC", mock.MatchedBy(fn2))
 
-	fn3 := func(data []byte) bool {
+	fn3 := func(map[string]string) bool {
+		return true
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn3))
+
+	fn4 := func(data []byte) bool {
 		return bytes.Equal(data, []byte("value"))
 	}
 
-	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
+	mwAPI.On("Write", mock.MatchedBy(fn4)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
 		Etag:    "asd",
@@ -1759,6 +1825,7 @@ func TestClientUploadPart(t *testing.T) {
 
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -1799,11 +1866,17 @@ func TestClientUploadPartWithVersioning(t *testing.T) {
 
 	mwAPI.On("SendCRC", mock.MatchedBy(fn2))
 
-	fn3 := func(data []byte) bool {
+	fn3 := func(map[string]string) bool {
+		return true
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn3))
+
+	fn4 := func(data []byte) bool {
 		return bytes.Equal(data, []byte("value"))
 	}
 
-	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
+	mwAPI.On("Write", mock.MatchedBy(fn4)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
 		Etag:       "asd",
@@ -1845,6 +1918,7 @@ func TestClientUploadPartWithVersioning(t *testing.T) {
 
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)
@@ -1891,11 +1965,17 @@ func TestClientUploadPartIfAbsentAndLocked(t *testing.T) {
 
 	mwAPI.On("SendCRC", mock.MatchedBy(fn2))
 
-	fn3 := func(data []byte) bool {
+	fn3 := func(map[string]string) bool {
+		return true
+	}
+
+	mwAPI.On("SendMetadata", mock.MatchedBy(fn3))
+
+	fn4 := func(data []byte) bool {
 		return bytes.Equal(data, []byte("value"))
 	}
 
-	mwAPI.On("Write", mock.MatchedBy(fn3)).Return(5, nil)
+	mwAPI.On("Write", mock.MatchedBy(fn4)).Return(5, nil)
 
 	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{
 		Etag:       "asd",
@@ -1939,6 +2019,7 @@ func TestClientUploadPartIfAbsentAndLocked(t *testing.T) {
 	mwAPI.AssertExpectations(t)
 	mwAPI.AssertNumberOfCalls(t, "SetLock", 1)
 	mwAPI.AssertNumberOfCalls(t, "Write", 1)
+	mwAPI.AssertNumberOfCalls(t, "SendMetadata", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendMD5", 1)
 	mwAPI.AssertNumberOfCalls(t, "SendCRC", 1)
 	mwAPI.AssertNumberOfCalls(t, "Close", 1)

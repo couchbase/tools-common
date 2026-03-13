@@ -188,6 +188,7 @@ func TestClientGetObject(t *testing.T) {
 	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
 	output.ContentLength = ptr.To[int64](42)
 	output.Body = io.NopCloser(strings.NewReader("value"))
+	output.Metadata = map[string]*string{"FOO": ptr.To("bar")}
 
 	bAPI.
 		EXPECT().
@@ -210,6 +211,7 @@ func TestClientGetObject(t *testing.T) {
 			Key:          "blob",
 			Size:         ptr.To[int64](42),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			Metadata:     map[string]string{"foo": "bar"},
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
 	}
@@ -250,6 +252,7 @@ func TestClientGetObjectWithByteRange(t *testing.T) {
 			Key:          "blob",
 			Size:         ptr.To[int64](42),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			Metadata:     make(map[string]string),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
 	}
@@ -309,6 +312,7 @@ func TestClientGetObjectVersionID(t *testing.T) {
 			Size:         ptr.To[int64](42),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			VersionID:    "version1",
+			Metadata:     make(map[string]string),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
 	}
@@ -354,6 +358,7 @@ func TestClientGetObjectLockData(t *testing.T) {
 			LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 			LockExpiration: &now,
 			LockType:       objval.LockTypeCompliance,
+			Metadata:       make(map[string]string),
 		},
 		Body: io.NopCloser(strings.NewReader("value")),
 	}
@@ -371,6 +376,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 	output.ContentLength = ptr.To[int64](42)
 	output.ETag = ptr.To(azcore.ETag("etag"))
 	output.LastModified = ptr.To((time.Time{}).Add(24 * time.Hour))
+	output.Metadata = map[string]*string{"FOO": ptr.To("bar")}
 
 	bAPI.EXPECT().GetProperties(gomock.Any(), gomock.Any()).Return(output, nil)
 
@@ -386,6 +392,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		CAS:          "etag",
 		Size:         ptr.To[int64](42),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		Metadata:     map[string]string{"foo": "bar"},
 	}
 
 	require.Equal(t, expected, attrs)
@@ -422,6 +429,7 @@ func TestClientGetObjectAttrsVersionID(t *testing.T) {
 		Size:         ptr.To[int64](42),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		VersionID:    "version1",
+		Metadata:     make(map[string]string),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -458,6 +466,7 @@ func TestClientGetObjectAttrsLockData(t *testing.T) {
 		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 		LockType:       objval.LockTypeCompliance,
 		LockExpiration: &now,
+		Metadata:       make(map[string]string),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -489,15 +498,17 @@ func TestClientPutObject(t *testing.T) {
 		DoAndReturn(fn)
 
 	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
-		Bucket: "container",
-		Key:    "blob",
-		Body:   strings.NewReader("value"),
+		Bucket:   "container",
+		Key:      "blob",
+		Body:     strings.NewReader("value"),
+		Metadata: map[string]string{"FOO": "bar"},
 	})
 	require.NoError(t, err)
 
 	require.Equal(t, "blob", attrs.Key)
 	require.Equal(t, "asd", *attrs.ETag)
 	require.Equal(t, "123", attrs.VersionID)
+	require.Equal(t, map[string]string{"foo": "bar"}, attrs.Metadata)
 	require.True(t, time.Now().After(*attrs.LastModified))
 }
 

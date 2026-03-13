@@ -94,8 +94,8 @@ github.com/couchbase/tools-common/errors v1.1.0 h1:ruGRk4YX7UBiqBGmMgl5QaLXbH6L3
 github.com/couchbase/tools-common/errors v1.1.0/go.mod h1:fIO0OUBgKtTD5UW34aRyZYjqnx58rY0/ZjX2EGT3xtQ=
 github.com/couchbase/tools-common/fs v1.0.3 h1:KXhisN+hmp5yicOWkUBNjJcd/WsblHA2SVShjL2eGiY=
 github.com/couchbase/tools-common/fs v1.0.3/go.mod h1:5Pw+X/IkVL909GEtrCkIfV+yKLV1FL8TS2U1ZcmB37U=
-github.com/couchbase/tools-common/functional v1.1.1 h1:9Vg6RdP0L30cVjZ0NF8MRQyLfco45Pfi0h7317ww8gA=
-github.com/couchbase/tools-common/functional v1.1.1/go.mod h1:lz29Irff3Lm0qIYRyTaZ2WH9e000U6wr5sbl+inQe2A=
+github.com/couchbase/tools-common/functional v1.4.0 h1:YnTzlUgZO6esW2FQFsXpB1E5fFH2W/i6BzbNSqqaZ2M=
+github.com/couchbase/tools-common/functional v1.4.0/go.mod h1:32ycqLbh8s4Rn7lQb0vM83+Pa2jybn23V5NDSwf5auA=
 github.com/couchbase/tools-common/http v1.0.11 h1:vJiA7A/xiSAPX4xnSBqTF5x3wyRYkKnHrNIpjW11jTE=
 github.com/couchbase/tools-common/http v1.0.11/go.mod h1:UJo6vBOzF/COMbzoO5XQbOTPOxaNHLBVBAcGMgxtIm8=
 github.com/couchbase/tools-common/strings v1.0.0 h1:GSP3nA/dDkoLbBPt4Zezfl0KJxLiPyw61PoWrNBsK5g=

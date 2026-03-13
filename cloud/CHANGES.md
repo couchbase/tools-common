@@ -1,6 +1,11 @@
 # Changes
 
+## v8.2.0
+
+- Add the ability to get/set object metadata.
+
 ## v8.1.4
+
 - Treat all Azure blob versions as current if the versionID is missing. This fixes a bug where DeleteDirectory does not
   delete objects if versioning is not enabled.
 

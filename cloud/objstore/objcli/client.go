@@ -80,6 +80,9 @@ type PutObjectOptions struct {
 	//
 	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
 	Lock *ObjectLock
+
+	// Metadata is key/value metadata to associate with the object, where keys are case-insensitive.
+	Metadata map[string]string
 }
 
 // CopyObjectOptions encapsulates the options available when using the 'CopyObject' function.

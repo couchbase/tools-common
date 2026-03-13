@@ -174,6 +174,7 @@ func (r reader) Attrs() storage.ReaderObjectAttrs {
 // writerAPI is a checksum aware writer API which is used to upload data to Google Storage.
 type writerAPI interface {
 	io.WriteCloser
+	SendMetadata(md map[string]string)
 	SendMD5(md5 []byte)
 	SendCRC(crc uint32)
 	SetLock(lock *objcli.ObjectLock) error
@@ -192,6 +193,10 @@ func (w writer) Write(p []byte) (int, error) {
 
 func (w writer) Close() error {
 	return w.w.Close()
+}
+
+func (w writer) SendMetadata(md map[string]string) {
+	w.w.Metadata = md
 }
 
 func (w writer) SendMD5(md5 []byte) {

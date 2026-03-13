@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
+	"github.com/couchbase/tools-common/functional/maps"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -117,12 +118,18 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
+	metadata := maps.Map[map[string]*string, map[string]string](
+		resp.Metadata,
+		func(k string, v *string) (string, string) { return strings.ToLower(k), *v },
+	)
+
 	attrs := objval.ObjectAttrs{
 		Key:            opts.Key,
 		ETag:           (*string)(resp.ETag),
 		Size:           resp.ContentLength,
 		LastModified:   resp.LastModified,
 		LockExpiration: resp.ImmutabilityPolicyExpiresOn,
+		Metadata:       metadata,
 	}
 
 	if resp.ImmutabilityPolicyMode != nil {
@@ -164,12 +171,18 @@ func (c *Client) GetObjectAttrs(ctx context.Context, opts objcli.GetObjectAttrsO
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
+	metadata := maps.Map[map[string]*string, map[string]string](
+		resp.Metadata,
+		func(k string, v *string) (string, string) { return strings.ToLower(k), *v },
+	)
+
 	attrs := &objval.ObjectAttrs{
 		Key:            opts.Key,
 		ETag:           (*string)(resp.ETag),
 		Size:           resp.ContentLength,
 		LastModified:   resp.LastModified,
 		LockExpiration: resp.ImmutabilityPolicyExpiresOn,
+		Metadata:       metadata,
 	}
 
 	if resp.ImmutabilityPolicyMode != nil {
@@ -197,8 +210,19 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*
 		return nil, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
+	pmd := maps.Map[map[string]string, map[string]*string](
+		opts.Metadata,
+		func(k, v string) (string, *string) { return strings.ToLower(k), ptr.To(v) },
+	)
+
+	vmd := maps.Map[map[string]string, map[string]string](
+		opts.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
 	inputOpts := &blockblob.UploadOptions{
 		TransactionalValidation: blob.TransferValidationTypeMD5(md5sum.Sum(nil)),
+		Metadata:                pmd,
 	}
 
 	switch opts.Precondition {
@@ -238,6 +262,7 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*
 	attrs := &objval.ObjectAttrs{
 		Key:          opts.Key,
 		LastModified: res.LastModified,
+		Metadata:     vmd,
 	}
 
 	if res.ETag != nil {

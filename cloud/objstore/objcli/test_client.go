@@ -512,6 +512,7 @@ func (t *TestClient) putObjectLocked(opts PutObjectOptions) (*objval.ObjectAttrs
 		LastModified:     &now,
 		VersionID:        versionID,
 		IsCurrentVersion: true,
+		Metadata:         opts.Metadata,
 	}
 
 	_, ok := t.Buckets[bucket]

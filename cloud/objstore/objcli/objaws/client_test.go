@@ -65,6 +65,7 @@ func TestClientGetObject(t *testing.T) {
 		Body:          io.NopCloser(strings.NewReader("value")),
 		ContentLength: ptr.To(int64(len("value"))),
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
+		Metadata:      map[string]string{"FOO": "bar"},
 	}
 
 	api.On("GetObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -85,6 +86,7 @@ func TestClientGetObject(t *testing.T) {
 			Key:          "key",
 			Size:         ptr.To(int64(len("value"))),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+			Metadata:     map[string]string{"foo": "bar"},
 		},
 	}
 
@@ -134,6 +136,7 @@ func TestClientGetObjectVersionID(t *testing.T) {
 			Size:         ptr.To(int64(len("value"))),
 			LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 			VersionID:    "version1",
+			Metadata:     make(map[string]string),
 		},
 	}
 
@@ -183,6 +186,7 @@ func TestClientGetObjectLockData(t *testing.T) {
 			LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 			LockExpiration: output.ObjectLockRetainUntilDate,
 			LockType:       objval.LockTypeCompliance,
+			Metadata:       make(map[string]string),
 		},
 	}
 
@@ -232,6 +236,7 @@ func TestClientGetObjectLockDataNonCompliance(t *testing.T) {
 			LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 			LockExpiration: output.ObjectLockRetainUntilDate,
 			LockType:       objval.LockTypeUndefined,
+			Metadata:       make(map[string]string),
 		},
 	}
 
@@ -299,6 +304,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		ETag:          ptr.To("etag"),
 		ContentLength: ptr.To[int64](5),
 		LastModified:  ptr.To((time.Time{}).Add(24 * time.Hour)),
+		Metadata:      map[string]string{"FOO": "bar"},
 	}
 
 	api.On("HeadObject", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
@@ -317,6 +323,7 @@ func TestClientGetObjectAttrs(t *testing.T) {
 		CAS:          "etag",
 		Size:         ptr.To[int64](5),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
+		Metadata:     map[string]string{"foo": "bar"},
 	}
 
 	require.Equal(t, expected, attrs)
@@ -363,6 +370,7 @@ func TestClientGetObjectAttrsVersionId(t *testing.T) {
 		Size:         ptr.To[int64](5),
 		LastModified: ptr.To((time.Time{}).Add(24 * time.Hour)),
 		VersionID:    "version1",
+		Metadata:     make(map[string]string),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -409,6 +417,7 @@ func TestClientGetObjectAttrsLockData(t *testing.T) {
 		LastModified:   ptr.To((time.Time{}).Add(24 * time.Hour)),
 		LockExpiration: output.ObjectLockRetainUntilDate,
 		LockType:       objval.LockTypeCompliance,
+		Metadata:       make(map[string]string),
 	}
 
 	require.Equal(t, expected, attrs)
@@ -422,12 +431,13 @@ func TestClientPutObject(t *testing.T) {
 
 	fn := func(input *s3.PutObjectInput) bool {
 		var (
-			body   = input.Body != nil && bytes.Equal(testutil.ReadAll(t, input.Body), []byte("value"))
-			bucket = input.Bucket != nil && *input.Bucket == "bucket"
-			key    = input.Key != nil && *input.Key == "key"
+			body     = input.Body != nil && bytes.Equal(testutil.ReadAll(t, input.Body), []byte("value"))
+			bucket   = input.Bucket != nil && *input.Bucket == "bucket"
+			key      = input.Key != nil && *input.Key == "key"
+			metadata = reflect.DeepEqual(input.Metadata, map[string]string{"foo": "bar"})
 		)
 
-		return body && bucket && key
+		return body && bucket && key && metadata
 	}
 
 	api.On("PutObject", matchers.Context, mock.MatchedBy(fn)).Return(
@@ -438,9 +448,10 @@ func TestClientPutObject(t *testing.T) {
 	client := &Client{serviceAPI: api}
 
 	attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
-		Bucket: "bucket",
-		Key:    "key",
-		Body:   strings.NewReader("value"),
+		Bucket:   "bucket",
+		Key:      "key",
+		Body:     strings.NewReader("value"),
+		Metadata: map[string]string{"FOO": "bar"},
 	})
 	require.NoError(t, err)
 
@@ -448,6 +459,7 @@ func TestClientPutObject(t *testing.T) {
 	require.Equal(t, int64(10), *attrs.Size)
 	require.Equal(t, "asd", *attrs.ETag)
 	require.Equal(t, "123", attrs.VersionID)
+	require.Equal(t, map[string]string{"foo": "bar"}, attrs.Metadata)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObject", 1)

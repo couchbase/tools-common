@@ -57,6 +57,11 @@ type ObjectAttrs struct {
 	//
 	// NOTE: Not populated during object iteration.
 	CAS string
+
+	// Metadata is the key/value metadata associated with the object, where keys are case-insensitive.
+	//
+	// NOTE: Not populated during object iteration.
+	Metadata map[string]string
 }
 
 // IsDir returns a boolean indicating whether these attributes represent a synthetic directory, created by the library

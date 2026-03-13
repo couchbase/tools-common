@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ import (
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
+	"github.com/couchbase/tools-common/functional/maps"
 	"github.com/couchbase/tools-common/sync/v2/hofp"
 	"github.com/couchbase/tools-common/types/v2/ptr"
 	"github.com/couchbase/tools-common/types/v2/timeprovider"
@@ -119,16 +121,27 @@ func (c *Client) GetObject(ctx context.Context, opts objcli.GetObjectOptions) (*
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}
 
-	remote := reader.Attrs()
+	oattrs, err := object.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object attrs: %w", err)
+	}
+
+	metadata := maps.Map[map[string]string, map[string]string](
+		oattrs.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
+	rattrs := reader.Attrs()
 
 	attrs := objval.ObjectAttrs{
 		Key:          opts.Key,
-		Size:         ptr.To(remote.Size),
-		LastModified: ptr.To(remote.LastModified),
+		Size:         ptr.To(rattrs.Size),
+		LastModified: ptr.To(rattrs.LastModified),
+		Metadata:     metadata,
 	}
 
-	if remote.Generation != 0 {
-		v := strconv.FormatInt(remote.Generation, 10)
+	if rattrs.Generation != 0 {
+		v := strconv.FormatInt(rattrs.Generation, 10)
 		attrs.VersionID = v
 		attrs.CAS = v
 	}
@@ -204,6 +217,12 @@ func (c *Client) PutObject(ctx context.Context, opts objcli.PutObjectOptions) (*
 		return nil, fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
+	metadata := maps.Map[map[string]string, map[string]string](
+		opts.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
+	writer.SendMetadata(metadata)
 	writer.SendMD5(md5sum.Sum(nil))
 	writer.SendCRC(crc32c.Sum32())
 
@@ -893,11 +912,17 @@ func getLockType(gcpLockMode string) objval.LockType {
 
 // parseGCPAttrs converts GCP's ObjectAttrs to objval.ObjectAttrs
 func parseGCPAttrs(key string, gcpAttrs *storage.ObjectAttrs) *objval.ObjectAttrs {
+	metadata := maps.Map[map[string]string, map[string]string](
+		gcpAttrs.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
 	attrs := &objval.ObjectAttrs{
 		Key:          key,
 		ETag:         ptr.To(gcpAttrs.Etag),
 		Size:         ptr.To(gcpAttrs.Size),
 		LastModified: &gcpAttrs.Updated,
+		Metadata:     metadata,
 	}
 
 	if gcpAttrs.Retention != nil {
