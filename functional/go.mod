@@ -3,7 +3,8 @@ module github.com/couchbase/tools-common/functional
 go 1.24.0
 
 require (
-	github.com/stretchr/testify v1.8.4
+	github.com/couchbase/tools-common/types/v2 v2.2.2
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
 )
 
