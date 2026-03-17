@@ -108,12 +108,12 @@ func TestMaskCBMArguments(t *testing.T) {
 		[]string{
 			"-p", "*****", "--password", "*****", "--p", "*****", "--obj-access-key-id", "*****",
 			"--obj-secret-access-key", "*****", "--obj-refresh-token", "*****", "--km-secret-access-key", "*****",
-			"--passphrase", "*****",
+			"--km-refresh-token", "*****", "--passphrase", "*****",
 		},
 		MaskCBMArguments([]string{
 			"-p", "pass", "--password", "pass", "--p", "pass", "--obj-access-key-id", "keyid",
 			"--obj-secret-access-key", "secret", "--obj-refresh-token", "token", "--km-secret-access-key", "secret",
-			"--passphrase", "pass",
+			"--km-refresh-token", "token", "--passphrase", "pass",
 		}))
 }
 
