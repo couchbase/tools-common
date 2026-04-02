@@ -5,6 +5,7 @@
 - Add Client.GetObjectLock function. For S3 it uses the GetObjectRetention function. For Azure and GCP it falls back on
 GetObjectAttrs.
 - Parse S3 "403 Forbidden" errors as objerr.ErrUnauthorized.
+- Parse S3 "404 NoSuchObjectLockConfiguration" errors as objerr.NotFoundError.
 
 ## v8.2.0
 

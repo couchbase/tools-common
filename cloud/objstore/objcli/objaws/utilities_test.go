@@ -38,6 +38,11 @@ func TestHandleError(t *testing.T) {
 	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &smithy.GenericAPIError{Code: "Forbidden"})
 	require.ErrorIs(t, err, objerr.ErrUnauthorized)
 
+	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &smithy.GenericAPIError{Code: "NoSuchObjectLockConfiguration"})
+	require.ErrorAs(t, err, &notFound)
+	require.Equal(t, "object lock configuration for key", notFound.Type)
+	require.Equal(t, "key1", notFound.Name)
+
 	err = handleError(ptr.To("bucket1"), ptr.To("key1"), &s3types.NoSuchKey{})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "key", notFound.Type)

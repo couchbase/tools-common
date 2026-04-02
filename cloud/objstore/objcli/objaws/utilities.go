@@ -36,6 +36,12 @@ func handleError(bucket, key *string, err error) error {
 		}
 
 		return &objerr.NotFoundError{Type: "key", Name: *key}
+	case "NoSuchObjectLockConfiguration":
+		if key == nil {
+			key = ptr.To("<empty key name>")
+		}
+
+		return &objerr.NotFoundError{Type: "object lock configuration for key", Name: *key}
 	case "NoSuchBucket":
 		if bucket == nil {
 			bucket = ptr.To("<empty bucket name>")
