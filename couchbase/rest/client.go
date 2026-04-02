@@ -707,20 +707,16 @@ func (c *Client) stream(ctx *retry.Context, request *Request, resp *http.Respons
 	stream <- StreamingResponse{Error: err}
 }
 
-// Do converts and executes the provided request returning the raw HTTP response. In general users should prefer to use
-// the 'Execute' function which handles closing resources and returns more informative errors.
-//
-// NOTE: If the returned error is nil, the Response will contain a non-nil Body which the caller is expected to close.
-func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, error) {
-	shouldRetry := func(ctx *retry.Context, resp *http.Response, err error) bool {
-		if resp != nil {
-			return c.shouldRetryWithResponse(ctx, request, resp)
+// getRetryer creates a new retryer for 'request', respecting the options in 'RetryerOptions' if they are passed.
+func (c *Client) getRetryer(request *Request) retry.Retryer[*http.Response] {
+	opts := request.RetryerOptions
+	if opts == nil {
+		opts = &retry.RetryerOptions[*http.Response]{
+			MaxRetries: c.requestRetries,
 		}
-
-		return c.shouldRetryWithError(ctx, request, err)
 	}
 
-	logRetry := func(ctx *retry.Context, resp *http.Response, err error) {
+	opts.Log = func(ctx *retry.Context, resp *http.Response, err error) {
 		args := []any{
 			"attempt", ctx.Attempt(),
 			"method", request.Method,
@@ -740,20 +736,25 @@ func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, erro
 		c.logger.Warn("retrying request", args...)
 	}
 
-	cleanup := func(resp *http.Response) {
-		if resp == nil {
-			return
+	opts.ShouldRetry = func(ctx *retry.Context, resp *http.Response, err error) bool {
+		if resp != nil {
+			return c.shouldRetryWithResponse(ctx, request, resp)
 		}
 
-		c.cleanupResp(resp)
+		return c.shouldRetryWithError(ctx, request, err)
 	}
 
-	retryer := retry.NewRetryer[*http.Response](retry.RetryerOptions[*http.Response]{
-		MaxRetries:  c.requestRetries,
-		ShouldRetry: shouldRetry,
-		Log:         logRetry,
-		Cleanup:     cleanup,
-	})
+	opts.Cleanup = c.cleanupResp
+
+	return retry.NewRetryer[*http.Response](*opts) //nolint:bodyclose
+}
+
+// Do converts and executes the provided request returning the raw HTTP response. In general users should prefer to use
+// the 'Execute' function which handles closing resources and returns more informative errors.
+//
+// NOTE: If the returned error is nil, the Response will contain a non-nil Body which the caller is expected to close.
+func (c *Client) Do(ctx context.Context, request *Request) (*http.Response, error) {
+	retryer := c.getRetryer(request)
 
 	resp, err := retryer.DoWithContext(
 		ctx,

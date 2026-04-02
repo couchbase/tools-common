@@ -1,5 +1,9 @@
 # Changes
 
+## v4.1.0
+
+- Allow specifying a customer retryer for `rest.Request`s.
+
 ## v4.0.2
 
 - Return a known error from `cbcrypto.Reader` if the file does not seem to be

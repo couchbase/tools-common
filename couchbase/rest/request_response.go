@@ -1,10 +1,12 @@
 package rest
 
 import (
+	"net/http"
 	"net/url"
 	"time"
 
 	netutil "github.com/couchbase/tools-common/http/util"
+	"github.com/couchbase/tools-common/utils/v3/retry"
 )
 
 // Method is a readability wrapper around the method for a given REST request; only the methods defined in the 'http'
@@ -80,6 +82,13 @@ type Request struct {
 
 	// NoRetryOnStatusCodes is a list of status codes which will explicitly not be retried.
 	NoRetryOnStatusCodes []int
+
+	// RetryerOptions allows specifying a custom configuration for the retries of this request (e.g. number of attempts,
+	// min/max delay etc).
+	//
+	// NOTE: The function fields (e.g. 'Cleanup', 'ShouldRetry', 'Log') will be overridden to respect the retry related
+	// fields above and the client's logger.
+	RetryerOptions *retry.RetryerOptions[*http.Response]
 }
 
 // IsIdempotent returns a boolean indicating whether this request is idempotent and may be retried.

@@ -699,6 +699,55 @@ func TestClientExecuteWithModeLoopback(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestClientExecuteWithCustomRetryerOptions(t *testing.T) {
+	// To check that the retryer options are respected we require 10 retries before a valid response. This check is for
+	// safety in case 'DefaultRequestRetries' changes.
+	require.Less(t, DefaultRequestRetries, 10)
+
+	handlers := make(TestHandlers)
+
+	handlers.Add(
+		http.MethodGet,
+		"/test",
+		NewTestHandlerWithRetries(t, 10, http.StatusTooEarly, http.StatusOK, "", []byte("body")),
+	)
+
+	cluster := NewTestCluster(t, TestClusterOptions{
+		Handlers: handlers,
+	})
+	defer cluster.Close()
+
+	request := &Request{
+		ContentType:        ContentTypeURLEncoded,
+		Endpoint:           "/test",
+		ExpectedStatusCode: http.StatusOK,
+		Method:             http.MethodGet,
+		RetryOnStatusCodes: []int{http.StatusTooEarly},
+		Service:            ServiceManagement,
+		RetryerOptions: &retry.RetryerOptions[*http.Response]{
+			MinDelay:   time.Millisecond,
+			MaxDelay:   10 * time.Millisecond,
+			MinJitter:  time.Millisecond,
+			MaxJitter:  time.Millisecond,
+			MaxRetries: 15,
+		},
+	}
+
+	expected := &Response{
+		StatusCode: http.StatusOK,
+		Body:       []byte("body"),
+	}
+
+	client, err := newTestClient(cluster, true)
+	require.NoError(t, err)
+
+	defer client.Close()
+
+	actual, err := client.Execute(request)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+}
+
 func TestClientExecuteWithDefaultRetries(t *testing.T) {
 	for status := range netutil.TemporaryFailureStatusCodes {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
