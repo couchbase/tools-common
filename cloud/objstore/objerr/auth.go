@@ -11,5 +11,8 @@ var (
 	// ErrUnauthorized is returned if we've successfully authenticated against the cloud provider, however, we've
 	// attempted an operation where we don't have the valid permissions. This is typically a result of not having the
 	// correct RBAC permissions.
+	//
+	// NOTE: This error message is inaccurate for S3. Neither "403 AccessDenied" nor "403 Forbidden" guarantee that the
+	// user has been authenticated successfully.
 	ErrUnauthorized = errors.New("authenticated user does not have the permission to access this resource")
 )

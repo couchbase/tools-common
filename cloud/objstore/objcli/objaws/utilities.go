@@ -22,7 +22,7 @@ func handleError(bucket, key *string, err error) error {
 	switch errorCode {
 	case "InvalidAccessKeyId", "SignatureDoesNotMatch":
 		return objerr.ErrUnauthenticated
-	case "AccessDenied":
+	case "AccessDenied", "Forbidden":
 		return objerr.ErrUnauthorized
 	case "PreconditionFailed", "Conflict":
 		if key == nil {
