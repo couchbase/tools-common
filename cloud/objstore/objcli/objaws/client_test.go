@@ -2227,3 +2227,111 @@ func TestClientSetObjectLock(t *testing.T) {
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "PutObjectRetention", 1)
 }
+
+func TestClientGetObjectLock(t *testing.T) {
+	expirationTime := time.Now().Add(24 * time.Hour)
+
+	type test struct {
+		name        string
+		opts        objcli.GetObjectLockOptions
+		output      *s3.GetObjectRetentionOutput
+		err         error
+		expected    *objval.ObjectAttrs
+		expectError bool
+	}
+
+	tests := []test{
+		{
+			name: "ComplianceMode",
+			opts: objcli.GetObjectLockOptions{Bucket: "bucket", Key: "key"},
+			output: &s3.GetObjectRetentionOutput{
+				Retention: &types.ObjectLockRetention{
+					Mode:            types.ObjectLockRetentionModeCompliance,
+					RetainUntilDate: ptr.To(expirationTime),
+				},
+			},
+			expected: &objval.ObjectAttrs{
+				Key:            "key",
+				LockExpiration: ptr.To(expirationTime),
+				LockType:       objval.LockTypeCompliance,
+			},
+		},
+		{
+			name: "WithVersionID",
+			opts: objcli.GetObjectLockOptions{Bucket: "bucket", Key: "key", VersionID: "version1"},
+			output: &s3.GetObjectRetentionOutput{
+				Retention: &types.ObjectLockRetention{
+					Mode:            types.ObjectLockRetentionModeCompliance,
+					RetainUntilDate: ptr.To(expirationTime),
+				},
+			},
+			expected: &objval.ObjectAttrs{
+				Key:            "key",
+				VersionID:      "version1",
+				LockExpiration: ptr.To(expirationTime),
+				LockType:       objval.LockTypeCompliance,
+			},
+		},
+		{
+			name: "NoRetention",
+			opts: objcli.GetObjectLockOptions{Bucket: "bucket", Key: "key"},
+			output: &s3.GetObjectRetentionOutput{
+				Retention: nil,
+			},
+			expected: &objval.ObjectAttrs{Key: "key"},
+		},
+		{
+			name: "GovernanceMode",
+			opts: objcli.GetObjectLockOptions{Bucket: "bucket", Key: "key"},
+			output: &s3.GetObjectRetentionOutput{
+				Retention: &types.ObjectLockRetention{
+					Mode:            types.ObjectLockRetentionModeGovernance,
+					RetainUntilDate: ptr.To(expirationTime),
+				},
+			},
+			expected: &objval.ObjectAttrs{
+				Key:            "key",
+				LockExpiration: ptr.To(expirationTime),
+				LockType:       objval.LockTypeUndefined,
+			},
+		},
+		{
+			name:        "Error",
+			opts:        objcli.GetObjectLockOptions{Bucket: "bucket", Key: "key"},
+			err:         &smithy.GenericAPIError{Code: "NoSuchKey", Message: "The specified key does not exist"},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			api := &mockServiceAPI{}
+
+			fn := func(input *s3.GetObjectRetentionInput) bool {
+				bucket := input.Bucket != nil && *input.Bucket == test.opts.Bucket
+				key := input.Key != nil && *input.Key == test.opts.Key
+				versionID := test.opts.VersionID == "" ||
+					(input.VersionId != nil && *input.VersionId == test.opts.VersionID)
+
+				return bucket && key && versionID
+			}
+
+			api.On("GetObjectRetention", matchers.Context, mock.MatchedBy(fn)).Return(test.output, test.err)
+
+			client := &Client{serviceAPI: api}
+
+			attrs, err := client.GetObjectLock(context.Background(), test.opts)
+
+			if test.expectError {
+				require.Error(t, err)
+				require.Nil(t, attrs)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.expected, attrs)
+			}
+
+			api.AssertExpectations(t)
+			api.AssertNumberOfCalls(t, "GetObjectRetention", 1)
+		})
+	}
+}

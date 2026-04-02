@@ -1009,6 +1009,10 @@ func (c *Client) SetObjectLock(ctx context.Context, opts objcli.SetObjectLockOpt
 	return nil
 }
 
+func (c *Client) GetObjectLock(ctx context.Context, opts objcli.GetObjectLockOptions) (*objval.ObjectAttrs, error) {
+	return c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions(opts))
+}
+
 // getLockType converts Azure's 'blob.ImmutabilityPolicyMode' to 'objval.LockType'.
 //
 // NOTE: The value of the blob.ImmutabilityPolicyModeLocked constant is capitalized ("Locked"), however the Azure API

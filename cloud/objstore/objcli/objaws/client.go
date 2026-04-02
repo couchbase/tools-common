@@ -991,6 +991,34 @@ func (c *Client) SetObjectLock(ctx context.Context, opts objcli.SetObjectLockOpt
 	return nil
 }
 
+func (c *Client) GetObjectLock(ctx context.Context, opts objcli.GetObjectLockOptions) (*objval.ObjectAttrs, error) {
+	input := &s3.GetObjectRetentionInput{
+		Bucket: ptr.To(opts.Bucket),
+		Key:    ptr.To(opts.Key),
+	}
+
+	if opts.VersionID != "" {
+		input.VersionId = ptr.To(opts.VersionID)
+	}
+
+	resp, err := c.serviceAPI.GetObjectRetention(ctx, input)
+	if err != nil {
+		return nil, handleError(input.Bucket, input.Key, err)
+	}
+
+	attrs := &objval.ObjectAttrs{
+		Key:       opts.Key,
+		VersionID: opts.VersionID,
+	}
+
+	if resp.Retention != nil {
+		attrs.LockExpiration = resp.Retention.RetainUntilDate
+		attrs.LockType = getLockTypeFromRetentionMode(resp.Retention.Mode)
+	}
+
+	return attrs, nil
+}
+
 // paginator wraps the AWS paginator API in an interface.
 type paginator[T any] interface {
 	HasMorePages() bool
@@ -1012,6 +1040,16 @@ func listObjects[O any](ctx context.Context, pgn paginator[O], fn func(O) error)
 	}
 
 	return nil
+}
+
+func getLockTypeFromRetentionMode(awsLockMode types.ObjectLockRetentionMode) objval.LockType {
+	switch awsLockMode {
+	case types.ObjectLockRetentionModeCompliance:
+		return objval.LockTypeCompliance
+	default:
+		// Currently, we only care if the object is in 'compliance' mode.
+		return objval.LockTypeUndefined
+	}
 }
 
 // getLockType converts S3's 'types.ObjectLockMode' to 'objval.LockType'.

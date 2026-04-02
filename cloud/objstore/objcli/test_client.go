@@ -453,6 +453,10 @@ func (t *TestClient) SetObjectLock(_ context.Context, opts SetObjectLockOptions)
 	return nil
 }
 
+func (t *TestClient) GetObjectLock(ctx context.Context, opts GetObjectLockOptions) (*objval.ObjectAttrs, error) {
+	return t.GetObjectAttrs(ctx, GetObjectAttrsOptions(opts))
+}
+
 func (t *TestClient) getBucketLocked(bucket string) objval.TestBucket {
 	_, ok := t.Buckets[bucket]
 	if !ok {

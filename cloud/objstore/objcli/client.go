@@ -317,6 +317,18 @@ type SetObjectLockOptions struct {
 	Lock *ObjectLock
 }
 
+// GetObjectLockOptions encapsulates the options available when using the 'GetObjectLock' function.
+type GetObjectLockOptions struct {
+	// Bucket is the bucket being operated on.
+	Bucket string
+
+	// Key is the key (path) of the object/blob being operated on.
+	Key string
+
+	// VersionID is used to identify a specific version when object versioning is enabled.
+	VersionID string
+}
+
 // Client is a unified interface for accessing/managing objects stored in the cloud.
 type Client interface {
 	// Provider returns the cloud provider this client is interfacing with.
@@ -405,6 +417,9 @@ type Client interface {
 
 	// SetObjectLock sets the lock for an existing object.
 	SetObjectLock(ctx context.Context, opts SetObjectLockOptions) error
+
+	// GetObjectLock returns the lock data for the given object (version).
+	GetObjectLock(ctx context.Context, opts GetObjectLockOptions) (*objval.ObjectAttrs, error)
 
 	// Close the underlying client/SDK where applicable; use of the client, or the underlying SDK after a call to Close
 	// has undefined behavior. This is required to stop memory leaks in GCP.

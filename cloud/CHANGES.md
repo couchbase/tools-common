@@ -1,5 +1,10 @@
 # Changes
 
+## v8.3.0
+
+- Add Client.GetObjectLock function. For S3 it uses the GetObjectRetention function. For Azure and GCP it falls back on
+GetObjectAttrs.
+
 ## v8.2.0
 
 - Add the ability to get/set object metadata.

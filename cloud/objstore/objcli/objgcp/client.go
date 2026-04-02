@@ -900,6 +900,10 @@ func (c *Client) SetObjectLock(ctx context.Context, opts objcli.SetObjectLockOpt
 	return nil
 }
 
+func (c *Client) GetObjectLock(ctx context.Context, opts objcli.GetObjectLockOptions) (*objval.ObjectAttrs, error) {
+	return c.GetObjectAttrs(ctx, objcli.GetObjectAttrsOptions(opts))
+}
+
 // getLockType converts GCP's retention mode to 'objval.LockType'.
 func getLockType(gcpLockMode string) objval.LockType {
 	switch gcpLockMode {

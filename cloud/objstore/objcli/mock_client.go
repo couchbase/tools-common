@@ -343,6 +343,36 @@ func (_m *MockClient) GetObjectAttrs(ctx context.Context, opts GetObjectAttrsOpt
 	return r0, r1
 }
 
+// GetObjectLock provides a mock function with given fields: ctx, opts
+func (_m *MockClient) GetObjectLock(ctx context.Context, opts GetObjectLockOptions) (*objval.ObjectAttrs, error) {
+	ret := _m.Called(ctx, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetObjectLock")
+	}
+
+	var r0 *objval.ObjectAttrs
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, GetObjectLockOptions) (*objval.ObjectAttrs, error)); ok {
+		return rf(ctx, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, GetObjectLockOptions) *objval.ObjectAttrs); ok {
+		r0 = rf(ctx, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*objval.ObjectAttrs)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, GetObjectLockOptions) error); ok {
+		r1 = rf(ctx, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IterateObjects provides a mock function with given fields: ctx, opts
 func (_m *MockClient) IterateObjects(ctx context.Context, opts IterateObjectsOptions) error {
 	ret := _m.Called(ctx, opts)
