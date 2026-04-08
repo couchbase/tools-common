@@ -834,7 +834,7 @@ func (c *Client) GetBucketVersioningStatus(
 
 	attrs, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, handleError(opts.Bucket, "", err)
 	}
 
 	res := &objval.BucketVersioningStatus{
@@ -852,7 +852,7 @@ func (c *Client) GetBucketLockingStatus(
 
 	attrs, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, handleError(opts.Bucket, "", err)
 	}
 
 	res := &objval.BucketLockingStatus{

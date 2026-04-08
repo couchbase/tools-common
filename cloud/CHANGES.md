@@ -6,6 +6,7 @@
 GetObjectAttrs.
 - Parse S3 "403 Forbidden" errors as objerr.ErrUnauthorized.
 - Parse S3 "404 NoSuchObjectLockConfiguration" errors as objerr.NotFoundError.
+- Add error handling for GCP Client.GetBucketVersioningStatus and Client.GetBucketLockingStatus
 
 ## v8.2.0
 
