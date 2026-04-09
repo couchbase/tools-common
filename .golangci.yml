@@ -45,6 +45,10 @@ linters:
       # De Morgan's Law; ignoring because the compiler should do this anyway, and prefer readability.
       - linters: 'staticcheck'
         text: 'QF1001'
+      - path: _test\.go$
+        linters:
+          - prealloc
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
