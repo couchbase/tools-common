@@ -21,10 +21,15 @@ func (e *InvalidByteRangeError) Error() string {
 }
 
 // ByteRange represents a byte range of an object in the HTTP range header format. For more information on the format
-// see 'https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35'.
+// see 'https://www.rfc-editor.org/rfc/rfc9110.html#name-byte-ranges'.
 type ByteRange struct {
+	// Start is the index of the first byte to download (inclusive, zero-indexed).
 	Start int64
-	End   int64
+
+	// End is the index of the last byte to download (inclusive). A value of 0 is treated as "no upper bound",
+	// meaning the range extends to the last byte of the object. For example, {Start: 0, End: 0} downloads the
+	// entire object, and {Start: 5, End: 0} downloads from byte 5 to the end.
+	End int64
 }
 
 // Valid returns an error if the byte range is invalid, <nil> otherwise.

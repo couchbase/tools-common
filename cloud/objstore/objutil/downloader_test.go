@@ -238,11 +238,29 @@ func TestMPDownloaderByteRangeUseProvided(t *testing.T) {
 	require.Same(t, expected, br)
 }
 
+func TestMPDownloaderByteRangeZeroByteObject(t *testing.T) {
+	client := objcli.NewTestClient(t, objval.ProviderAWS)
+
+	_, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   bytes.NewReader([]byte{}),
+	})
+	require.NoError(t, err)
+
+	downloader := NewMPDownloader(MPDownloaderOptions{Client: client, Bucket: "bucket", Key: "key"})
+
+	br, err := downloader.byteRange()
+	require.NoError(t, err)
+	require.Nil(t, br)
+}
+
 func TestMPDownloaderInternalDownload(t *testing.T) {
 	type test struct {
 		name     string
 		data     []byte
 		br       *objval.ByteRange
+		partSize int64
 		expected []byte
 	}
 
@@ -271,6 +289,13 @@ func TestMPDownloaderInternalDownload(t *testing.T) {
 			br:   &objval.ByteRange{Start: 1, End: 3},
 			// Not provided a starting byte range so this should be null padded/sparse
 			expected: append([]byte{0}, []byte("alu")...),
+		},
+		{
+			name:     "MultiChunkNonZeroStart",
+			data:     []byte("abcdefghij"),
+			partSize: 4,
+			br:       &objval.ByteRange{Start: 2, End: 9},
+			expected: append([]byte{0, 0}, []byte("cdefghij")...),
 		},
 	}
 
@@ -304,7 +329,14 @@ func TestMPDownloaderInternalDownload(t *testing.T) {
 				Writer: file,
 			}
 
-			downloader := NewMPDownloader(options)
+			var downloader *MPDownloader
+
+			if test.partSize > 0 {
+				options.Options = Options{PartSize: test.partSize, Context: context.Background()}
+				downloader = &MPDownloader{opts: options}
+			} else {
+				downloader = NewMPDownloader(options)
+			}
 
 			require.NoError(t, downloader.download(test.br))
 

@@ -37,6 +37,10 @@ type MPDownloaderOptions struct {
 	//
 	// NOTE: Download will not create sparse files, a non-zero start offset will be "shifted" prior to being written to
 	// disk.
+	//
+	// The provided byte range is passed directly to the cloud provider. An open-ended range (End == 0) should only be
+	// used when it is known that there is at least one byte "remaining" e.g. range 99-0 would return an error for a
+	// 100-byte object, but not for a 101-byte object.
 	ByteRange *objval.ByteRange
 
 	// Writer is the destination for the object.
@@ -66,19 +70,26 @@ func NewMPDownloader(opts MPDownloaderOptions) *MPDownloader {
 
 // Download executes the download.
 //
-// NOTE: If no byte range is provided, the whole object will be downloaded.
+// NOTE: If no byte range is provided, the whole object will be downloaded. If the object is empty (0 bytes), then no
+// download will be done. The caller is responsible for ensuring the byte range (if provided) is valid via
+// ByteRange.Valid(), that the requested bytes exist, and there is at least one byte in the requested range.
 func (m *MPDownloader) Download() error {
 	br, err := m.byteRange()
 	if err != nil {
 		return fmt.Errorf("failed to get object byte range: %w", err)
 	}
 
+	if br == nil {
+		return nil
+	}
+
 	return m.download(br)
 }
 
-// byteRange returns the byte range which should be downloaded.
+// byteRange returns the byte range to download. When no byte range is provided in 'm.opts', GetObjectAttrs is called
+// to determine the object size. Returns nil when there is nothing to download i.e. the object is zero bytes.
 func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
-	// Provided with a byte range, use this instead of fetching the whole object
+	// Provided with a byte range - use this instead of fetching the whole object
 	if m.opts.ByteRange != nil {
 		return m.opts.ByteRange, nil
 	}
@@ -92,7 +103,12 @@ func (m *MPDownloader) byteRange() (*objval.ByteRange, error) {
 		return nil, fmt.Errorf("failed to get object attributes: %w", err)
 	}
 
-	return &objval.ByteRange{End: ptr.From(attrs.Size) - 1}, nil
+	size := ptr.From(attrs.Size)
+	if size == 0 {
+		return nil, nil
+	}
+
+	return &objval.ByteRange{End: size - 1}, nil
 }
 
 // download the given byte range using multiple concurrent requests.
@@ -105,7 +121,7 @@ func (m *MPDownloader) download(br *objval.ByteRange) error {
 		return pool.Queue(func(ctx context.Context) error { return m.downloadChunk(ctx, br) })
 	}
 
-	for s, e := br.Start, m.opts.PartSize-1; s <= br.End; s, e = s+m.opts.PartSize, e+m.opts.PartSize {
+	for s, e := br.Start, br.Start+m.opts.PartSize-1; s <= br.End; s, e = s+m.opts.PartSize, e+m.opts.PartSize {
 		// Can ignore this error, the same error will be propagated by the call to 'Stop' below.
 		if err := queue(&objval.ByteRange{Start: s, End: min(e, br.End)}); err != nil {
 			break

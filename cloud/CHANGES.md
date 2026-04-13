@@ -1,5 +1,11 @@
 # Changes
 
+## v8.3.1
+
+- Fix chunking in `MPDownloader.download` when the byte range has a non-zero start offset.
+- `MPDownloader` now skips downloading when the object is zero bytes.
+- Clarified behaviour/requirements around byte ranges.
+
 ## v8.3.0
 
 - Add Client.GetObjectLock function. For S3 it uses the GetObjectRetention function. For Azure and GCP it falls back on
