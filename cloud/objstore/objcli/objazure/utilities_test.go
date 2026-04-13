@@ -38,6 +38,9 @@ func TestHandleError(t *testing.T) {
 	err = handleError("container1", "blob1", respError(bloberror.AuthorizationFailure))
 	require.ErrorIs(t, err, objerr.ErrUnauthorized)
 
+	err = handleError("container1", "blob1", respError(bloberror.AuthorizationPermissionMismatch))
+	require.ErrorIs(t, err, objerr.ErrUnauthorized)
+
 	err = handleError("container1", "blob1", respError(bloberror.BlobNotFound))
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "blob", notFound.Type)

@@ -12,7 +12,8 @@ func handleError(bucket, key string, err error) error {
 		return objerr.ErrUnauthenticated
 	}
 
-	if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
+	if bloberror.HasCode(err, bloberror.AuthorizationFailure) ||
+		bloberror.HasCode(err, bloberror.AuthorizationPermissionMismatch) {
 		return objerr.ErrUnauthorized
 	}
 

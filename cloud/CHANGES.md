@@ -1,5 +1,9 @@
 # Changes
 
+## v8.3.2
+
+- Parse Azure "403 AuthorizationPermissionMismatch" errors as objerr.ErrUnauthorized.
+
 ## v8.3.1
 
 - Fix chunking in `MPDownloader.download` when the byte range has a non-zero start offset.
