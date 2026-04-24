@@ -43,7 +43,8 @@ func (u *CloudOrFileURL) String() string {
 
 // Join returns a new CloudOrFileURL with args appended to u.
 func (u *CloudOrFileURL) Join(args ...string) *CloudOrFileURL {
-	parts := []string{u.Path}
+	parts := make([]string, 0, 1+len(args))
+	parts = append(parts, u.Path)
 	parts = append(parts, args...)
 
 	return &CloudOrFileURL{Bucket: u.Bucket, Path: path.Join(parts...), Provider: u.Provider}

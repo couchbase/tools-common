@@ -406,7 +406,7 @@ func (c *Client) DeleteObjects(ctx context.Context, opts objcli.DeleteObjectsOpt
 }
 
 func (c *Client) DeleteObjectVersions(ctx context.Context, opts objcli.DeleteObjectVersionsOptions) error {
-	objVersions := make([]objval.ObjectAttrs, 0)
+	objVersions := make([]objval.ObjectAttrs, 0, len(opts.Versions))
 
 	for _, objVersion := range opts.Versions {
 		objVersions = append(objVersions, objval.ObjectAttrs{

@@ -1,5 +1,12 @@
 # Changes
 
+## v8.4.0
+
+- Add `objcli.NewHTTPClient` and `objcli.HTTPTimeouts` for creating a configurable HTTP client for use by object store
+  SDKs, with timeouts configurable via the `CB_OBJECT_STORE_HTTP_TIMEOUTS` environment variable.
+- Add `objcli.GetMaxRetries` and `objcli.GetMaxRetryBackoff` for configurable object store retry settings.
+- Add `objaws.AWSNewConfig`, `objaws.AWSLogger`, `objaws.AWSRetryer`, and `objaws.AddSchemeIfMissing`.
+
 ## v8.3.2
 
 - Parse Azure "403 AuthorizationPermissionMismatch" errors as objerr.ErrUnauthorized.
