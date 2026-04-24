@@ -163,7 +163,7 @@ sync, types, databases, http, environment, couchbase, cloud
 When bumping all the modules (e.g. for dependency updates) they must be bumped in the following order.
 
 ```python
-[core, auth, cbbs, errors, fs, functional, strings, testing, utils, sync, databases, types, http, environment, cloud, couchbase]
+[core, auth, cbbs, errors, fs, functional, strings, testing, utils, sync, databases, types, http, environment, cloud, couchbase, crypt]
 ```
 
 This is the topologically sorted order of the modules, where later modules depend on those earlier in the list; an
