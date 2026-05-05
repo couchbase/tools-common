@@ -50,16 +50,6 @@ pipeline {
                     sh "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT_VERSION}/install.sh | sh -s -- -b ${GOBIN} ${GOLANGCI_LINT_VERSION}"
                     sh "golangci-lint --version"
 
-                    // A clone of 'jq' written in Go (required for merging coverage files)
-                    sh "go install github.com/itchyny/gojq/cmd/gojq@latest"
-
-                    // Unit test reporting
-                    sh "go install github.com/jstemmer/go-junit-report@latest"
-
-                    // Coverage reporting
-                    sh "go install github.com/axw/gocov/gocov@latest"
-                    sh "go install github.com/AlekSi/gocov-xml@latest"
-
                     // clone project
                     sh "git clone git@github.com:couchbase/tools-common.git"
 
@@ -120,7 +110,7 @@ pipeline {
 
             // Post the test coverage
             recordCoverage(
-                tools: [[parser: 'COBERTURA', pattern: 'reports/coverage.xml']],
+                tools: [[parser: 'GO_COV', pattern: 'reports/*.out']],
                 qualityGates: [[threshold: 30.0, metric: 'LINE', baseline: 'PROJECT']],
                 sourceDirectories: [[path: "tools-common/"]],
                 sourceCodeRetention: "LAST_BUILD",
