@@ -19,7 +19,7 @@ func NewCloudKM(opts *Options) (KeyManager, error) {
 		return nil, fmt.Errorf("key url is required")
 	}
 
-	keeper, err := openKeeper(opts)
+	keeper, err := NewCloudKeeper(opts)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to key manager: %w", err)
 	}
@@ -63,13 +63,15 @@ func (k *CloudKM) GetRepositoryKey() ([]byte, error) {
 	return k.userKey, nil
 }
 
-func openKeeper(opts *Options) (Keeper, error) {
+// NewCloudKeeper connects to the external KMS based on opts.KeyURL and returns a Keeper for direct encrypt/decrypt
+// operations without managing a repository key.
+func NewCloudKeeper(opts *Options) (Keeper, error) {
 	switch {
 	case strings.HasPrefix(opts.KeyURL, "awskms://"):
 		return getAWSKeeper(strings.TrimPrefix(opts.KeyURL, "awskms://"), opts.KeyRegion,
 			opts.SecretAccessKey, opts.AccessKeyID, opts.RefreshToken, opts.OverrideEndpoint)
 	case strings.HasPrefix(opts.KeyURL, "gcpkms://"):
-		return getGCPKeeper(strings.TrimPrefix(opts.KeyURL, "gcpkms://"), opts.AuthFile)
+		return getGCPKeeper(strings.TrimPrefix(opts.KeyURL, "gcpkms://"), opts.AuthFile, opts.JSONCreds)
 	case strings.HasPrefix(opts.KeyURL, "azurekeyvault://"):
 		return getAzureKeeper(strings.Replace(opts.KeyURL, "azurekeyvault://", "https://", 1),
 			opts.TenantID, opts.AccessKeyID, opts.SecretAccessKey)

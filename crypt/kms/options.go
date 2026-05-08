@@ -26,4 +26,6 @@ type Options struct {
 	RefreshToken string
 	// AuthFile is the path to a service-account JSON file for gcpkms://.
 	AuthFile string
+	// JSONCreds is the raw GCP service-account JSON for gcpkms://. Takes precedence over AuthFile.
+	JSONCreds []byte
 }

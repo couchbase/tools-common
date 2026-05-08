@@ -38,14 +38,17 @@ func (k *gcpKeeper) Decrypt(ctx context.Context, cipherText []byte) ([]byte, err
 
 // getGCPKeeper dials the GCP KMS and returns a client to it. The available auth options are:
 // 1. Service account via the GOOGLE_APPLICATION_CREDENTIALS environmental variable.
-// 2. Service account explicitly passed to the system via pathToServiceFile.
-// 3. In GCP the client will find credentials by itself.
-func getGCPKeeper(url, pathToServiceFile string) (Keeper, error) {
+// 2. Service account JSON explicitly passed via serviceJSON.
+// 3. Service account file explicitly passed via pathToServiceFile.
+// 4. In GCP the client will find credentials by itself.
+func getGCPKeeper(url, pathToServiceFile string, serviceJSON []byte) (Keeper, error) {
 	var clientOpts option.ClientOption
 
-	if pathToServiceFile != "" {
-		// See MB-71354
-		clientOpts = option.WithCredentialsFile(pathToServiceFile)
+	// These functions are deprecated but we still need them, so ignore the lint. See MB-71354
+	if serviceJSON != nil {
+		clientOpts = option.WithCredentialsJSON(serviceJSON) //nolint:staticcheck
+	} else if pathToServiceFile != "" {
+		clientOpts = option.WithCredentialsFile(pathToServiceFile) //nolint:staticcheck
 	}
 
 	keeper := &gcpKeeper{keyID: url}
