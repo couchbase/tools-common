@@ -1,5 +1,9 @@
 # Changes
 
+## v8.4.1
+
+- Upgraded `github.com/go-jose/go-jose` to v4.1.4
+
 ## v8.4.0
 
 - Add `objcli.NewHTTPClient` and `objcli.HTTPTimeouts` for creating a configurable HTTP client for use by object store
