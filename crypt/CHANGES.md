@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.1
+
+- Upgraded `github.com/go-jose/go-jose` to v4.1.4
+
 ## v1.1.0
 
 - Add `crypt/kms.NewCloudKeeper` to connect to a cloud KMS and return a `Keeper` for direct encrypt/decrypt operations
