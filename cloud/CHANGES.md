@@ -1,5 +1,9 @@
 # Changes
 
+## v8.4.2
+
+- Upgraded dependencies
+
 ## v8.4.1
 
 - Upgraded `github.com/go-jose/go-jose` to v4.1.4

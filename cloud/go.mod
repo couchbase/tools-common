@@ -1,6 +1,6 @@
 module github.com/couchbase/tools-common/cloud/v8
 
-go 1.24.0
+go 1.25.0
 
 require (
 	cloud.google.com/go/storage v1.57.2
@@ -14,11 +14,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.20.18
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0
 	github.com/aws/smithy-go v1.24.0
-	github.com/couchbase/tools-common/environment v1.1.2
+	github.com/couchbase/tools-common/environment v1.1.3
 	github.com/couchbase/tools-common/errors v1.1.0
 	github.com/couchbase/tools-common/fs v1.0.3
 	github.com/couchbase/tools-common/functional v1.4.0
-	github.com/couchbase/tools-common/http v1.0.11
+	github.com/couchbase/tools-common/http v1.0.12
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/couchbase/tools-common/sync/v2 v2.0.2
 	github.com/couchbase/tools-common/testing v1.0.3
@@ -87,11 +87,11 @@ require (
 	go.opentelemetry.io/otel/sdk v1.39.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genproto v0.0.0-20250922171735-9219d122eba9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
