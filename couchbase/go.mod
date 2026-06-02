@@ -1,13 +1,13 @@
 module github.com/couchbase/tools-common/couchbase/v4
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/couchbase/goutils v0.2.0
 	github.com/couchbase/tools-common/auth/v2 v2.1.0
-	github.com/couchbase/tools-common/environment v1.1.2
+	github.com/couchbase/tools-common/environment v1.1.3
 	github.com/couchbase/tools-common/errors v1.1.0
-	github.com/couchbase/tools-common/http v1.0.11
+	github.com/couchbase/tools-common/http v1.0.12
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/couchbase/tools-common/sync/v2 v2.0.2
 	github.com/couchbase/tools-common/testing v1.0.3
@@ -23,7 +23,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/klauspost/compress v1.18.2
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/crypto v0.46.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
 	golang.org/x/mod v0.31.0
 )
@@ -40,8 +40,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

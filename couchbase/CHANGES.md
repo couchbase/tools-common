@@ -1,5 +1,9 @@
 # Changes
 
+## v4.1.1
+
+- Upgraded dependencies
+
 ## v4.1.0
 
 - Allow specifying a customer retryer for `rest.Request`s.
