@@ -1,5 +1,9 @@
 # Changes
 
+## v1.0.12
+
+- Upgraded `x/crypto` to v0.52.0
+
 ## v1.0.11
 
 - Upgraded dependencies
