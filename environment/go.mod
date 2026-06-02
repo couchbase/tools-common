@@ -1,9 +1,9 @@
 module github.com/couchbase/tools-common/environment
 
-go 1.24.0
+go 1.25.0
 
 require (
-	github.com/couchbase/tools-common/http v1.0.11
+	github.com/couchbase/tools-common/http v1.0.12
 	github.com/couchbase/tools-common/strings v1.0.0
 	github.com/couchbase/tools-common/types/v2 v2.2.2
 	github.com/stretchr/testify v1.11.1
