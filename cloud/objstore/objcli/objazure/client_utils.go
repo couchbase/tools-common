@@ -39,7 +39,7 @@ func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *se
 		return client, nil
 	}
 
-	client, err = getServiceClientWithTokenCredential(serviceURL, options)
+	client, err = getServiceClientWithTokenCredential(serviceURL, accessKeyID, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service client with token credential: %w", err)
 	}
@@ -104,9 +104,10 @@ func GetServiceClientWithClientSecret(
 // username and password.
 func getServiceClientWithTokenCredential(
 	serviceURL string,
+	clientID string,
 	options *service.ClientOptions,
 ) (*service.Client, error) {
-	credential, err := NewTokenCredential()
+	credential, err := NewTokenCredential(clientID)
 	if err != nil {
 		return nil, err
 	}

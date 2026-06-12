@@ -3,6 +3,7 @@
 ## v8.5.0
 
 - Add a function for obtaining Azure client using Azure AD client secret credential.
+- Add support for authentication with Azure managed identity credential with user-provided ID
 
 ## v8.4.2
 

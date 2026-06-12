@@ -21,7 +21,7 @@ type TokenCredential struct {
 
 // NewTokenCredential returns an initialized 'TokenCredential', will return an error if none of the expected credentials
 // are available.
-func NewTokenCredential() (*TokenCredential, error) {
+func NewTokenCredential(clientID string) (*TokenCredential, error) {
 	var (
 		providers = 2
 		creds     = make([]azcore.TokenCredential, 0, providers)
@@ -39,7 +39,7 @@ func NewTokenCredential() (*TokenCredential, error) {
 	// onto the next item in the chain.
 	//
 	// See https://github.com/Azure/azure-sdk-for-go/issues/19699#issuecomment-1352295710 for more information.
-	mi, err := newWrappedMIC()
+	mi, err := newWrappedMIC(clientID)
 	merr.Add(err)
 
 	if mi != nil {
@@ -72,10 +72,14 @@ type wrappedMIC struct {
 }
 
 // newWrappedMIC returns an initialized 'wrappedMIC'.
-func newWrappedMIC() (*wrappedMIC, error) {
+func newWrappedMIC(clientID string) (*wrappedMIC, error) {
 	options := &azidentity.ManagedIdentityCredentialOptions{
 		// Used to indicate to the SDK which managed identity to use, this is explicitly used by 'couchbase-cloud'.
 		ID: azidentity.ClientID((os.Getenv("AZURE_CLIENT_ID"))),
+	}
+
+	if clientID != "" {
+		options.ID = azidentity.ClientID(clientID)
 	}
 
 	msi, err := azidentity.NewManagedIdentityCredential(options)
