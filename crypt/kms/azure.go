@@ -111,6 +111,12 @@ func parseAzureURL(url string) (string, string, string, error) {
 // getCredentials will try to get secret credentials if the arguments are all present or will try to get them from the
 // environment if none are set. Either all parameters must be passed or none of them, otherwise it will return an error.
 func getCredentials(tenantID, secretID, secretKey string) (azcore.TokenCredential, error) {
+	if secretID != "" && tenantID == "" && secretKey == "" {
+		return azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+			ID: azidentity.ClientID(secretID),
+		})
+	}
+
 	if (tenantID != "" || secretID != "" || secretKey != "") && (tenantID == "" || secretID == "" || secretKey == "") {
 		return nil, fmt.Errorf(
 			"if one of --km-tenant-id, --km-access-key-id, --km-secret-access-key is passed all three must be passed")

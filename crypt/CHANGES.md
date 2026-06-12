@@ -3,6 +3,7 @@
 ## v1.2.0
 
 - Add AuthByInstanceMetaData field to KMS options.
+- Add support for Azure managed identity credential with user-provided ID
 
 ## v1.1.2
 
