@@ -69,7 +69,8 @@ func NewCloudKeeper(opts *Options) (Keeper, error) {
 	switch {
 	case strings.HasPrefix(opts.KeyURL, "awskms://"):
 		return getAWSKeeper(strings.TrimPrefix(opts.KeyURL, "awskms://"), opts.KeyRegion,
-			opts.SecretAccessKey, opts.AccessKeyID, opts.RefreshToken, opts.OverrideEndpoint)
+			opts.SecretAccessKey, opts.AccessKeyID, opts.RefreshToken, opts.OverrideEndpoint,
+			opts.AuthByInstanceMetaData)
 	case strings.HasPrefix(opts.KeyURL, "gcpkms://"):
 		return getGCPKeeper(strings.TrimPrefix(opts.KeyURL, "gcpkms://"), opts.AuthFile, opts.JSONCreds)
 	case strings.HasPrefix(opts.KeyURL, "azurekeyvault://"):

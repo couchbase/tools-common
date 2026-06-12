@@ -28,4 +28,6 @@ type Options struct {
 	AuthFile string
 	// JSONCreds is the raw GCP service-account JSON for gcpkms://. Takes precedence over AuthFile.
 	JSONCreds []byte
+	// AuthByInstanceMetaData explicitly enables authentication by instance metadata for AWS KMS.
+	AuthByInstanceMetaData bool
 }

@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.0
+
+- Add AuthByInstanceMetaData field to KMS options.
+
 ## v1.1.2
 
 - Upgraded dependencies

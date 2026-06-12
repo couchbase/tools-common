@@ -15,12 +15,14 @@ import (
 // getAWSKeeper creates a custom aws session and uses it to dial aws KMS.
 func getAWSKeeper(
 	url, region, secretAccessKey, accessKeyID, refreshToken, overrideEndpoint string,
+	authByInstanceMetaData bool,
 ) (*secrets.Keeper, error) {
 	config, _, err := objaws.AWSNewConfig(context.Background(), objaws.AWSOptions{
-		Region:          region,
-		AccessKeyID:     accessKeyID,
-		SecretAccessKey: secretAccessKey,
-		RefreshToken:    refreshToken,
+		Region:                 region,
+		AccessKeyID:            accessKeyID,
+		SecretAccessKey:        secretAccessKey,
+		RefreshToken:           refreshToken,
+		AuthByInstanceMetaData: authByInstanceMetaData,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create aws session options: %w", err)
