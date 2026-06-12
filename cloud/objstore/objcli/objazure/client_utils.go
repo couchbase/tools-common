@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
@@ -64,6 +65,30 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 	client, err := service.NewClientWithSharedKeyCredential(serviceURL, credentials, options)
 	if err != nil {
 		return nil, err // Purposefully not wrapped
+	}
+
+	return client, nil
+}
+
+// GetServiceClientWithClientSecret creates a service client that authenticates using Azure AD client secret
+// credentials (tenant ID, client ID, client secret). Unlike GetServiceClient, this bypasses shared key and
+// environment-based credential chains entirely.
+func GetServiceClientWithClientSecret(
+	tenantID, clientID, clientSecret, endpoint string, options *service.ClientOptions,
+) (*service.Client, error) {
+	serviceURL, err := getServiceURL(endpoint, clientID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service URL: %w", err)
+	}
+
+	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client secret credential: %w", err)
+	}
+
+	client, err := service.NewClient(serviceURL, cred, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create azure service client: %w", err)
 	}
 
 	return client, nil

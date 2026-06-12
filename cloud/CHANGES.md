@@ -1,5 +1,9 @@
 # Changes
 
+## v8.5.0
+
+- Add a function for obtaining Azure client using Azure AD client secret credential.
+
 ## v8.4.2
 
 - Upgraded dependencies
