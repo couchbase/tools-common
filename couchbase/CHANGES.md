@@ -1,5 +1,9 @@
 # Changes
 
+## v4.2.0
+
+- Add 8.1.0 (Totoro) to couchbase/value
+
 ## v4.1.1
 
 - Upgraded dependencies

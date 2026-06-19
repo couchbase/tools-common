@@ -68,11 +68,14 @@ const (
 	// Version7_6_4 represents the 7.6.4 release of Couchbase Server (Trinity).
 	Version7_6_4 = Version("7.6.4")
 
-	// Version8_0_0 represents the 7.6.0 release of Couchbase Server (Morpheus).
+	// Version8_0_0 represents the 8.0.0 release of Couchbase Server (Morpheus).
 	Version8_0_0 = Version("8.0.0")
 
+	// Version8_1_0 represents the 8.1.0 release of Couchbase Server (Totoro).
+	Version8_1_0 = Version("8.1.0")
+
 	// VersionLatest represents the latest known version of Couchbase server, this may be an unreleased version.
-	VersionLatest = Version8_0_0
+	VersionLatest = Version8_1_0
 
 	// VersionColumnar1_0_0 represents the 1.0.0 release of Couchbase Columnar (Goldfish).
 	VersionColumnar1_0_0 = Version("1.0.0" + SuffixColumnar)
