@@ -1,5 +1,9 @@
 # Changes
 
+## v4.2.1
+
+- Export cbcrypto magic bytes
+
 ## v4.2.0
 
 - Add 8.1.0 (Totoro) to couchbase/value

@@ -58,8 +58,8 @@ const (
 	pbkdf2IterationMultiplier = 1024
 )
 
-// magicBytes is the cbcrypto file format magic string: "\x00Couchbase Encrypted\x00"
-var magicBytes = []byte("\x00Couchbase Encrypted\x00")
+// MagicBytes is the cbcrypto file format magic string: "\x00Couchbase Encrypted\x00"
+var MagicBytes = []byte("\x00Couchbase Encrypted\x00")
 
 // CompressionType defines the compression algorithm used in an encrypted file.
 type CompressionType int
@@ -356,7 +356,7 @@ func parseHeader(headerData []byte) (*Header, error) {
 		return nil, &ErrNotEncrypted{Reason: "file is too small to be a valid cbcrypto file"}
 	}
 
-	if !bytes.Equal(headerData[:len(magicBytes)], magicBytes) {
+	if !bytes.Equal(headerData[:len(MagicBytes)], MagicBytes) {
 		return nil, &ErrNotEncrypted{Reason: "does not contain the cbcrypto magic string"}
 	}
 

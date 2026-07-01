@@ -84,7 +84,7 @@ func NewCBCWriter(w io.Writer, opts WriterOptions) (*CBCWriter, error) {
 	}
 
 	header := make([]byte, headerSize)
-	copy(header, magicBytes)
+	copy(header, MagicBytes)
 	header[versionOffset] = CurrentVersion
 	header[compressionOffset] = byte(opts.Compression)
 
