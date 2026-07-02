@@ -1,5 +1,9 @@
 # Changes
 
+## v8.5.1
+
+- Fix panic in GCP's `AppendToObject`
+
 ## v8.5.0
 
 - Add a function for obtaining Azure client using Azure AD client secret credential.

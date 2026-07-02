@@ -984,6 +984,39 @@ func TestClientAppendToObjectUsingObjectComposition(t *testing.T) {
 	mcAPI.AssertNumberOfCalls(t, "Run", 1)
 }
 
+// Previously a non "not found" error from 'GetObjectAttrs' would cause a panic. This test checks we just return an
+// error.
+//
+// See MB-72688
+func TestClientAppendToObjectHandleError(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool {
+		return bucket == "bucket"
+	})).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return key == "key" })).Return(moAPI)
+
+	moAPI.On("Retryer", mock.MatchedBy(func(option storage.RetryOption) bool {
+		return reflect.DeepEqual(option, storage.WithPolicy(storage.RetryAlways))
+	})).Return(moAPI)
+
+	moAPI.On("Attrs", mock.Anything).Return(nil, assert.AnError)
+
+	client := &Client{serviceAPI: msAPI}
+
+	_, err := client.AppendToObject(context.Background(), objcli.AppendToObjectOptions{
+		Bucket: "bucket",
+		Key:    "key",
+		Body:   strings.NewReader("value"),
+	})
+	require.Error(t, err)
+}
+
 func TestClientDeleteObjects(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}

@@ -264,7 +264,7 @@ func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectO
 	})
 
 	// As defined by the 'Client' interface, if the given object does not exist, we create it
-	if objerr.IsNotFoundError(err) || ptr.From(attrs.Size) == 0 {
+	if objerr.IsNotFoundError(err) || (attrs != nil && ptr.From(attrs.Size) == 0) {
 		putOpts := objcli.PutObjectOptions{
 			Bucket: opts.Bucket,
 			Key:    opts.Key,
