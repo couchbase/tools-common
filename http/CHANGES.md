@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.0
+
+- Add support in TLS for validating peer certificates
+
 ## v1.0.12
 
 - Upgraded `x/crypto` to v0.52.0

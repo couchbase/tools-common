@@ -2,6 +2,7 @@ package tls
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 )
 
@@ -20,6 +21,8 @@ type ConfigOptions struct {
 
 	CipherSuites []uint16
 	MinVersion   uint16
+
+	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 }
 
 // Validate returns an error if the given TLS config is invalid for some reason.
