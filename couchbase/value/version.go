@@ -151,6 +151,12 @@ func (v Version) Equal(other Version) bool {
 	return v.compare(other) == 0 && semver.IsValid("v"+string(v)) || v == other
 }
 
+// MajorMinor returns the version stripped of its the patch number.
+func (v Version) MajorMinor() Version {
+	mm := semver.MajorMinor("v" + string(v))
+	return Version(mm[1:])
+}
+
 // ServerVersion returns the Couchbase server version that this version equates to, after resolving unknown & missing
 // versions.
 func (v Version) ServerVersion() Version {

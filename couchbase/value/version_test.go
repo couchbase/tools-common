@@ -339,3 +339,31 @@ func TestVersionParse(t *testing.T) {
 		})
 	}
 }
+
+func TestVersionMajorMinor(t *testing.T) {
+	tests := []struct {
+		version           Version
+		expected          Version
+		newerThanMorpheus bool
+	}{
+		{version: Version("8.0.0"), expected: Version("8.0")},
+		{version: Version("8.0.9"), expected: Version("8.0")},
+		{version: Version("8.0.9"), expected: Version("8.0")},
+		{version: Version("8.0"), expected: Version("8.0")},
+		{version: Version("8.1.0"), expected: Version("8.1"), newerThanMorpheus: true},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.version), func(t *testing.T) {
+			got := test.version.MajorMinor()
+			require.Equal(t, test.expected, got)
+
+			if test.newerThanMorpheus {
+				require.True(t, got.Newer(Version8_0_0))
+				return
+			}
+
+			require.False(t, got.Newer(Version8_0_0))
+		})
+	}
+}

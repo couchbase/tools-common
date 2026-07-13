@@ -1,5 +1,9 @@
 # Changes
 
+# v4.3.0
+
+- Add `MajorMinor` method to `Version`
+
 ## v4.2.1
 
 - Export cbcrypto magic bytes
