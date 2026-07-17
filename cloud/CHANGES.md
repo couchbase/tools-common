@@ -1,5 +1,9 @@
 # Changes
 
+## v8.5.2
+
+- Do not overwrite azure managed identity system default ID with empty string
+
 ## v8.5.1
 
 - Fix panic in GCP's `AppendToObject`

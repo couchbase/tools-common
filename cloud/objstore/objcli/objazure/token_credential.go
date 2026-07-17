@@ -73,9 +73,11 @@ type wrappedMIC struct {
 
 // newWrappedMIC returns an initialized 'wrappedMIC'.
 func newWrappedMIC(clientID string) (*wrappedMIC, error) {
-	options := &azidentity.ManagedIdentityCredentialOptions{
+	options := &azidentity.ManagedIdentityCredentialOptions{}
+
+	if clientID == "" {
 		// Used to indicate to the SDK which managed identity to use, this is explicitly used by 'couchbase-cloud'.
-		ID: azidentity.ClientID((os.Getenv("AZURE_CLIENT_ID"))),
+		clientID = os.Getenv("AZURE_CLIENT_ID")
 	}
 
 	if clientID != "" {
