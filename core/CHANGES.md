@@ -1,5 +1,9 @@
 # Changes
 
+## v2.1.3
+
+- Add `--auth-token` to flags to mask
+
 ## v2.1.2
 
 - Add `--km-refresh-token` to flags to mask

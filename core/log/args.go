@@ -8,7 +8,7 @@ import (
 var (
 	cbmFlagsToMask = []string{
 		"-p", "--p", "--password", "--obj-access-key-id", "--obj-secret-access-key", "--obj-refresh-token",
-		"--km-access-key-id", "--km-secret-access-key", "--km-refresh-token", "--passphrase",
+		"--km-access-key-id", "--km-secret-access-key", "--km-refresh-token", "--passphrase", "--auth-token",
 	}
 	cbmFlagsToTag = []string{
 		"-u", "--u", "--username", "-k", "--k", "--key", "--filter-keys", "--filter-values",
