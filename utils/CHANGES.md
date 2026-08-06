@@ -1,5 +1,9 @@
 # Changes
 
+## v3.2.0
+
+- Added the ability to reverse retry back-off.
+
 ## v3.1.1
 
 - Upgraded dependencies.

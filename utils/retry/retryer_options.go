@@ -50,6 +50,9 @@ type RetryerOptions[T any] struct {
 	// MaxJitter is the maximum amount of jitter to apply before backing off.
 	MaxJitter time.Duration
 
+	// Reverse indicates that back-off should be reversed (slowest first, decreasing to fastest).
+	Reverse bool
+
 	// ShouldRetry is a custom retry function, when not supplied, this will be defaulted to 'err != nil'.
 	ShouldRetry ShouldRetryFunc[T]
 

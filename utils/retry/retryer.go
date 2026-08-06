@@ -131,6 +131,10 @@ func (r Retryer[T]) Jitter() (time.Duration, error) {
 //
 // NOTE: After fifty attempts, a constant duration is returned (the max available, or the chosen max delay).
 func (r Retryer[T]) Duration(attempt int) time.Duration {
+	if r.options.Reverse {
+		attempt = max(1, r.options.MaxRetries-attempt+1)
+	}
+
 	// We truncate the attempt to fifty, to avoid overflowing the first multiplicand; this allows people to retry more
 	// that fifty times but just hit a point where back-off is constant (or sits at their chosen max back-off).
 	attempt = min(attempt, 50)

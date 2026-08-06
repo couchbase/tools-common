@@ -221,10 +221,191 @@ func TestRetryerDuration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			for i := 0; i < 3; i++ {
-				require.Equal(
+				assert.Equal(
 					t,
 					test.expected[i],
 					NewRetryer[int](RetryerOptions[int]{Algorithm: test.algorithm}).Duration(i+1),
+				)
+			}
+		})
+	}
+}
+
+func TestRetryerDurationWithMinMax(t *testing.T) {
+	type test struct {
+		name      string
+		algorithm Algorithm
+		expected  []time.Duration
+	}
+
+	tests := []*test{
+		{
+			name:      "Fibonacci",
+			algorithm: AlgorithmFibonacci,
+			expected:  []time.Duration{time.Second, time.Second, 2 * time.Second},
+		},
+		{
+			name:      "Exponential",
+			algorithm: AlgorithmExponential,
+			expected:  []time.Duration{2 * time.Second, 4 * time.Second, 5 * time.Second},
+		},
+		{
+			name:      "Linear",
+			algorithm: AlgorithmLinear,
+			expected:  []time.Duration{1 * time.Second, 2 * time.Second, 3 * time.Second},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for i := 0; i < 3; i++ {
+				options := RetryerOptions[int]{
+					Algorithm: test.algorithm,
+					MinDelay:  time.Second,
+					MaxDelay:  5 * time.Second,
+				}
+
+				assert.Equal(
+					t,
+					test.expected[i],
+					NewRetryer[int](options).Duration(i+1),
+				)
+			}
+		})
+	}
+}
+
+func TestRetryerDurationReverse(t *testing.T) {
+	type test struct {
+		name      string
+		algorithm Algorithm
+		expected  []time.Duration
+	}
+
+	tests := []*test{
+		{
+			name:      "Fibonacci",
+			algorithm: AlgorithmFibonacci,
+			expected:  []time.Duration{100 * time.Millisecond, 50 * time.Millisecond, 50 * time.Millisecond},
+		},
+		{
+			name:      "Exponential",
+			algorithm: AlgorithmExponential,
+			expected:  []time.Duration{400 * time.Millisecond, 200 * time.Millisecond, 100 * time.Millisecond},
+		},
+		{
+			name:      "Linear",
+			algorithm: AlgorithmLinear,
+			expected:  []time.Duration{150 * time.Millisecond, 100 * time.Millisecond, 50 * time.Millisecond},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for i := 0; i < 3; i++ {
+				assert.Equal(
+					t,
+					test.expected[i],
+					NewRetryer[int](RetryerOptions[int]{Algorithm: test.algorithm, Reverse: true}).Duration(i+1),
+				)
+			}
+		})
+	}
+}
+
+func TestRetryerDurationReverseWithMinMax(t *testing.T) {
+	type test struct {
+		name      string
+		algorithm Algorithm
+		expected  []time.Duration
+	}
+
+	tests := []*test{
+		{
+			name:      "Fibonacci",
+			algorithm: AlgorithmFibonacci,
+			expected:  []time.Duration{2 * time.Second, time.Second, time.Second},
+		},
+		{
+			name:      "Exponential",
+			algorithm: AlgorithmExponential,
+			expected:  []time.Duration{5 * time.Second, 4 * time.Second, 2 * time.Second},
+		},
+		{
+			name:      "Linear",
+			algorithm: AlgorithmLinear,
+			expected:  []time.Duration{3 * time.Second, 2 * time.Second, 1 * time.Second},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for i := 0; i < 3; i++ {
+				options := RetryerOptions[int]{
+					Algorithm: test.algorithm,
+					MinDelay:  time.Second,
+					MaxDelay:  5 * time.Second,
+					Reverse:   true,
+				}
+
+				assert.Equal(
+					t,
+					test.expected[i],
+					NewRetryer[int](options).Duration(i+1),
+				)
+			}
+		})
+	}
+}
+
+func TestRetryerDurationReverseOverFifty(t *testing.T) {
+	const (
+		maxFib = 12586269025 * 50 * time.Millisecond
+		maxExp = math.MaxInt64
+		expLin = 2*time.Second + 500*time.Millisecond
+	)
+
+	type test struct {
+		name      string
+		algorithm Algorithm
+		expected  []time.Duration
+	}
+
+	tests := []*test{
+		{
+			name:      "Fibonacci",
+			algorithm: AlgorithmFibonacci,
+			expected:  []time.Duration{maxFib, maxFib, maxFib},
+		},
+		{
+			name:      "Exponential",
+			algorithm: AlgorithmExponential,
+			expected:  []time.Duration{maxExp, maxExp, maxExp},
+		},
+		{
+			name:      "Linear",
+			algorithm: AlgorithmLinear,
+			expected:  []time.Duration{expLin, expLin, expLin},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := RetryerOptions[int]{
+				Algorithm:  test.algorithm,
+				MaxRetries: 100,
+				MaxDelay:   math.MaxInt64,
+				Reverse:    true,
+			}
+
+			// For a reverse retryer with MaxRetries=100, attempts 1 to 50 should all map to
+			// attempts >= 51, which truncate to 50. Therefore, attempts 1, 2, 3 should all yield
+			// the 50th attempt duration.
+			for i := 0; i < 3; i++ {
+				assert.Equal(
+					t,
+					test.expected[i],
+					NewRetryer[int](options).Duration(i+1),
 				)
 			}
 		})
@@ -271,7 +452,7 @@ func TestRetryerDurationOverFifty(t *testing.T) {
 			}
 
 			for i := 50; i < 53; i++ {
-				require.Equal(
+				assert.Equal(
 					t,
 					test.expected[i-50],
 					NewRetryer[int](options).Duration(i+1),
