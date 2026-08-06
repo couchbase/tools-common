@@ -469,3 +469,37 @@ func TestRetryerDurationWithOverflow(t *testing.T) {
 		NewRetryer[int](RetryerOptions[int]{Algorithm: AlgorithmExponential}).Duration(42),
 	)
 }
+
+func TestRetryerDurationRandomWithDefaults(t *testing.T) {
+	options := RetryerOptions[int]{
+		Algorithm: AlgorithmRandom,
+		MinDelay:  50 * time.Millisecond,
+		MaxDelay:  2*time.Second + 500*time.Millisecond,
+	}
+
+	retryer := NewRetryer[int](options)
+
+	var last time.Duration
+
+	for i := 0; i < 100; i++ {
+		dur := retryer.Duration(i + 1)
+
+		assert.GreaterOrEqual(t, dur, options.MinDelay)
+		assert.LessOrEqual(t, dur, options.MaxDelay)
+		assert.NotEqual(t, last, dur)
+
+		last = dur
+	}
+}
+
+func TestRetryerDurationRandomWithEqualMinMax(t *testing.T) {
+	retryerEqual := NewRetryer[int](RetryerOptions[int]{
+		Algorithm: AlgorithmRandom,
+		MinDelay:  time.Second,
+		MaxDelay:  time.Second,
+	})
+
+	for i := 0; i < 50; i++ {
+		assert.Equal(t, time.Second, retryerEqual.Duration(i+1).Round(time.Millisecond))
+	}
+}

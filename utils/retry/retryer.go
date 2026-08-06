@@ -148,6 +148,8 @@ func (r Retryer[T]) Duration(attempt int) time.Duration {
 		n = 1 << attempt
 	case AlgorithmFibonacci:
 		n = time.Duration(math.Round(math.Pow(math.Phi, float64(attempt)) / sqrt5))
+	case AlgorithmRandom:
+		return r.random()
 	}
 
 	duration := n * r.options.MinDelay
@@ -161,4 +163,16 @@ func (r Retryer[T]) Duration(attempt int) time.Duration {
 	duration = min(r.options.MaxDelay, duration)
 
 	return duration
+}
+
+// random returns a random duration between the min/max delay values.
+//
+// NOTE: Returns the `MaxDelay` in the event that random number generation fails.
+func (r *Retryer[T]) random() time.Duration {
+	dur, err := random.Integer(r.options.MinDelay, r.options.MaxDelay+1)
+	if err != nil {
+		return r.options.MaxDelay
+	}
+
+	return dur
 }

@@ -14,6 +14,9 @@ const (
 
 	// AlgorithmLinear backs off linearly e.g. 50ms, 100ms, 150ms ... 1.75s
 	AlgorithmLinear
+
+	// AlgorithmRandom picks a random duration between the min/max delay.
+	AlgorithmRandom
 )
 
 // LogFunc is a function which is run before each retry attempt after failing to run the given 'RetryableFunc'.
