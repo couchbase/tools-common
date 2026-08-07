@@ -286,17 +286,17 @@ func TestRetryerDurationReverse(t *testing.T) {
 		{
 			name:      "Fibonacci",
 			algorithm: AlgorithmFibonacci,
-			expected:  []time.Duration{100 * time.Millisecond, 50 * time.Millisecond, 50 * time.Millisecond},
+			expected:  []time.Duration{2500 * time.Millisecond, 1700 * time.Millisecond, 1050 * time.Millisecond},
 		},
 		{
 			name:      "Exponential",
 			algorithm: AlgorithmExponential,
-			expected:  []time.Duration{400 * time.Millisecond, 200 * time.Millisecond, 100 * time.Millisecond},
+			expected:  []time.Duration{2500 * time.Millisecond, 1600 * time.Millisecond, 800 * time.Millisecond},
 		},
 		{
 			name:      "Linear",
 			algorithm: AlgorithmLinear,
-			expected:  []time.Duration{150 * time.Millisecond, 100 * time.Millisecond, 50 * time.Millisecond},
+			expected:  []time.Duration{2500 * time.Millisecond, 2450 * time.Millisecond, 2400 * time.Millisecond},
 		},
 	}
 
@@ -324,7 +324,7 @@ func TestRetryerDurationReverseWithMinMax(t *testing.T) {
 		{
 			name:      "Fibonacci",
 			algorithm: AlgorithmFibonacci,
-			expected:  []time.Duration{2 * time.Second, time.Second, time.Second},
+			expected:  []time.Duration{5 * time.Second, 3 * time.Second, 2 * time.Second},
 		},
 		{
 			name:      "Exponential",
@@ -334,7 +334,7 @@ func TestRetryerDurationReverseWithMinMax(t *testing.T) {
 		{
 			name:      "Linear",
 			algorithm: AlgorithmLinear,
-			expected:  []time.Duration{3 * time.Second, 2 * time.Second, 1 * time.Second},
+			expected:  []time.Duration{5 * time.Second, 4 * time.Second, 3 * time.Second},
 		},
 	}
 
@@ -359,11 +359,7 @@ func TestRetryerDurationReverseWithMinMax(t *testing.T) {
 }
 
 func TestRetryerDurationReverseOverFifty(t *testing.T) {
-	const (
-		maxFib = 12586269025 * 50 * time.Millisecond
-		maxExp = math.MaxInt64
-		expLin = 2*time.Second + 500*time.Millisecond
-	)
+	const delay = 50 * time.Millisecond
 
 	type test struct {
 		name      string
@@ -375,17 +371,35 @@ func TestRetryerDurationReverseOverFifty(t *testing.T) {
 		{
 			name:      "Fibonacci",
 			algorithm: AlgorithmFibonacci,
-			expected:  []time.Duration{maxFib, maxFib, maxFib},
+			expected: []time.Duration{
+				// fibonacci(50)
+				12586269025 * delay,
+				// fibonacci(49)
+				7778742049 * delay,
+				// fibonacci(48)
+				4807526976 * delay,
+			},
 		},
 		{
 			name:      "Exponential",
 			algorithm: AlgorithmExponential,
-			expected:  []time.Duration{maxExp, maxExp, maxExp},
+			expected: []time.Duration{
+				// (1 << 38) * delay overflows, so max int is used
+				math.MaxInt64,
+				// We work backwards from that point
+				(1 << 37) * delay,
+				(1 << 36) * delay,
+			},
 		},
 		{
 			name:      "Linear",
 			algorithm: AlgorithmLinear,
-			expected:  []time.Duration{expLin, expLin, expLin},
+			expected: []time.Duration{
+				// We don't reach the point of overflow, so we work back from 50
+				50 * delay,
+				49 * delay,
+				48 * delay,
+			},
 		},
 	}
 
@@ -398,9 +412,9 @@ func TestRetryerDurationReverseOverFifty(t *testing.T) {
 				Reverse:    true,
 			}
 
-			// For a reverse retryer with MaxRetries=100, attempts 1 to 50 should all map to
-			// attempts >= 51, which truncate to 50. Therefore, attempts 1, 2, 3 should all yield
-			// the 50th attempt duration.
+			// For a reverse retryer, we find the first attempt K that reaches the maximum possible
+			// duration. Attempts 1, 2, and 3 should yield the decreasing durations starting from
+			// the maximum possible duration.
 			for i := 0; i < 3; i++ {
 				assert.Equal(
 					t,
@@ -414,8 +428,11 @@ func TestRetryerDurationReverseOverFifty(t *testing.T) {
 
 func TestRetryerDurationOverFifty(t *testing.T) {
 	const (
+		// maxFib is the max fibonacci value that we can use without overflowing
 		maxFib = 12586269025 * 50 * time.Millisecond
+		// maxExp is 'MaxDelay' as exponential overflows
 		maxExp = math.MaxInt64
+		// expLin is the expected linear value (as we don't reach anywhere near overflowing)
 		expLin = 2*time.Second + 500*time.Millisecond
 	)
 

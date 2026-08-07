@@ -1,6 +1,10 @@
 # Changes
 
-## v3.2.0
+## v3.2.1
+
+- Fixed the semantics of `Reverse` retry back-off
+
+## v3.2.0 (Retracted)
 
 - Added the ability to reverse retry back-off.
 - Added `AlgorithmRandom` to `retry` (random back-off between min/max delay).

@@ -10,6 +10,9 @@ import (
 	"github.com/couchbase/tools-common/utils/v3/crypto/random"
 )
 
+// truncate is the internal max retry threshold; the point at which the back-off is constant, or equal to the max delay.
+const truncate = 50
+
 // RetryableFunc represents a function which is retryable.
 type RetryableFunc[T any] func(ctx *Context) (T, error)
 
@@ -131,13 +134,37 @@ func (r Retryer[T]) Jitter() (time.Duration, error) {
 //
 // NOTE: After fifty attempts, a constant duration is returned (the max available, or the chosen max delay).
 func (r Retryer[T]) Duration(attempt int) time.Duration {
-	if r.options.Reverse {
-		attempt = max(1, r.options.MaxRetries-attempt+1)
+	if r.options.Algorithm == AlgorithmRandom {
+		return r.random()
 	}
 
+	if !r.options.Reverse {
+		return r.duration(attempt)
+	}
+
+	// Find the first attempt that reaches the maximum possible duration.
+	var (
+		mx = r.duration(truncate)
+		k  = 1
+	)
+
+	for i := 1; i <= truncate; i++ {
+		if r.duration(i) != mx {
+			continue
+		}
+
+		k = i
+
+		break
+	}
+
+	return r.duration(max(1, k-attempt+1))
+}
+
+func (r Retryer[T]) duration(attempt int) time.Duration {
 	// We truncate the attempt to fifty, to avoid overflowing the first multiplicand; this allows people to retry more
-	// that fifty times but just hit a point where back-off is constant (or sits at their chosen max back-off).
-	attempt = min(attempt, 50)
+	// than fifty times but just hit a point where back-off is constant (or sits at their chosen max back-off).
+	attempt = min(attempt, truncate)
 
 	var n time.Duration
 
@@ -148,8 +175,6 @@ func (r Retryer[T]) Duration(attempt int) time.Duration {
 		n = 1 << attempt
 	case AlgorithmFibonacci:
 		n = time.Duration(math.Round(math.Pow(math.Phi, float64(attempt)) / sqrt5))
-	case AlgorithmRandom:
-		return r.random()
 	}
 
 	duration := n * r.options.MinDelay
