@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.5
+
+- Write 401 http status code when client cert does not have a known username
+
 ## v1.2.4
 
 - Upgraded dependencies

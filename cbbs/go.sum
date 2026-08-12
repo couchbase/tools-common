@@ -1,5 +1,5 @@
-github.com/couchbase/cbauth v0.1.13 h1:1MXacfujb5E4g1MabltOjWUz7Ilewbix2mdSADFa358=
-github.com/couchbase/cbauth v0.1.13/go.mod h1:W7zkNXa0B2cTDg90YmmuTSbu+PlYOvMqzQvmNlNH/Mg=
+github.com/couchbase/cbauth v0.1.23 h1:6B6G21HRRYvg7ZNuEtDXM/fqNhzXw/DGsM+gAAyKJPI=
+github.com/couchbase/cbauth v0.1.23/go.mod h1:cYQHAaRGaAlJJQd1RGBCrmnhKF0MStUnbOAt91FQY5A=
 github.com/couchbase/clog v0.1.0 h1:4Kh/YHkhRjMCbdQuvRVsm39XZh4FtL1d8fAwJsHrEPY=
 github.com/couchbase/clog v0.1.0/go.mod h1:7tzUpEOsE+fgU81yfcjy5N1H6XtbVC8SgOz/3mCjmd4=
 github.com/couchbase/go-couchbase v0.1.1 h1:ClFXELcKj/ojyoTYbsY34QUrrYCBi/1G749sXSCkdhk=
@@ -7,8 +7,8 @@ github.com/couchbase/go-couchbase v0.1.1/go.mod h1:+/bddYDxXsf9qt0xpDUtRR47A2Gja
 github.com/couchbase/gomemcached v0.3.3 h1:D7qqXLO8wNa4pn5oE65lT3pA3IeStn4joT7/JgGXzKc=
 github.com/couchbase/gomemcached v0.3.3/go.mod h1:pISAjweI42vljCumsJIo7CVhqIMIIP9g3Wfhl1JJw68=
 github.com/couchbase/goutils v0.1.2/go.mod h1:h89Ek/tiOxxqjz30nPPlwZdQbdB8BwgnuBxeoUe/ViE=
-github.com/couchbase/goutils v0.2.0 h1:2hTV1VUunDcgd2ctYZ27Zv5ShACS0NAZ86viOFwp1gU=
-github.com/couchbase/goutils v0.2.0/go.mod h1:h89Ek/tiOxxqjz30nPPlwZdQbdB8BwgnuBxeoUe/ViE=
+github.com/couchbase/goutils v0.3.0 h1:rsv72B6BDjW9jmwlfiDUrdu3EpNvPuo5WLULHzQ0DLE=
+github.com/couchbase/goutils v0.3.0/go.mod h1:7Gm+D3vXfV4HS+hQWvKfy6e6ILCptGXNqBKvQXhplhk=
 github.com/couchbase/tools-common/couchbase/v4 v4.1.1 h1:lRSAn+NCV+A13/I0fj/0kqirjrh5qEjIrsofXO8EHMQ=
 github.com/couchbase/tools-common/couchbase/v4 v4.1.1/go.mod h1:5A+ZBJnd4txq/nSsJYo1eYA/tC6ipeLB2yiuOkVMGVE=
 github.com/couchbase/tools-common/errors v1.1.0 h1:ruGRk4YX7UBiqBGmMgl5QaLXbH6L33lD4zxgoGE4/OY=

@@ -32,13 +32,23 @@ func AuthMiddlewareHandler(
 	return authMiddlewareHandler(cbauth.Default, permission, userFriendlyName, w, r)
 }
 
+func isUnauthorisedError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, cbauth.ErrNoAuth) ||
+		errors.Is(err, cbauth.ErrUserNotFound) ||
+		// for some reason cbauth does not return the ErrNoAuth when no credentials are provided, it only does when
+		// the provided credentials are invalid so we have to manually check for the no credentials find error
+		err.Error() == "no web credentials found in request"
+}
+
 func authMiddlewareHandler(
 	authoriser cbAuthoriser, permission, userFriendlyName string, w http.ResponseWriter, r *http.Request,
 ) error {
 	cred, err := authoriser.AuthWebCreds(r)
-	// for some reason cbauth does not return the ErrNoAuth when no credentials are provided, it only does when
-	// the provided credentials are invalid so we have to manually check for the no credentials find error
-	if err == cbauth.ErrNoAuth || (err != nil && err.Error() == "no web credentials found in request") {
+	if isUnauthorisedError(err) {
 		cbauth.SendUnauthorized(w)
 		return ErrUnauthorised
 	}

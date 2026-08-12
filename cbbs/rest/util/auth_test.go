@@ -19,6 +19,8 @@ type creds struct {
 func (*creds) Domain() string      { return "" }
 func (*creds) Name() string        { return "" }
 func (*creds) User() (_, _ string) { return "", "" }
+func (*creds) Expiry() int64       { return 0 }
+func (*creds) Extras() string      { return "" }
 
 func (c *creds) IsAllowed(_ string) (bool, error) {
 	return c.isAllowed, c.err
@@ -29,6 +31,10 @@ func (c *creds) IsAllowedInternal(_ string) (bool, error) {
 }
 
 func (c *creds) GetBuckets() ([]string, error) {
+	return nil, nil
+}
+
+func (c *creds) GetCredential(_ string) (*cbauth.Credential, error) {
 	return nil, nil
 }
 
@@ -64,6 +70,12 @@ func TestAuthMiddlewareHandler(t *testing.T) {
 		{
 			name:       "NoCreds",
 			authErr:    errors.New("no web credentials found in request"),
+			resultErr:  ErrUnauthorised,
+			statusCode: http.StatusUnauthorized,
+		},
+		{
+			name:       "UserNotFound",
+			authErr:    cbauth.ErrUserNotFound,
 			resultErr:  ErrUnauthorised,
 			statusCode: http.StatusUnauthorized,
 		},

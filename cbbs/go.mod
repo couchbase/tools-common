@@ -3,7 +3,7 @@ module github.com/couchbase/tools-common/cbbs
 go 1.25.0
 
 require (
-	github.com/couchbase/cbauth v0.1.13
+	github.com/couchbase/cbauth v0.1.23
 	github.com/couchbase/tools-common/couchbase/v4 v4.1.1
 	github.com/couchbase/tools-common/errors v1.1.0
 	github.com/couchbase/tools-common/fs v1.0.3
@@ -15,7 +15,7 @@ require (
 	github.com/couchbase/clog v0.1.0 // indirect
 	github.com/couchbase/go-couchbase v0.1.1 // indirect
 	github.com/couchbase/gomemcached v0.3.3 // indirect
-	github.com/couchbase/goutils v0.2.0 // indirect
+	github.com/couchbase/goutils v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
