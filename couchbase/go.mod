@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/couchbase/v4
+module github.com/couchbase/tools-common/couchbase/v5
 
 go 1.25.0
 
@@ -44,6 +44,3 @@ require (
 	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// Retracted due to incorrect module path (was still v3)
-retract v4.0.0
