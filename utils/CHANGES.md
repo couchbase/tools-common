@@ -1,5 +1,9 @@
 # Changes
 
+## v3.2.2
+
+- Bump dependencies
+
 ## v3.2.1
 
 - Fixed the semantics of `Reverse` retry back-off
