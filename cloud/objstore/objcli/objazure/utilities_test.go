@@ -2,6 +2,7 @@ package objazure
 
 import (
 	"net"
+	"net/http"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -64,6 +65,9 @@ func TestHandleError(t *testing.T) {
 	err = handleError("container1", "blob1", respError(bloberror.BlobArchived))
 	require.ErrorAs(t, err, &archiveStorage)
 	require.Equal(t, "blob1", archiveStorage.Key)
+
+	err = handleError("container1", "blob1", &azcore.ResponseError{StatusCode: http.StatusNotImplemented})
+	require.ErrorIs(t, err, objerr.ErrServerSideNotImplemented)
 }
 
 func TestIsKeyNotFound(t *testing.T) {

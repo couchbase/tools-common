@@ -58,6 +58,13 @@ func TestHandleError(t *testing.T) {
 	require.Equal(t, "bucket", notFound.Type)
 	require.Equal(t, "bucket1", notFound.Name)
 
+	err = handleError(ptr.To("bucket1"), nil, &smithy.OperationError{
+		ServiceID:     "S3",
+		OperationName: "GetObjectLockConfiguration",
+		Err:           &smithy.GenericAPIError{Code: "NotImplemented"},
+	})
+	require.ErrorIs(t, err, objerr.ErrServerSideNotImplemented)
+
 	err = handleError(nil, ptr.To("key1"), &s3types.NoSuchBucket{})
 	require.ErrorAs(t, err, &notFound)
 	require.Equal(t, "bucket", notFound.Type)

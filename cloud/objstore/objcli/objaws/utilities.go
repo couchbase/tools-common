@@ -54,6 +54,8 @@ func handleError(bucket, key *string, err error) error {
 		}
 
 		return &objerr.ErrArchiveStorage{Key: *key}
+	case "NotImplemented":
+		return objerr.ErrServerSideNotImplemented
 	}
 
 	// The AWS error type doesn't implement Unwrap, se we must manually unwrap and check it here

@@ -26,6 +26,10 @@ func TestHandleError(t *testing.T) {
 	require.ErrorIs(t,
 		handleError("bucket", "key", &googleapi.Error{Code: http.StatusForbidden}), objerr.ErrUnauthorized)
 
+	require.ErrorIs(t,
+		handleError("bucket", "key", &googleapi.Error{Code: http.StatusNotImplemented}),
+		objerr.ErrServerSideNotImplemented)
+
 	require.ErrorAs(t, handleError("", "", storage.ErrBucketNotExist), &notFound)
 	require.Equal(t, "bucket", notFound.Type)
 	require.Equal(t, "<empty bucket name>", notFound.Name)

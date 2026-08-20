@@ -1,5 +1,9 @@
 # Changes
 
+## v8.6.0
+
+- Add ErrServerSideNotImplemented error
+
 ## v8.5.2
 
 - Do not overwrite azure managed identity system default ID with empty string

@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// UnimplementedOperationError indicates that something was not found.
+// UnimplementedOperationError indicates that the client does not support this operation.
 type UnimplementedOperationError struct {
 	Name string
 }

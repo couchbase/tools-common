@@ -1,6 +1,10 @@
 package objazure
 
 import (
+	"errors"
+	"net/http"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 
 	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
@@ -46,6 +50,12 @@ func handleError(bucket, key string, err error) error {
 		}
 
 		return &objerr.ErrArchiveStorage{Key: key}
+	}
+
+	var respErr *azcore.ResponseError
+
+	if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotImplemented {
+		return objerr.ErrServerSideNotImplemented
 	}
 
 	return objerr.HandleError(err)
