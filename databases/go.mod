@@ -1,10 +1,10 @@
 module github.com/couchbase/tools-common/databases
 
-go 1.24.0
+go 1.25.0
 
 require (
-	github.com/couchbase/tools-common/sync/v2 v2.0.2
-	github.com/mattn/go-sqlite3 v1.14.32
+	github.com/couchbase/tools-common/sync/v2 v2.0.3
+	github.com/mattn/go-sqlite3 v1.14.50
 	github.com/stretchr/testify v1.8.4
 )
 
