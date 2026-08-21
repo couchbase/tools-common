@@ -1,5 +1,9 @@
 # Changes
 
+## v8.6.1
+
+- Bump dependencies
+
 ## v8.6.0
 
 - Add ErrServerSideNotImplemented error
