@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"net/netip"
 )
 
 // Nodes is a wrapper around a slice of nodes which allows custom unmarshalling.
@@ -58,6 +59,10 @@ func (n *Node) GetQualifiedHostname(service Service, useSSL, useAltAddr bool) (s
 	hostname := n.GetHostname(useAltAddr)
 	if hostname == "" {
 		return "", n.BootstrapNode
+	}
+
+	if ip, err := netip.ParseAddr(hostname); err == nil && ip.Is6() {
+		hostname = fmt.Sprintf("[%s]", hostname)
 	}
 
 	port := n.GetPort(service, useSSL, useAltAddr)
