@@ -1,5 +1,9 @@
 # Changes
 
+## v1.4.1
+
+- Bump dependencies
+
 ## v1.4.0
 
 - Added a `Map` function to `maps`
