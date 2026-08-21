@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.1
+
+- Bump dependencies
+
 ## v1.1.0
 
 - Add support in TLS for validating peer certificates
