@@ -1,5 +1,9 @@
 # Changes
 
+## v5.0.1
+
+- Bump dependencies
+
 ## v5.0.0
 
 - Add version 8.5.0 for Totoro and remove 8.1.0
