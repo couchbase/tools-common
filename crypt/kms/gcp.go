@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	cloudkms "cloud.google.com/go/kms/apiv1"
+	"cloud.google.com/go/kms/apiv1/kmspb"
 	"google.golang.org/api/option"
-	"google.golang.org/genproto/googleapis/cloud/kms/v1" //nolint:staticcheck
 )
 
 type gcpKeeper struct {
@@ -19,7 +19,7 @@ func (k *gcpKeeper) Close() error {
 }
 
 func (k *gcpKeeper) Encrypt(ctx context.Context, plainText []byte) ([]byte, error) {
-	res, err := k.client.Encrypt(ctx, &kms.EncryptRequest{Plaintext: plainText, Name: k.keyID}) //nolint:staticcheck
+	res, err := k.client.Encrypt(ctx, &kmspb.EncryptRequest{Plaintext: plainText, Name: k.keyID})
 	if err != nil {
 		return nil, fmt.Errorf("could not encrypt data: %w", err)
 	}
@@ -28,7 +28,7 @@ func (k *gcpKeeper) Encrypt(ctx context.Context, plainText []byte) ([]byte, erro
 }
 
 func (k *gcpKeeper) Decrypt(ctx context.Context, cipherText []byte) ([]byte, error) {
-	res, err := k.client.Decrypt(ctx, &kms.DecryptRequest{Ciphertext: cipherText, Name: k.keyID}) //nolint:staticcheck
+	res, err := k.client.Decrypt(ctx, &kmspb.DecryptRequest{Ciphertext: cipherText, Name: k.keyID})
 	if err != nil {
 		return nil, fmt.Errorf("could not decrypt data: %w", err)
 	}
