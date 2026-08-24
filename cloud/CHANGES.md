@@ -1,5 +1,9 @@
 # Changes
 
+## v8.6.2
+
+- Do not specify algorithm to use when sending objects to S3
+
 ## v8.6.1
 
 - Bump dependencies
