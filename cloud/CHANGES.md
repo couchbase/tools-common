@@ -1,5 +1,10 @@
 # Changes
 
+## v8.6.3
+
+- Do not use accessKeyID as a user-assigned clientID for Azure managed identity authentication.
+- Retract versions 8.5.0 to 8.6.2
+
 ## v8.6.2
 
 - Do not specify algorithm to use when sending objects to S3
