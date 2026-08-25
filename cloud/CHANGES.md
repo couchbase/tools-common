@@ -1,5 +1,13 @@
 # Changes
 
+
+## v9.0.0
+
+- BREAKING: `GetServiceClient` now accepts a `ClientID` used for managed identity authentication, and
+  `GetServiceClientWithClientSecret` now accepts an `AccountName` used to construct the service URL. The
+  `GetServiceClient` and `GetServiceClientWithClientSecret` functions now take their optional arguments via options
+  structs (`ServiceClientOptions` and `ClientSecretServiceClientOptions`).
+
 ## v8.6.3
 
 - Do not use accessKeyID as a user-assigned clientID for Azure managed identity authentication.

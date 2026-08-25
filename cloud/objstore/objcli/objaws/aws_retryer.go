@@ -12,7 +12,7 @@ import (
 	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objcli"
 	httputil "github.com/couchbase/tools-common/http/util"
 )
 

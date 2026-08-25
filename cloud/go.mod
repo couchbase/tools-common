@@ -1,4 +1,4 @@
-module github.com/couchbase/tools-common/cloud/v8
+module github.com/couchbase/tools-common/cloud/v9
 
 go 1.26.0
 
@@ -96,6 +96,3 @@ require (
 	google.golang.org/grpc v1.83.1 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
-
-// Retracted due to conflating the Azure storage account name with the managed identity client ID.
-retract [v8.5.0, v8.6.2]

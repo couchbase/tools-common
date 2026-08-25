@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objerr"
 )
 
 const (
@@ -20,17 +20,51 @@ const (
 	azureEndpointSuffix = "endpointsuffix"
 )
 
+// ServiceClientOptions encapsulates the options available when creating an Azure service client using
+// 'GetServiceClient'.
+type ServiceClientOptions struct {
+	// AccountName is the name of the storage account, it's used for shared key authentication and to construct the
+	// service URL.
+	//
+	// NOTE: When omitted it's sourced from the environment (either 'AZURE_STORAGE_ACCOUNT' or an Azure style
+	// connection string).
+	AccountName string
+
+	// AccountKey is the access key for the storage account given by 'AccountName', it's used only for shared key
+	// authentication.
+	//
+	// NOTE: When omitted it's sourced from the environment (either 'AZURE_STORAGE_KEY' or an Azure style
+	// connection string).
+	AccountKey string
+
+	// ClientID is the client ID of a user-assigned managed identity.
+	//
+	// NOTE: When omitted it's sourced from the 'AZURE_CLIENT_ID' environment variable.
+	ClientID string
+
+	// Endpoint is the URL which should be used when communicating with the Azure storage service.
+	//
+	// NOTE: When omitted the account name is used to construct the endpoint.
+	Endpoint string
+
+	// ClientOptions are the SDK level options used when creating the service client.
+	ClientOptions *service.ClientOptions
+}
+
 // GetServiceClient returns the Azure Service Client that facilitates all the necessary interactions with the Azure
 // blob storage.
-func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *service.ClientOptions) (
-	*service.Client, error,
-) {
-	serviceURL, err := getServiceURL(endpoint, accessKeyID)
+func GetServiceClient(options ServiceClientOptions) (*service.Client, error) {
+	serviceURL, err := getServiceURL(options.Endpoint, options.AccountName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service URL: %w", err)
 	}
 
-	client, err := getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccessKey, options)
+	client, err := getServiceClientWithStaticCredentials(
+		serviceURL,
+		options.AccountName,
+		options.AccountKey,
+		options.ClientOptions,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service client with static credentials: %w", err)
 	}
@@ -39,7 +73,7 @@ func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *se
 		return client, nil
 	}
 
-	client, err = getServiceClientWithTokenCredential(serviceURL, options)
+	client, err = getServiceClientWithTokenCredential(serviceURL, options.ClientID, options.ClientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service client with token credential: %w", err)
 	}
@@ -50,10 +84,10 @@ func GetServiceClient(accessKeyID, secretAccessKey, endpoint string, options *se
 // getServiceClientWithStaticCredentials attempts to create an Azure Service Client with static credentials. In case it
 // fails to find any static credentials, instead of failing we proceed to try to create a Service Client with a token
 // credential.
-func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccessKey string,
+func getServiceClientWithStaticCredentials(serviceURL, accountName, accountKey string,
 	options *service.ClientOptions,
 ) (*service.Client, error) {
-	credentials, err := getStaticCredentials(accessKeyID, secretAccessKey)
+	credentials, err := getStaticCredentials(accountName, accountKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get static credentials: %w", handleCredsError(err))
 	}
@@ -70,13 +104,32 @@ func getServiceClientWithStaticCredentials(serviceURL, accessKeyID, secretAccess
 	return client, nil
 }
 
+// ClientSecretServiceClientOptions encapsulates the options available when creating an Azure service client using
+// 'GetServiceClientWithClientSecret'.
+type ClientSecretServiceClientOptions struct {
+	// AccountName is the name of the storage account which we'll be interacting with, it's only used to construct the
+	// service URL.
+	//
+	// NOTE: When omitted it's sourced from the environment (either 'AZURE_STORAGE_ACCOUNT' or an Azure style
+	// connection string). It is required when no endpoint is provided.
+	AccountName string
+
+	// Endpoint is the URL which should be used when communicating with the Azure storage service.
+	//
+	// NOTE: When omitted the account name is used to construct the endpoint.
+	Endpoint string
+
+	// ClientOptions are the SDK level options used when creating the service client.
+	ClientOptions *service.ClientOptions
+}
+
 // GetServiceClientWithClientSecret creates a service client that authenticates using Azure AD client secret
 // credentials (tenant ID, client ID, client secret). Unlike GetServiceClient, this bypasses shared key and
 // environment-based credential chains entirely.
 func GetServiceClientWithClientSecret(
-	tenantID, clientID, clientSecret, endpoint string, options *service.ClientOptions,
+	tenantID, clientID, clientSecret string, options ClientSecretServiceClientOptions,
 ) (*service.Client, error) {
-	serviceURL, err := getServiceURL(endpoint, clientID)
+	serviceURL, err := getServiceURL(options.Endpoint, options.AccountName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service URL: %w", err)
 	}
@@ -86,7 +139,7 @@ func GetServiceClientWithClientSecret(
 		return nil, fmt.Errorf("failed to create client secret credential: %w", err)
 	}
 
-	client, err := service.NewClient(serviceURL, cred, options)
+	client, err := service.NewClient(serviceURL, cred, options.ClientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create azure service client: %w", err)
 	}
@@ -94,7 +147,7 @@ func GetServiceClientWithClientSecret(
 	return client, nil
 }
 
-// getServiceClientWithStaticCredentials attempts to create an Azure Service Client with a token credential, this will
+// getServiceClientWithTokenCredential attempts to create an Azure Service Client with a token credential, this will
 // auth by:
 //
 //	a) Service principal (1. with secret, 2. with certificate, 3. username and password)
@@ -104,9 +157,10 @@ func GetServiceClientWithClientSecret(
 // username and password.
 func getServiceClientWithTokenCredential(
 	serviceURL string,
+	clientID string,
 	options *service.ClientOptions,
 ) (*service.Client, error) {
-	credential, err := NewTokenCredential()
+	credential, err := NewTokenCredential(clientID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +174,7 @@ func getServiceClientWithTokenCredential(
 }
 
 // getServiceURL returns the URL which should be used when communicating with the Azure storage service.
-func getServiceURL(endpoint, accessKeyID string) (string, error) {
+func getServiceURL(endpoint, accountName string) (string, error) {
 	if endpoint != "" {
 		return endpoint, nil
 	}
@@ -131,7 +185,7 @@ func getServiceURL(endpoint, accessKeyID string) (string, error) {
 		return values[azureBlobEndpoint], nil
 	}
 
-	account, err := azureGetAccount(accessKeyID)
+	account, err := azureGetAccount(accountName)
 	if err != nil {
 		return "", err // Purposefully not wrapped
 	}
@@ -185,9 +239,9 @@ func getConnectionStringValues() map[string]string {
 
 // getStaticCredentials attempts to create static credentials using the client options or the environment. Returns
 // <nil>, <nil> in the event that no static credentials were found.
-func getStaticCredentials(accessKeyID, secretAccessKey string) (*azblob.SharedKeyCredential, error) {
-	if accessKeyID != "" && secretAccessKey != "" {
-		return azblob.NewSharedKeyCredential(accessKeyID, secretAccessKey)
+func getStaticCredentials(accountName, accountKey string) (*azblob.SharedKeyCredential, error) {
+	if accountName != "" && accountKey != "" {
+		return azblob.NewSharedKeyCredential(accountName, accountKey)
 	}
 
 	return getStaticCredentialsFromEnv()

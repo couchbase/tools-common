@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objerr"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
@@ -16,11 +16,11 @@ import (
 
 func TestAzureGetStaticCredentials(t *testing.T) {
 	type test struct {
-		name            string
-		accessKeyID     string
-		secretAccessKey string
-		env             map[string]string
-		expected        *azblob.SharedKeyCredential
+		name        string
+		accountName string
+		accountKey  string
+		env         map[string]string
+		expected    *azblob.SharedKeyCredential
 	}
 
 	enc := func(secret string) string {
@@ -36,20 +36,20 @@ func TestAzureGetStaticCredentials(t *testing.T) {
 
 	tests := []*test{
 		{
-			name:            "StaticCredentials",
-			accessKeyID:     "account",
-			secretAccessKey: enc("secret"),
+			name:        "StaticCredentials",
+			accountName: "account",
+			accountKey:  enc("secret"),
 			// Static credentials should take priority
 			env:      map[string]string{"AZURE_STORAGE_ACCOUNT": "another", "AZURE_STORAGE_KEY": enc("secret")},
 			expected: must("account", "secret"),
 		},
 		{
 			name:        "StaticCredentialsMustSupplyBoth",
-			accessKeyID: "account",
+			accountName: "account",
 		},
 		{
-			name:            "StaticCredentialsMustSupplyBoth",
-			secretAccessKey: enc("secret"),
+			name:       "StaticCredentialsMustSupplyBoth",
+			accountKey: enc("secret"),
 		},
 		{
 			name: "StaticCredentialsViaEnv",
@@ -86,7 +86,7 @@ func TestAzureGetStaticCredentials(t *testing.T) {
 				defer os.Unsetenv(key)
 			}
 
-			actual, err := getStaticCredentials(test.accessKeyID, test.secretAccessKey)
+			actual, err := getStaticCredentials(test.accountName, test.accountKey)
 			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
 		})
@@ -142,7 +142,7 @@ func TestAzureGetEndpoint(t *testing.T) {
 	type test struct {
 		name          string
 		endpoint      string
-		accessKeyID   string
+		accountName   string
 		env           map[string]string
 		expected      string
 		expectedError error
@@ -156,7 +156,7 @@ func TestAzureGetEndpoint(t *testing.T) {
 		},
 		{
 			name:        "AccountViaStatic",
-			accessKeyID: "account",
+			accountName: "account",
 			env:         map[string]string{"AZURE_STORAGE_ACCOUNT": "another_account"}, // Static credential should take priority
 			expected:    "https://account.blob.core.windows.net",
 		},
@@ -197,7 +197,7 @@ func TestAzureGetEndpoint(t *testing.T) {
 				defer os.Unsetenv(key)
 			}
 
-			actual, err := getServiceURL(test.endpoint, test.accessKeyID)
+			actual, err := getServiceURL(test.endpoint, test.accountName)
 
 			if test.expectedError != nil {
 				require.ErrorIs(t, err, test.expectedError)

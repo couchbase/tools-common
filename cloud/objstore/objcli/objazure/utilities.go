@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objerr"
 )
 
 // handleError converts an error relating accessing an object via its key into a user friendly error where possible.

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objval"
 )
 
 func TestIterateObjectsWithDelimiter(t *testing.T) {

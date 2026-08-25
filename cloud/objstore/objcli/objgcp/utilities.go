@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objerr"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objerr"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"

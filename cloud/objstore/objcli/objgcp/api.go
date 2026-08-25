@@ -7,8 +7,8 @@ import (
 
 	"cloud.google.com/go/storage"
 
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objcli"
-	"github.com/couchbase/tools-common/cloud/v8/objstore/objval"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objval"
 )
 
 //go:generate mockery --all --case underscore --inpackage
