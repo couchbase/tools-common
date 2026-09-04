@@ -118,8 +118,7 @@ func getCredentials(tenantID, secretID, secretKey string) (azcore.TokenCredentia
 	}
 
 	if (tenantID != "" || secretID != "" || secretKey != "") && (tenantID == "" || secretID == "" || secretKey == "") {
-		return nil, fmt.Errorf(
-			"if one of --km-tenant-id, --km-access-key-id, --km-secret-access-key is passed all three must be passed")
+		return nil, fmt.Errorf("client secret authentication requires tenantID, clientID and clientSecret")
 	}
 
 	if tenantID == "" {

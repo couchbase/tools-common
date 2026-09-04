@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.2
+
+- Fix KM Azure client secret authentication error message
+
 ## v1.2.1
 
 - Upgraded dependencies
