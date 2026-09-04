@@ -1,5 +1,8 @@
 # Changes
 
+## v9.0.1
+
+- Return all authentication errors if creating chained token credential fails.
 
 ## v9.0.0
 

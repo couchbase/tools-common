@@ -53,7 +53,9 @@ func NewTokenCredential(clientID string) (*TokenCredential, error) {
 
 	chain, err := azidentity.NewChainedTokenCredential(creds, nil)
 	if err != nil {
-		return nil, err
+		merr.Add(err)
+
+		return nil, merr
 	}
 
 	return &TokenCredential{chain: chain}, nil
