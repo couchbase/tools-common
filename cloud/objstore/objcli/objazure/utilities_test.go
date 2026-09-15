@@ -24,6 +24,7 @@ func TestHandleError(t *testing.T) {
 	var (
 		notFound       *objerr.NotFoundError
 		archiveStorage *objerr.ErrArchiveStorage
+		precondition   *objerr.PreconditionFailedError
 	)
 
 	err = handleError("container1", "blob1", nil)
@@ -65,6 +66,14 @@ func TestHandleError(t *testing.T) {
 	err = handleError("container1", "blob1", respError(bloberror.BlobArchived))
 	require.ErrorAs(t, err, &archiveStorage)
 	require.Equal(t, "blob1", archiveStorage.Key)
+
+	err = handleError("container1", "blob1", respError(bloberror.ConditionNotMet))
+	require.ErrorAs(t, err, &precondition)
+	require.Equal(t, "blob1", precondition.Key)
+
+	err = handleError("container1", "blob1", respError(bloberror.BlobAlreadyExists))
+	require.ErrorAs(t, err, &precondition)
+	require.Equal(t, "blob1", precondition.Key)
 
 	err = handleError("container1", "blob1", &azcore.ResponseError{StatusCode: http.StatusNotImplemented})
 	require.ErrorIs(t, err, objerr.ErrServerSideNotImplemented)

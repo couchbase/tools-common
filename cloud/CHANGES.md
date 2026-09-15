@@ -1,5 +1,9 @@
 # Changes
 
+## v9.0.2
+
+- Map azure `BlobAlreadyExists` to `PreconditionFailed`
+
 ## v9.0.1
 
 - Return all authentication errors if creating chained token credential fails.

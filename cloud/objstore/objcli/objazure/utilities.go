@@ -21,7 +21,7 @@ func handleError(bucket, key string, err error) error {
 		return objerr.ErrUnauthorized
 	}
 
-	if bloberror.HasCode(err, bloberror.ConditionNotMet) {
+	if bloberror.HasCode(err, bloberror.ConditionNotMet) || bloberror.HasCode(err, bloberror.BlobAlreadyExists) {
 		return &objerr.PreconditionFailedError{Key: key}
 	}
 
