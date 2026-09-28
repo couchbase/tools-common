@@ -1,5 +1,9 @@
 # Changes
 
+## v5.1.0
+
+- Add list of system event IDs that invalidate snapshot backups.
+
 ## v5.0.1
 
 - Bump dependencies

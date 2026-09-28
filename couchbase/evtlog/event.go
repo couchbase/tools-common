@@ -30,10 +30,42 @@ const (
 	SeverityFatal Severity = "fatal"
 )
 
+// EventIDsThatInvalidateSnapshots is the set of Couchbase system event IDs that must not have happened during a
+// snapshot backup. If one or more of them has happened since the snapshots started taking place then the snapshots
+// should be thrown away and retried.
+var EventIDsThatInvalidateSnapshots = map[EventID]struct{}{
+	0:    {}, // Node successfully joined the cluster.
+	1:    {}, // Service started.
+	4:    {}, // Rebalance failed.
+	5:    {}, // Rebalance interrupted.
+	6:    {}, // Graceful failover initiated.
+	7:    {}, // Graceful failover completed.
+	8:    {}, // Graceful failover failed.
+	9:    {}, // Graceful failover interrupted.
+	10:   {}, // Hard failover initiated.
+	11:   {}, // Hard failover completed.
+	12:   {}, // Hard failover failed.
+	13:   {}, // Hard failover interrupted.
+	14:   {}, // Auto failover initiated.
+	15:   {}, // Auto failover completed.
+	16:   {}, // Auto failover failed.
+	17:   {}, // Auto failover warning.
+	19:   {}, // Service crashed.
+	20:   {}, // Node down.
+	8192: {}, // Bucket created.
+	8193: {}, // Bucket deleted.
+}
+
 // EventID is the unique identifier of the event type, currently each service is apportioned 1024 event ids.
 //
 // NOTE: See MB-47035 and its parent for more information about which services are supplied which ids.
 type EventID uint
+
+// InvalidatesSnapshots returns true if the given event ID should invalidate a snapshot backup.
+func (e EventID) InvalidatesSnapshots() bool {
+	_, ok := EventIDsThatInvalidateSnapshots[e]
+	return ok
+}
 
 // Event represents an event, and is the structure which will be used when reporting events using a 'Service'.
 type Event struct {
