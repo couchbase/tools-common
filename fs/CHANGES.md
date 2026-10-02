@@ -1,5 +1,11 @@
 # Changes
 
+## v1.1.0
+
+- Make Atomic sync the data to disk to ensure the resulting file is not empty in
+  crash scenarios
+- Add AtomicFile which is more efficient than Atomic
+
 ## v1.0.4
 
 - Upgraded dependencies

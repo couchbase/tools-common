@@ -250,8 +250,7 @@ func Sync(path string) error {
 	return file.Sync()
 }
 
-// Atomic will perform the provided function in an "atmoic" fashion. It's required that the provided function create the
-// file at the given path if it doesn't already exist.
+// Atomic will perform the provided function in an "atomic" fashion using the rename pattern.
 //
 // NOTE: This only works to the degree that the underlying operating system guarantees that renames are atomic.
 func Atomic(path string, fn func(path string) error) error {
@@ -266,6 +265,39 @@ func Atomic(path string, fn func(path string) error) error {
 	}
 
 	err = fn(file.Name())
+	if err != nil {
+		return err
+	}
+
+	err = Sync(file.Name())
+	if err != nil {
+		return err
+	}
+
+	return os.Rename(file.Name(), path)
+}
+
+// AtomicFile will perform the provided function in an "atomic" fashion, like Atomic. It is more efficient than Atomic
+// as the temporary file is only opened once. The provided function must not close the file.
+//
+// NOTE: This only works to the degree that the underlying operating system guarantees that renames are atomic.
+func AtomicFile(path string, fn func(f *os.File) error) error {
+	file, err := os.CreateTemp(filepath.Dir(path), fmt.Sprintf("temporary_%s_", filepath.Base(path)))
+	if err != nil {
+		return err
+	}
+
+	err = fn(file)
+	if err != nil {
+		return err
+	}
+
+	err = file.Sync()
+	if err != nil {
+		return err
+	}
+
+	err = file.Close()
 	if err != nil {
 		return err
 	}

@@ -656,3 +656,36 @@ func TestAtomic(t *testing.T) {
 		})
 	}
 }
+
+func TestAtomicFile(t *testing.T) {
+	for _, exists := range []bool{false, true} {
+		t.Run(strconv.FormatBool(exists), func(t *testing.T) {
+			var (
+				testDir = t.TempDir()
+				path    = filepath.Join(testDir, "file")
+			)
+
+			if exists {
+				require.NoError(t, os.WriteFile(path, []byte("<existing data>"), 0o777))
+			}
+
+			err := AtomicFile(path, func(f *os.File) error {
+				if _, err := f.Write([]byte("Hello, World!")); err != nil {
+					return err
+				}
+
+				return f.Chmod(DefaultFileMode)
+			})
+			require.NoError(t, err)
+
+			stats, err := os.Stat(path)
+			require.NoError(t, err)
+			require.Equal(t, DefaultFileMode, stats.Mode())
+			require.Equal(t, int64(13), stats.Size())
+
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, []byte("Hello, World!"), data)
+		})
+	}
+}
