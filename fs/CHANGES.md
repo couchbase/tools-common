@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.1
+
+- Remove the temporary file created by `util.Atomic` and `util.AtomicFile` on failure
+
 ## v1.1.0
 
 - Make Atomic sync the data to disk to ensure the resulting file is not empty in

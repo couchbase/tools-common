@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -688,4 +689,34 @@ func TestAtomicFile(t *testing.T) {
 			require.Equal(t, []byte("Hello, World!"), data)
 		})
 	}
+}
+
+func TestAtomicFnFailureRemovesTemporaryFile(t *testing.T) {
+	var (
+		testDir = t.TempDir()
+		path    = filepath.Join(testDir, "file")
+		errFn   = errors.New("fn failed")
+	)
+
+	err := Atomic(path, func(_ string) error { return errFn })
+	require.ErrorIs(t, err, errFn)
+
+	entries, err := os.ReadDir(testDir)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestAtomicFileFnFailureRemovesTemporaryFile(t *testing.T) {
+	var (
+		testDir = t.TempDir()
+		path    = filepath.Join(testDir, "file")
+		errFn   = errors.New("fn failed")
+	)
+
+	err := AtomicFile(path, func(_ *os.File) error { return errFn })
+	require.ErrorIs(t, err, errFn)
+
+	entries, err := os.ReadDir(testDir)
+	require.NoError(t, err)
+	require.Empty(t, entries)
 }

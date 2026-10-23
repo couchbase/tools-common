@@ -253,11 +253,20 @@ func Sync(path string) error {
 // Atomic will perform the provided function in an "atomic" fashion using the rename pattern.
 //
 // NOTE: This only works to the degree that the underlying operating system guarantees that renames are atomic.
-func Atomic(path string, fn func(path string) error) error {
+func Atomic(path string, fn func(path string) error) (err error) {
 	file, err := os.CreateTemp(filepath.Dir(path), fmt.Sprintf("temporary_%s_", filepath.Base(path)))
 	if err != nil {
 		return err
 	}
+
+	// Remove the temporary file if we fail to move it into place
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		os.Remove(file.Name())
+	}()
 
 	err = file.Close()
 	if err != nil {
@@ -281,11 +290,21 @@ func Atomic(path string, fn func(path string) error) error {
 // as the temporary file is only opened once. The provided function must not close the file.
 //
 // NOTE: This only works to the degree that the underlying operating system guarantees that renames are atomic.
-func AtomicFile(path string, fn func(f *os.File) error) error {
+func AtomicFile(path string, fn func(f *os.File) error) (err error) {
 	file, err := os.CreateTemp(filepath.Dir(path), fmt.Sprintf("temporary_%s_", filepath.Base(path)))
 	if err != nil {
 		return err
 	}
+
+	// Close and remove the temporary file if we fail to move it into place, closing an already closed file is harmless
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		file.Close()
+		os.Remove(file.Name())
+	}()
 
 	err = fn(file)
 	if err != nil {
