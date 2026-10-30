@@ -1,5 +1,9 @@
 # Changes
 
+## v1.2.0
+
+- Add `ValidateKeyPair` and `ValidateCA` for strict PEM cert/key and CA validation
+
 ## v1.1.1
 
 - Bump dependencies
