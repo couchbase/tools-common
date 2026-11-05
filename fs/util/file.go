@@ -241,7 +241,7 @@ func WriteJSONFile(path string, data any, mode os.FileMode) error {
 
 // Sync the provided file to disk.
 func Sync(path string) error {
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_WRONLY, DefaultFileMode)
 	if err != nil {
 		return err
 	}

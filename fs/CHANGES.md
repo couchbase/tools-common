@@ -1,5 +1,9 @@
 # Changes
 
+## v1.1.2
+
+- Fix Sync (and Atomic) on Windows by opening file with write permissions.
+
 ## v1.1.1
 
 - Remove the temporary file created by `util.Atomic` and `util.AtomicFile` on failure
