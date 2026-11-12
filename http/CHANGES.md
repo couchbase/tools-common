@@ -1,5 +1,9 @@
 # Changes
 
+## v1.3.0
+
+- Add `ParseCerts` to strictly parse PEM encoded certificates and `IsSelfSigned` to identify a root CA
+
 ## v1.2.0
 
 - Add `ValidateKeyPair` and `ValidateCA` for strict PEM cert/key and CA validation
