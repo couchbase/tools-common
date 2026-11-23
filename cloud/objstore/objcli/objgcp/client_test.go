@@ -1772,6 +1772,76 @@ func TestClientListParts(t *testing.T) {
 	mbAPI.AssertNumberOfCalls(t, "Objects", 1)
 }
 
+func TestClientListPartsMatchesUploadPart(t *testing.T) {
+	var (
+		msAPI = &mockServiceAPI{}
+		mbAPI = &mockBucketAPI{}
+		moAPI = &mockObjectAPI{}
+		mwAPI = &mockWriterAPI{}
+		miAPI = &mockObjectIteratorAPI{}
+	)
+
+	msAPI.On("Bucket", mock.MatchedBy(func(bucket string) bool { return bucket == "bucket" })).Return(mbAPI)
+
+	mbAPI.On("Object", mock.MatchedBy(func(key string) bool { return strings.HasPrefix(key, "key-mpu-id-") })).
+		Return(moAPI)
+
+	moAPI.On("Retryer", mock.Anything).Return(moAPI)
+	moAPI.On("NewWriter", mock.Anything).Return(mwAPI, nil)
+
+	mwAPI.On("SendMD5", mock.Anything)
+	mwAPI.On("SendCRC", mock.Anything)
+	mwAPI.On("SendMetadata", mock.Anything)
+	mwAPI.On("Write", mock.Anything).Return(5, nil)
+	mwAPI.On("Close").Return(nil)
+
+	mwAPI.On("Attrs").Return(&storage.ObjectAttrs{Generation: 123})
+
+	client := &Client{serviceAPI: msAPI}
+
+	uploaded, err := client.UploadPart(context.Background(), objcli.UploadPartOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+		Number:   1,
+		Body:     strings.NewReader("value"),
+	})
+	require.NoError(t, err)
+
+	query := &storage.Query{Prefix: "key-mpu-id", Delimiter: "/", Projection: storage.ProjectionNoACL}
+	require.NoError(t, query.SetAttrSelection([]string{"Name", "Etag", "Size", "Updated", "Retention", "Generation"}))
+
+	mbAPI.On("Objects", mock.Anything, query).Return(miAPI)
+
+	call := miAPI.On("Next").Return(&storage.ObjectAttrs{
+		Name:       parsePartID(uploaded.ID).Key,
+		Size:       5,
+		Generation: 123,
+	}, nil)
+
+	call.Repeatability = 1
+
+	miAPI.On("Next").Return(nil, iterator.Done)
+
+	listed, err := client.ListParts(context.Background(), objcli.ListPartsOptions{
+		Bucket:   "bucket",
+		UploadID: "id",
+		Key:      "key",
+	})
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+
+	require.Equal(t, uploaded.ID, listed[0].ID)
+	require.Equal(t, "123", parsePartID(listed[0].ID).VersionID)
+	require.Equal(t, uploaded.Size, listed[0].Size)
+
+	msAPI.AssertExpectations(t)
+	mbAPI.AssertExpectations(t)
+	moAPI.AssertExpectations(t)
+	mwAPI.AssertExpectations(t)
+	miAPI.AssertExpectations(t)
+}
+
 func TestClientUploadPart(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}

@@ -425,16 +425,11 @@ func (c *Client) DeleteDirectory(ctx context.Context, opts objcli.DeleteDirector
 		return nil
 	}
 
-	err := c.iterateObjects(
-		ctx,
-		opts.Bucket,
-		opts.Prefix,
-		"",
-		opts.Versions,
-		nil,
-		nil,
-		fn,
-	)
+	err := c.iterateObjects(ctx, iterateObjectsOptions{
+		bucket:   opts.Bucket,
+		prefix:   opts.Prefix,
+		versions: opts.Versions,
+	}, fn)
 	if err != nil {
 		return fmt.Errorf("failed to iterate objects: %w", err)
 	}
@@ -453,29 +448,51 @@ func (c *Client) IterateObjects(ctx context.Context, opts objcli.IterateObjectsO
 		return opts.Func(&attrs)
 	}
 
-	return c.iterateObjects(ctx, opts.Bucket, opts.Prefix, opts.Delimiter, opts.Versions, opts.Include, opts.Exclude, fn)
+	return c.iterateObjects(ctx, iterateObjectsOptions{
+		bucket:    opts.Bucket,
+		prefix:    opts.Prefix,
+		delimiter: opts.Delimiter,
+		versions:  opts.Versions,
+		include:   opts.Include,
+		exclude:   opts.Exclude,
+	}, fn)
+}
+
+// iterateObjectsOptions encapsulates the options for 'iterateObjects'.
+type iterateObjectsOptions struct {
+	bucket    string
+	prefix    string
+	delimiter string
+
+	// versions lists all the versions of each object, including noncurrent versions and delete markers, instead of only
+	// the current version. This implies 'withVersionID', because the VersionID tells the versions of an object apart.
+	versions bool
+
+	// withVersionID fills in the VersionID of each listed object. It does not change which objects are listed.
+	//
+	// NOTE: On GCS, the VersionID is the object's generation. Every object has one, even if the bucket does not use
+	// Object Versioning.
+	withVersionID bool
+
+	include []*regexp.Regexp
+	exclude []*regexp.Regexp
 }
 
 // iterateObjects iterates through the objects in the remote storage allowing enabling listing object versions.
 func (c *Client) iterateObjects(
 	ctx context.Context,
-	bucket string,
-	prefix string,
-	delimiter string,
-	versions bool,
-	include []*regexp.Regexp,
-	exclude []*regexp.Regexp,
+	opts iterateObjectsOptions,
 	fn func(objval.ObjectAttrs) error,
 ) error {
-	if include != nil && exclude != nil {
+	if opts.include != nil && opts.exclude != nil {
 		return objcli.ErrIncludeAndExcludeAreMutuallyExclusive
 	}
 
 	query := &storage.Query{
-		Prefix:     prefix,
-		Delimiter:  delimiter,
+		Prefix:     opts.prefix,
+		Delimiter:  opts.delimiter,
 		Projection: storage.ProjectionNoACL,
-		Versions:   versions,
+		Versions:   opts.versions,
 	}
 
 	attrsToList := []string{
@@ -486,7 +503,9 @@ func (c *Client) iterateObjects(
 		"Retention",
 	}
 
-	if versions {
+	withVersionID := opts.withVersionID || opts.versions
+
+	if withVersionID {
 		attrsToList = append(attrsToList, "Generation")
 	}
 
@@ -495,7 +514,7 @@ func (c *Client) iterateObjects(
 		return fmt.Errorf("failed to set attribute selection: %w", err)
 	}
 
-	it := c.serviceAPI.Bucket(bucket).Objects(ctx, query)
+	it := c.serviceAPI.Bucket(opts.bucket).Objects(ctx, query)
 
 	for {
 		remote, err := it.Next()
@@ -505,10 +524,10 @@ func (c *Client) iterateObjects(
 		}
 
 		if err != nil {
-			return handleError(bucket, "", fmt.Errorf("failed to get next object: %w", err))
+			return handleError(opts.bucket, "", fmt.Errorf("failed to get next object: %w", err))
 		}
 
-		if objcli.ShouldIgnore(remote.Name, include, exclude) {
+		if objcli.ShouldIgnore(remote.Name, opts.include, opts.exclude) {
 			continue
 		}
 
@@ -527,8 +546,7 @@ func (c *Client) iterateObjects(
 				attrs.LockType = getLockType(remote.Retention.Mode)
 			}
 
-			// If versions are enabled, populate the attribute
-			if versions && remote.Generation != 0 {
+			if withVersionID && remote.Generation != 0 {
 				attrs.VersionID = strconv.FormatInt(remote.Generation, 10)
 			}
 		} else {
@@ -542,7 +560,7 @@ func (c *Client) iterateObjects(
 			return err
 		}
 
-		if versions && remote.Deleted.After(remote.Created) {
+		if opts.versions && remote.Deleted.After(remote.Created) {
 			err = fn(objval.ObjectAttrs{
 				Key:            remote.Name,
 				LastModified:   &remote.Deleted,
@@ -567,8 +585,8 @@ func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([
 		parts  = make([]objval.Part, 0)
 	)
 
-	fn := func(attrs *objval.ObjectAttrs) error {
-		partID, err := getPartID(attrs.Key, "")
+	fn := func(attrs objval.ObjectAttrs) error {
+		partID, err := getPartID(attrs.Key, attrs.VersionID)
 		if err != nil {
 			return fmt.Errorf("failed to get partID: %w", err)
 		}
@@ -581,12 +599,12 @@ func (c *Client) ListParts(ctx context.Context, opts objcli.ListPartsOptions) ([
 		return nil
 	}
 
-	err := c.IterateObjects(ctx, objcli.IterateObjectsOptions{
-		Bucket:    opts.Bucket,
-		Prefix:    prefix,
-		Delimiter: "/",
-		Func:      fn,
-	})
+	err := c.iterateObjects(ctx, iterateObjectsOptions{
+		bucket:        opts.Bucket,
+		prefix:        prefix,
+		delimiter:     "/",
+		withVersionID: true,
+	}, fn)
 	if err != nil {
 		return nil, handleError(opts.Bucket, opts.Key, err)
 	}

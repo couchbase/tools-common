@@ -1,5 +1,9 @@
 # Changes
 
+## v9.0.3
+
+- Fix GCP's `ListParts` part IDs not matching `UploadPart`.
+
 ## v9.0.2
 
 - Map azure `BlobAlreadyExists` to `PreconditionFailed`
