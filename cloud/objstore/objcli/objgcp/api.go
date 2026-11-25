@@ -245,6 +245,7 @@ type objectIteratorAPI interface {
 type composeAPI interface {
 	Run(ctx context.Context) (*storage.ObjectAttrs, error)
 	SetLock(lock *objcli.ObjectLock) error
+	SetMetadata(metadata map[string]string)
 }
 
 // composer implements the 'composeAPI' interface and encapsulates the Google Storage SDK in a unit testable interface.
@@ -254,6 +255,10 @@ type composer struct {
 
 func (c composer) Run(ctx context.Context) (*storage.ObjectAttrs, error) {
 	return c.c.Run(ctx)
+}
+
+func (c composer) SetMetadata(metadata map[string]string) {
+	c.c.Metadata = metadata
 }
 
 func (c composer) SetLock(lock *objcli.ObjectLock) error {

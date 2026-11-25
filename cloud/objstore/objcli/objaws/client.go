@@ -750,9 +750,15 @@ func (c *Client) listObjectVersions(
 }
 
 func (c *Client) CreateMultipartUpload(ctx context.Context, opts objcli.CreateMultipartUploadOptions) (string, error) {
+	metadata := maps.Map[map[string]string, map[string]string](
+		opts.Metadata,
+		func(k, v string) (string, string) { return strings.ToLower(k), v },
+	)
+
 	input := &s3.CreateMultipartUploadInput{
-		Bucket: ptr.To(opts.Bucket),
-		Key:    ptr.To(opts.Key),
+		Bucket:   ptr.To(opts.Bucket),
+		Key:      ptr.To(opts.Key),
+		Metadata: metadata,
 	}
 
 	if opts.Lock != nil {

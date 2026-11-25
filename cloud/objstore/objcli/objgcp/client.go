@@ -34,6 +34,7 @@ type composeOptions struct {
 	parts        []partIdentifier
 	precondition objcli.OperationPrecondition
 	lock         *objcli.ObjectLock
+	metadata     map[string]string
 }
 
 // Client implements the 'objcli.Client' interface allowing the creation/management of objects stored in Google Storage.
@@ -722,6 +723,7 @@ func (c *Client) CompleteMultipartUpload(
 		parts:        converted,
 		precondition: opts.Precondition,
 		lock:         opts.Lock,
+		metadata:     opts.Metadata,
 	}
 
 	attrs, err := c.complete(ctx, completeOpts)
@@ -790,6 +792,7 @@ func (c *Client) complete(ctx context.Context, opts *composeOptions) (*objval.Ob
 		),
 		precondition: opts.precondition,
 		lock:         opts.lock,
+		metadata:     opts.metadata,
 	}
 
 	return c.complete(ctx, finalOpts)
@@ -837,6 +840,15 @@ func (c *Client) compose(ctx context.Context, opts *composeOptions) (*objval.Obj
 		if err != nil {
 			return nil, fmt.Errorf("failed to set object lock: %w", err)
 		}
+	}
+
+	if len(opts.metadata) != 0 {
+		metadata := maps.Map[map[string]string, map[string]string](
+			opts.metadata,
+			func(k, v string) (string, string) { return strings.ToLower(k), v },
+		)
+
+		composer.SetMetadata(metadata)
 	}
 
 	attrs, err := composer.Run(ctx)

@@ -4,6 +4,8 @@
 
 - Add `PreconditionData` to `CopyObject`, `UploadPartCopy` and `objutil.CopyObject`, to only copy an object matching
   the given CAS.
+- Add `Metadata` to `CreateMultipartUpload` and `CompleteMultipartUpload`, and keep the metadata of the source object
+  when `objutil.CopyObject` copies in multiple parts.
 
 ## v9.0.3
 

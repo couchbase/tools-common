@@ -189,6 +189,12 @@ type CreateMultipartUploadOptions struct {
 	//
 	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
 	Lock *ObjectLock
+
+	// Metadata is key/value metadata to associate with the object, where keys are case-insensitive.
+	//
+	// NOTE: AWS takes the metadata when the upload is created, whereas Azure and GCP take it when the upload is
+	// completed, so the same metadata should be given to 'CompleteMultipartUpload'.
+	Metadata map[string]string
 }
 
 // ListPartsOptions encapsulates the options available when using the 'ListParts' function.
@@ -288,6 +294,12 @@ type CompleteMultipartUploadOptions struct {
 	//
 	// NOTE: Verify that versioning/locking is enabled using `GetBucketLockingStatus` before setting a lock.
 	Lock *ObjectLock
+
+	// Metadata is key/value metadata to associate with the object, where keys are case-insensitive.
+	//
+	// NOTE: Azure and GCP take the metadata when the upload is completed, whereas AWS takes it when the upload is
+	// created, so the same metadata should be given to 'CreateMultipartUpload'.
+	Metadata map[string]string
 }
 
 // AbortMultipartUploadOptions encapsulates the options available when using the 'AbortMultipartUpload' function.

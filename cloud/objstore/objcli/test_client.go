@@ -115,6 +115,8 @@ func (t *TestClient) CopyObject(_ context.Context, opts CopyObjectOptions) (*obj
 		Bucket: opts.DestinationBucket,
 		Key:    opts.DestinationKey,
 		Body:   bytes.NewReader(src.Body),
+		// A copy keeps the metadata of the source object
+		Metadata: src.Metadata,
 	})
 	if err != nil {
 		return nil, err
@@ -409,6 +411,7 @@ func (t *TestClient) CompleteMultipartUpload(
 		Body:         bytes.NewReader(buffer.Bytes()),
 		Precondition: opts.Precondition,
 		Lock:         opts.Lock,
+		Metadata:     opts.Metadata,
 	})
 	if err != nil {
 		return nil, err

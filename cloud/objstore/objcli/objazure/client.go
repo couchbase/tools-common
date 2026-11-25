@@ -897,7 +897,12 @@ func (c *Client) CompleteMultipartUpload(
 		converted = append(converted, part.ID)
 	}
 
-	inputOpts := &blockblob.CommitBlockListOptions{}
+	metadata := maps.Map[map[string]string, map[string]*string](
+		opts.Metadata,
+		func(k, v string) (string, *string) { return strings.ToLower(k), ptr.To(v) },
+	)
+
+	inputOpts := &blockblob.CommitBlockListOptions{Metadata: metadata}
 
 	if opts.Precondition == objcli.OperationPreconditionOnlyIfAbsent {
 		inputOpts.AccessConditions = &blob.AccessConditions{

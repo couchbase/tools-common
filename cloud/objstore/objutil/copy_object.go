@@ -77,9 +77,11 @@ func CopyObject(opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 		return opts.Client.CopyObject(opts.Context, copts)
 	}
 
+	// A single request copy keeps the metadata of the source object, so carry it over to match
 	id, err := opts.Client.CreateMultipartUpload(opts.Context, objcli.CreateMultipartUploadOptions{
-		Bucket: opts.DestinationBucket,
-		Key:    opts.DestinationKey,
+		Bucket:   opts.DestinationBucket,
+		Key:      opts.DestinationKey,
+		Metadata: attrs.Metadata,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start multipart upload: %w", err)
@@ -130,6 +132,7 @@ func CopyObject(opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 		UploadID: id,
 		Key:      opts.DestinationKey,
 		Parts:    parts,
+		Metadata: attrs.Metadata,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete multipart upload: %w", err)

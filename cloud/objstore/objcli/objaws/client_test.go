@@ -1796,9 +1796,10 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 			key         = input.Key != nil && *input.Key == "key"
 			lockMode    = input.ObjectLockMode == ""
 			retainUntil = input.ObjectLockRetainUntilDate == nil
+			metadata    = reflect.DeepEqual(input.Metadata, map[string]string{"key": "value"})
 		)
 
-		return bucket && key && lockMode && retainUntil
+		return bucket && key && lockMode && retainUntil && metadata
 	}
 
 	output := &s3.CreateMultipartUploadOutput{
@@ -1811,8 +1812,9 @@ func TestClientCreateMultipartUpload(t *testing.T) {
 	client := &Client{serviceAPI: api}
 
 	id, err := client.CreateMultipartUpload(context.Background(), objcli.CreateMultipartUploadOptions{
-		Bucket: "bucket",
-		Key:    "key",
+		Bucket:   "bucket",
+		Key:      "key",
+		Metadata: map[string]string{"Key": "value"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "id", id)

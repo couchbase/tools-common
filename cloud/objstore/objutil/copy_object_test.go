@@ -40,9 +40,10 @@ func TestCopyObject(t *testing.T) {
 			)
 
 			attrs, err := client.PutObject(context.Background(), objcli.PutObjectOptions{
-				Bucket: "srcBucket",
-				Key:    "srcKey",
-				Body:   bytes.NewReader(body),
+				Bucket:   "srcBucket",
+				Key:      "srcKey",
+				Body:     bytes.NewReader(body),
+				Metadata: map[string]string{"key": "value"},
 			})
 			require.NoError(t, err)
 
@@ -73,6 +74,7 @@ func TestCopyObject(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, body, testutil.ReadAll(t, dst.Body))
+			require.Equal(t, map[string]string{"key": "value"}, dst.Metadata)
 		})
 	}
 }

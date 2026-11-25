@@ -65,6 +65,11 @@ func (_m *mockComposeAPI) SetLock(lock *objcli.ObjectLock) error {
 	return r0
 }
 
+// SetMetadata provides a mock function with given fields: metadata
+func (_m *mockComposeAPI) SetMetadata(metadata map[string]string) {
+	_m.Called(metadata)
+}
+
 // newMockComposeAPI creates a new instance of mockComposeAPI. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func newMockComposeAPI(t interface {
