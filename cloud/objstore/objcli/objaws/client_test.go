@@ -672,6 +672,37 @@ func TestClientCopyObject(t *testing.T) {
 	api.AssertNumberOfCalls(t, "CopyObject", 1)
 }
 
+func TestClientCopyObjectPrecondition(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.CopyObjectInput) bool {
+		return ptr.From(input.CopySourceIfMatch) == "cas"
+	}
+
+	api.On("CopyObject", matchers.Context, mock.MatchedBy(fn)).Return(
+		nil,
+		&smithy.GenericAPIError{Code: "PreconditionFailed"},
+	)
+
+	client := &Client{serviceAPI: api}
+
+	_, err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
+		DestinationBucket: "dstBucket",
+		DestinationKey:    "dstKey",
+		SourceBucket:      "srcBucket",
+		SourceKey:         "srcKey",
+		PreconditionData:  "cas",
+	})
+
+	var preconditionFailed *objerr.PreconditionFailedError
+
+	require.ErrorAs(t, err, &preconditionFailed)
+	require.Equal(t, "srcKey", preconditionFailed.Key)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "CopyObject", 1)
+}
+
 func TestClientAppendToObjectDownloadAndAdd(t *testing.T) {
 	api := &mockServiceAPI{}
 
@@ -1972,6 +2003,37 @@ func TestClientUploadPartCopy(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, objval.Part{ID: "etag", Number: 1, Size: 65}, part)
+
+	api.AssertExpectations(t)
+	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)
+}
+
+func TestClientUploadPartCopyPrecondition(t *testing.T) {
+	api := &mockServiceAPI{}
+
+	fn := func(input *s3.UploadPartCopyInput) bool {
+		return ptr.From(input.CopySourceIfMatch) == "cas"
+	}
+
+	output := &s3.UploadPartCopyOutput{
+		CopyPartResult: &types.CopyPartResult{ETag: ptr.To("etag")},
+	}
+
+	api.On("UploadPartCopy", matchers.Context, mock.MatchedBy(fn)).Return(output, nil)
+
+	client := &Client{serviceAPI: api}
+
+	_, err := client.UploadPartCopy(context.Background(), objcli.UploadPartCopyOptions{
+		DestinationBucket: "dstBucket",
+		UploadID:          "id",
+		DestinationKey:    "key2",
+		SourceBucket:      "srcBucket",
+		SourceKey:         "key1",
+		Number:            1,
+		ByteRange:         &objval.ByteRange{Start: 64, End: 128},
+		PreconditionData:  "cas",
+	})
+	require.NoError(t, err)
 
 	api.AssertExpectations(t)
 	api.AssertNumberOfCalls(t, "UploadPartCopy", 1)

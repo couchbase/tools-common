@@ -2230,6 +2230,54 @@ func TestClientUploadPartCopy(t *testing.T) {
 	}
 }
 
+func TestClientCopyObjectPrecondition(t *testing.T) {
+	var (
+		msAPI  = &mockServiceAPI{}
+		msbAPI = &mockBucketAPI{}
+		mdbAPI = &mockBucketAPI{}
+		msoAPI = &mockObjectAPI{}
+		mdoAPI = &mockObjectAPI{}
+		mcAPI  = &mockCopierAPI{}
+	)
+
+	msAPI.On("Bucket", "srcBucket").Return(msbAPI)
+	msAPI.On("Bucket", "dstBucket").Return(mdbAPI)
+
+	msbAPI.On("Object", "srcKey").Return(msoAPI)
+	mdbAPI.On("Object", "dstKey").Return(mdoAPI)
+
+	msoAPI.On("If", storage.Conditions{GenerationMatch: 42}).Return(msoAPI)
+
+	mdoAPI.On("Retryer", mock.Anything).Return(mdoAPI)
+	mdoAPI.On("CopierFrom", mock.Anything).Return(mcAPI)
+
+	mcAPI.On("Run", mock.Anything).Return(&storage.ObjectAttrs{Generation: 43}, nil)
+
+	client := &Client{serviceAPI: msAPI}
+
+	opts := objcli.CopyObjectOptions{
+		DestinationBucket: "dstBucket",
+		DestinationKey:    "dstKey",
+		SourceBucket:      "srcBucket",
+		SourceKey:         "srcKey",
+		PreconditionData:  "42",
+	}
+
+	_, err := client.CopyObject(context.Background(), opts)
+	require.NoError(t, err)
+
+	msoAPI.AssertExpectations(t)
+	msoAPI.AssertNumberOfCalls(t, "If", 1)
+
+	// The CAS is an object generation, anything else can't be used
+	opts.PreconditionData = "not-a-generation"
+
+	_, err = client.CopyObject(context.Background(), opts)
+	require.Error(t, err)
+
+	mcAPI.AssertNumberOfCalls(t, "Run", 1)
+}
+
 func TestClientCompleteMultipartUploadOverMaxComposable(t *testing.T) {
 	var (
 		msAPI = &mockServiceAPI{}

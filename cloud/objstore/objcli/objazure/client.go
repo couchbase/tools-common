@@ -284,9 +284,11 @@ func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) 
 		return nil, fmt.Errorf("failed to get the source object URL: %w", err)
 	}
 
-	res, err := dstClient.CopyFromURL(ctx, srcURL, &blob.CopyFromURLOptions{})
+	inputOpts := &blob.CopyFromURLOptions{SourceModifiedAccessConditions: ifSourceMatches(opts.PreconditionData)}
+
+	res, err := dstClient.CopyFromURL(ctx, srcURL, inputOpts)
 	if err != nil {
-		return nil, handleError("", "", err)
+		return nil, handleError(opts.SourceBucket, opts.SourceKey, err)
 	}
 
 	attrs := &objval.ObjectAttrs{
@@ -830,17 +832,27 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 
 	dstClient := c.getBlobBlockClient(opts.DestinationBucket, opts.DestinationKey)
 
-	_, err = dstClient.StageBlockFromURL(
-		ctx,
-		blockID,
-		srcURL,
-		&blockblob.StageBlockFromURLOptions{Range: blob.HTTPRange{Offset: offset, Count: length}},
-	)
+	inputOpts := &blockblob.StageBlockFromURLOptions{
+		Range:                          blob.HTTPRange{Offset: offset, Count: length},
+		SourceModifiedAccessConditions: ifSourceMatches(opts.PreconditionData),
+	}
+
+	_, err = dstClient.StageBlockFromURL(ctx, blockID, srcURL, inputOpts)
 	if err != nil {
 		return objval.Part{}, handleError(opts.DestinationBucket, opts.DestinationKey, err)
 	}
 
 	return objval.Part{ID: blockID, Number: opts.Number, Size: length}, nil
+}
+
+// ifSourceMatches returns the conditions which only allow copying the source blob if it still matches the given CAS,
+// which for Azure is the blob ETag. Returns <nil> when no CAS is given.
+func ifSourceMatches(cas string) *blob.SourceModifiedAccessConditions {
+	if cas == "" {
+		return nil
+	}
+
+	return &blob.SourceModifiedAccessConditions{SourceIfMatch: ptr.To(azcore.ETag(cas))}
 }
 
 func (c *Client) getSASURL(bucket, src string) (string, error) {

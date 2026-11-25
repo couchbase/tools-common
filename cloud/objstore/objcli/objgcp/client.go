@@ -247,14 +247,34 @@ func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) 
 		dstHandle = c.serviceAPI.Bucket(opts.DestinationBucket).Object(opts.DestinationKey)
 	)
 
+	srcHandle, err := ifSourceMatches(srcHandle, opts.PreconditionData)
+	if err != nil {
+		return nil, err
+	}
+
 	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 	// destination object, always retry.
 	attrs, err := dstHandle.Retryer(storage.WithPolicy(storage.RetryAlways)).CopierFrom(srcHandle).Run(ctx)
 	if err != nil {
-		return nil, handleError("", "", err)
+		return nil, handleError(opts.SourceBucket, opts.SourceKey, err)
 	}
 
 	return parseGCPAttrs(opts.DestinationKey, attrs), nil
+}
+
+// ifSourceMatches returns a handle which only allows copying the source object if it still matches the given CAS, which
+// for Google Storage is the object generation. The handle is returned as is when no CAS is given.
+func ifSourceMatches(handle objectAPI, cas string) (objectAPI, error) {
+	if cas == "" {
+		return handle, nil
+	}
+
+	gen, err := strconv.ParseInt(cas, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse source CAS as int64: %w", err)
+	}
+
+	return handle.If(storage.Conditions{GenerationMatch: gen}), nil
 }
 
 func (c *Client) AppendToObject(ctx context.Context, opts objcli.AppendToObjectOptions) (*objval.ObjectAttrs, error) {
@@ -664,6 +684,11 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 		srcHandle    = c.serviceAPI.Bucket(opts.SourceBucket).Object(opts.SourceKey)
 		dstHandle    = c.serviceAPI.Bucket(opts.DestinationBucket).Object(intermediate)
 	)
+
+	srcHandle, err = ifSourceMatches(srcHandle, opts.PreconditionData)
+	if err != nil {
+		return objval.Part{}, err
+	}
 
 	// Copying is non-destructive from the source perspective and we don't mind potentially "overwriting" the
 	// destination object, always retry.

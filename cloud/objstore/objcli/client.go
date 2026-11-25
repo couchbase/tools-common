@@ -98,6 +98,10 @@ type CopyObjectOptions struct {
 
 	// SourceKey is the key of the object being copied.
 	SourceKey string
+
+	// PreconditionData is the 'ObjectAttrs.CAS' the source object must still match to be copied. If it does not, the
+	// operation fails with a 'PreconditionFailedError'. Ignored when empty.
+	PreconditionData string
 }
 
 // AppendToObjectOptions encapsulates the options available when using the 'AppendToObject' function.
@@ -255,6 +259,10 @@ type UploadPartCopyOptions struct {
 	//
 	// NOTE: Not supported by all cloud providers.
 	ByteRange *objval.ByteRange
+
+	// PreconditionData is the 'ObjectAttrs.CAS' the source object must still match to be copied. If it does not, the
+	// operation fails with a 'PreconditionFailedError'. Ignored when empty.
+	PreconditionData string
 }
 
 // CompleteMultipartUploadOptions encapsulates the options available when using the 'CompleteMultipartUpload' function.

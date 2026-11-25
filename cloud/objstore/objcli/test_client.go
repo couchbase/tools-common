@@ -107,6 +107,10 @@ func (t *TestClient) CopyObject(_ context.Context, opts CopyObjectOptions) (*obj
 		return nil, err
 	}
 
+	if opts.PreconditionData != "" && src.CAS != opts.PreconditionData {
+		return nil, &objerr.PreconditionFailedError{Key: opts.SourceKey}
+	}
+
 	attrs, err := t.putObjectLocked(PutObjectOptions{
 		Bucket: opts.DestinationBucket,
 		Key:    opts.DestinationKey,
@@ -355,6 +359,10 @@ func (t *TestClient) UploadPartCopy(_ context.Context, opts UploadPartCopyOption
 	object, err := t.getObjectRLocked(opts.SourceBucket, opts.SourceKey)
 	if err != nil {
 		return objval.Part{}, err
+	}
+
+	if opts.PreconditionData != "" && object.CAS != opts.PreconditionData {
+		return objval.Part{}, &objerr.PreconditionFailedError{Key: opts.SourceKey}
 	}
 
 	body := make([]byte, opts.ByteRange.End-opts.ByteRange.Start+1)

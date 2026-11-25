@@ -1,5 +1,10 @@
 # Changes
 
+## v9.1.0
+
+- Add `PreconditionData` to `CopyObject`, `UploadPartCopy` and `objutil.CopyObject`, to only copy an object matching
+  the given CAS.
+
 ## v9.0.3
 
 - Fix GCP's `ListParts` part IDs not matching `UploadPart`.

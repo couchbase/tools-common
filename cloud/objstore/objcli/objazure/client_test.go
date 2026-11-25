@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/couchbase/tools-common/cloud/v9/objstore/objcli"
+	"github.com/couchbase/tools-common/cloud/v9/objstore/objerr"
 	"github.com/couchbase/tools-common/cloud/v9/objstore/objval"
 	"github.com/couchbase/tools-common/testing/mock/matchers"
 	"github.com/couchbase/tools-common/types/v2/ptr"
@@ -725,6 +726,55 @@ func TestClientCopyObject(t *testing.T) {
 	require.Equal(t, "asd", *attrs.ETag)
 	require.Equal(t, "123", attrs.VersionID)
 	require.True(t, time.Now().After(*attrs.LastModified))
+}
+
+func TestClientCopyObjectPrecondition(t *testing.T) {
+	var (
+		ctrl  = gomock.NewController(t)
+		sAPI  = NewMockserviceAPI(ctrl)
+		scAPI = NewMockcontainerAPI(ctrl)
+		dcAPI = NewMockcontainerAPI(ctrl)
+		dbAPI = NewMockblobAPI(ctrl)
+	)
+
+	sAPI.EXPECT().NewContainerClient("srcContainer").Return(scAPI)
+	sAPI.EXPECT().NewContainerClient("dstContainer").Return(dcAPI)
+
+	scAPI.EXPECT().NewBlobClient("srcBlob").Return(dbAPI)
+	dcAPI.EXPECT().NewBlobClient("dstBlob").Return(dbAPI)
+
+	dbAPI.EXPECT().GetSASURL(gomock.Any(), gomock.Any(), gomock.Any()).Return("example.com", nil)
+
+	client := &Client{serviceAPI: sAPI, timeProvider: timeprovider.CurrentTimeProvider{}}
+
+	fn := func(
+		_ context.Context,
+		_ string,
+		options *blob.CopyFromURLOptions,
+	) (blob.CopyFromURLResponse, error) {
+		require.NotNil(t, options.SourceModifiedAccessConditions)
+		require.Equal(t, azcore.ETag("cas"), *options.SourceModifiedAccessConditions.SourceIfMatch)
+
+		return blob.CopyFromURLResponse{}, &azcore.ResponseError{ErrorCode: string(bloberror.SourceConditionNotMet)}
+	}
+
+	dbAPI.
+		EXPECT().
+		CopyFromURL(matchers.Context, gomock.Any(), gomock.Any()).
+		DoAndReturn(fn)
+
+	_, err := client.CopyObject(context.Background(), objcli.CopyObjectOptions{
+		DestinationBucket: "dstContainer",
+		DestinationKey:    "dstBlob",
+		SourceBucket:      "srcContainer",
+		SourceKey:         "srcBlob",
+		PreconditionData:  "cas",
+	})
+
+	var preconditionFailed *objerr.PreconditionFailedError
+
+	require.ErrorAs(t, err, &preconditionFailed)
+	require.Equal(t, "srcBlob", preconditionFailed.Key)
 }
 
 func TestClientAppendToObject(t *testing.T) {

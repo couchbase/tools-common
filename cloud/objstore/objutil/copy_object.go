@@ -37,6 +37,10 @@ type CopyObjectOptions struct {
 	//
 	// NOTE: This attribute is required.
 	SourceKey string
+
+	// PreconditionData is the 'ObjectAttrs.CAS' the source object must still match to be copied. If it does not, the
+	// operation fails with a 'PreconditionFailedError'. Ignored when empty.
+	PreconditionData string
 }
 
 // CopyObject copies an object from one place to another breaking the request into multiple parts where it's known that
@@ -67,6 +71,7 @@ func CopyObject(opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 			DestinationKey:    opts.DestinationKey,
 			SourceBucket:      opts.SourceBucket,
 			SourceKey:         opts.SourceKey,
+			PreconditionData:  opts.PreconditionData,
 		}
 
 		return opts.Client.CopyObject(opts.Context, copts)
@@ -103,6 +108,7 @@ func CopyObject(opts CopyObjectOptions) (*objval.ObjectAttrs, error) {
 			SourceKey:         opts.SourceKey,
 			Number:            len(parts) + 1,
 			ByteRange:         &objval.ByteRange{Start: start, End: end},
+			PreconditionData:  opts.PreconditionData,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to copy part: %w", err)

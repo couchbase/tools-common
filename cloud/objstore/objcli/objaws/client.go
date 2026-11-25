@@ -232,9 +232,13 @@ func (c *Client) CopyObject(ctx context.Context, opts objcli.CopyObjectOptions) 
 		CopySource: ptr.To(url.PathEscape(opts.SourceBucket + "/" + opts.SourceKey)),
 	}
 
+	if opts.PreconditionData != "" {
+		input.CopySourceIfMatch = ptr.To(opts.PreconditionData)
+	}
+
 	output, err := c.serviceAPI.CopyObject(ctx, input)
 	if err != nil {
-		return nil, handleError(nil, nil, err)
+		return nil, handleError(ptr.To(opts.SourceBucket), ptr.To(opts.SourceKey), err)
 	}
 
 	attrs := &objval.ObjectAttrs{
@@ -845,6 +849,10 @@ func (c *Client) UploadPartCopy(ctx context.Context, opts objcli.UploadPartCopyO
 		Key:             ptr.To(opts.DestinationKey),
 		PartNumber:      ptr.To(int32(opts.Number)),
 		UploadId:        ptr.To(opts.UploadID),
+	}
+
+	if opts.PreconditionData != "" {
+		input.CopySourceIfMatch = ptr.To(opts.PreconditionData)
 	}
 
 	output, err := c.serviceAPI.UploadPartCopy(ctx, input)
