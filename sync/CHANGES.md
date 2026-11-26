@@ -1,5 +1,10 @@
 # Changes
 
+## v2.1.0
+
+- Add `batcher`, which groups the items of concurrent calls sharing a key into batches, running one batch per key at a
+  time.
+
 ## v2.0.3
 
 - Upgraded dependencies
