@@ -10,7 +10,7 @@ var (
 		"-p", "--p", "--password", "--obj-access-key-id", "--obj-secret-access-key", "--obj-refresh-token",
 		"--km-access-key-id", "--km-secret-access-key", "--km-refresh-token", "--passphrase", "--auth-token", "--salt",
 		"--client-cert-password", "--client-key-password", "-k", "--k", "--key", "--collection-string", "--bucket",
-		"--include-data", "--exclude-data", "--include-buckets", "--exclude-buckets",
+		"--include-data", "--exclude-data", "--include-buckets", "--exclude-buckets", "--upload-proxy",
 	}
 	cbmFlagsToTag = []string{
 		"-u", "--u", "--username", "--filter-keys", "--filter-values", "--km-key-url",

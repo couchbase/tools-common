@@ -135,7 +135,7 @@ func TestMaskCBMArguments(t *testing.T) {
 			"--km-refresh-token", "*****", "--passphrase", "*****", "--auth-token", "*****", "--salt", "*****",
 			"--client-cert-password", "*****", "--client-key-password", "*****", "-k", "*****", "--key", "*****",
 			"--collection-string", "*****", "--bucket", "*****", "--include-data", "*****", "--exclude-data", "*****",
-			"--include-buckets", "*****", "--exclude-buckets", "*****",
+			"--include-buckets", "*****", "--exclude-buckets", "*****", "--upload-proxy", "*****",
 		},
 		MaskCBMArguments([]string{
 			"-p", "pass", "--password", "pass", "--p", "pass", "--obj-access-key-id", "keyid",
@@ -143,7 +143,7 @@ func TestMaskCBMArguments(t *testing.T) {
 			"--km-refresh-token", "token", "--passphrase", "pass", "--auth-token", "alongtoken", "--salt", "salt",
 			"--client-cert-password", "pass", "--client-key-password", "pass", "-k", "key", "--key", "key",
 			"--collection-string", "b.s.c", "--bucket", "b", "--include-data", "b.s", "--exclude-data", "b.t",
-			"--include-buckets", "b1", "--exclude-buckets", "b2",
+			"--include-buckets", "b1", "--exclude-buckets", "b2", "--upload-proxy", "http://user:password@localhost/",
 		}))
 }
 

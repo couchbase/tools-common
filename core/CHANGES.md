@@ -1,5 +1,9 @@
 # Changes
 
+## v2.1.5
+
+- Add `--upload-proxy` to the list of flags to mask
+
 ## v2.1.4
 
 - Mask in args logging:
